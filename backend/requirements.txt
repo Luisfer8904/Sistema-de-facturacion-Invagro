@@ -1,2 +1,5 @@
 flask
 python-dotenv
+gunicorn
+flask-sqlalchemy
+pymysql
