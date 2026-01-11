@@ -64,6 +64,20 @@ gunicorn --workers 3 --bind 0.0.0.0:8000 wsgi:app
 
 Este comando deja la app lista para Nginx y systemd.
 
+### Variables requeridas en /etc/invagro.env
+
+Estas variables deben existir en el servidor y cargarse con systemd usando `EnvironmentFile=/etc/invagro.env`:
+
+```env
+FLASK_ENV=production
+SECRET_KEY=tu-clave-segura
+DB_HOST=tu-host-mysql
+DB_PORT=3306
+DB_USER=tu-usuario
+DB_PASS=tu-password
+DB_NAME=invagro
+```
+
 ## Estructura del proyecto
 
 ```

@@ -24,5 +24,3 @@ if __name__ == "__main__":
     app = create_app()
     if app.config.get("FLASK_ENV") == "development":
         app.run()
-    else:
-        raise RuntimeError("Use Gunicorn para ejecutar la app en produccion.")
