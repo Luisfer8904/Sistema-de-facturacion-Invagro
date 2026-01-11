@@ -1,0 +1,121 @@
+-- Script SQL para crear las tablas del Sistema de Facturación Invagro
+-- Base de datos: dbapp
+-- Todas las tablas con prefijo "inva-"
+
+-- Usar la base de datos
+USE dbapp;
+
+-- Tabla de Usuarios
+CREATE TABLE IF NOT EXISTS `inva-usuarios` (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(50) UNIQUE NOT NULL,
+    password VARCHAR(255) NOT NULL,
+    nombre_completo VARCHAR(100),
+    email VARCHAR(100),
+    rol ENUM('admin', 'vendedor', 'contador') DEFAULT 'vendedor',
+    activo BOOLEAN DEFAULT TRUE,
+    fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    ultimo_acceso TIMESTAMP NULL,
+    INDEX idx_username (username),
+    INDEX idx_rol (rol)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Tabla de Clientes
+CREATE TABLE IF NOT EXISTS `inva-clientes` (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    nombre VARCHAR(100) NOT NULL,
+    ruc_dni VARCHAR(20) UNIQUE,
+    direccion TEXT,
+    telefono VARCHAR(20),
+    email VARCHAR(100),
+    fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_ruc_dni (ruc_dni),
+    INDEX idx_nombre (nombre)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Tabla de Productos
+CREATE TABLE IF NOT EXISTS `inva-productos` (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    codigo VARCHAR(50) UNIQUE NOT NULL,
+    nombre VARCHAR(100) NOT NULL,
+    categoria ENUM('veterinario', 'shampoo') NOT NULL,
+    precio DECIMAL(10,2) NOT NULL,
+    stock INT DEFAULT 0,
+    descripcion TEXT,
+    activo BOOLEAN DEFAULT TRUE,
+    INDEX idx_codigo (codigo),
+    INDEX idx_categoria (categoria),
+    INDEX idx_activo (activo)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Tabla de Facturas
+CREATE TABLE IF NOT EXISTS `inva-facturas` (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    numero_factura VARCHAR(50) UNIQUE NOT NULL,
+    cliente_id INT,
+    usuario_id INT,
+    fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    subtotal DECIMAL(10,2),
+    igv DECIMAL(10,2),
+    total DECIMAL(10,2),
+    estado ENUM('pendiente', 'pagada', 'anulada') DEFAULT 'pendiente',
+    FOREIGN KEY (cliente_id) REFERENCES `inva-clientes`(id) ON DELETE SET NULL,
+    FOREIGN KEY (usuario_id) REFERENCES `inva-usuarios`(id) ON DELETE SET NULL,
+    INDEX idx_numero_factura (numero_factura),
+    INDEX idx_fecha (fecha),
+    INDEX idx_estado (estado)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Tabla de Detalle de Facturas
+CREATE TABLE IF NOT EXISTS `inva-detalle_facturas` (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    factura_id INT NOT NULL,
+    producto_id INT NOT NULL,
+    cantidad INT NOT NULL,
+    precio_unitario DECIMAL(10,2) NOT NULL,
+    subtotal DECIMAL(10,2) NOT NULL,
+    FOREIGN KEY (factura_id) REFERENCES `inva-facturas`(id) ON DELETE CASCADE,
+    FOREIGN KEY (producto_id) REFERENCES `inva-productos`(id) ON DELETE RESTRICT,
+    INDEX idx_factura_id (factura_id),
+    INDEX idx_producto_id (producto_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Insertar usuario administrador por defecto
+-- Contraseña: invagro2024 (hash generado con Werkzeug)
+INSERT INTO `inva-usuarios` (username, password, nombre_completo, email, rol, activo)
+VALUES (
+    'admin',
+    'scrypt:32768:8:1$893aolVQOYC4AhAr$fb106a8be348e6c7285209a4f1c99c0ce0da8914233c8cb04ce95726c261d686670558059b7c4060d5983d9671665d10b3b757eb0b911ae18a15f91e1efd7450',
+    'Administrador Invagro',
+    'admin@invagro.com',
+    'admin',
+    TRUE
+) ON DUPLICATE KEY UPDATE username=username;
+
+-- Insertar productos de ejemplo
+INSERT INTO `inva-productos` (codigo, nombre, categoria, precio, stock, descripcion, activo)
+VALUES
+    ('SHMP001', 'Shampoo Antipulgas Premium', 'shampoo', 45.00, 50, 'Shampoo antipulgas de alta calidad para perros', TRUE),
+    ('SHMP002', 'Shampoo Hipoalergénico', 'shampoo', 38.00, 30, 'Shampoo especial para pieles sensibles', TRUE),
+    ('SHMP003', 'Shampoo Acondicionador 2 en 1', 'shampoo', 42.00, 40, 'Limpia y acondiciona el pelaje', TRUE),
+    ('VET001', 'Vitaminas Caninas', 'veterinario', 65.00, 40, 'Suplemento vitamínico completo', TRUE),
+    ('VET002', 'Desparasitante Interno', 'veterinario', 55.00, 60, 'Desparasitante de amplio espectro', TRUE),
+    ('VET003', 'Antipulgas Tópico', 'veterinario', 48.00, 35, 'Tratamiento antipulgas de larga duración', TRUE),
+    ('VET004', 'Suplemento Articular', 'veterinario', 72.00, 25, 'Para salud de articulaciones y huesos', TRUE)
+ON DUPLICATE KEY UPDATE codigo=codigo;
+
+-- Insertar clientes de ejemplo
+INSERT INTO `inva-clientes` (nombre, ruc_dni, direccion, telefono, email)
+VALUES
+    ('Veterinaria San Francisco', '20123456789', 'Av. Principal 123, Lima', '01-2345678', 'ventas@vetsanfrancisco.com'),
+    ('Pet Shop Los Cachorros', '20987654321', 'Jr. Los Perros 456, Lima', '01-8765432', 'info@loscachorros.com'),
+    ('Juan Pérez García', '12345678', 'Calle Las Flores 789, Lima', '987654321', 'juan.perez@email.com'),
+    ('Clínica Veterinaria El Arca', '20555666777', 'Av. Los Animales 321, Lima', '01-5556667', 'contacto@elarca.com'),
+    ('María González López', '87654321', 'Jr. Las Mascotas 654, Lima', '912345678', 'maria.gonzalez@email.com')
+ON DUPLICATE KEY UPDATE ruc_dni=ruc_dni;
+
+-- Verificar las tablas creadas
+SELECT 'Tablas creadas exitosamente' AS mensaje;
+SELECT COUNT(*) AS total_usuarios FROM `inva-usuarios`;
+SELECT COUNT(*) AS total_productos FROM `inva-productos`;
+SELECT COUNT(*) AS total_clientes FROM `inva-clientes`;
