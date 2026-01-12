@@ -33,12 +33,22 @@ CREATE TABLE IF NOT EXISTS `inva-clientes` (
     INDEX idx_nombre (nombre)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Tabla de Categorias
+CREATE TABLE IF NOT EXISTS `inva-categorias` (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    nombre VARCHAR(100) UNIQUE NOT NULL,
+    activo BOOLEAN DEFAULT TRUE,
+    fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_nombre (nombre),
+    INDEX idx_activo (activo)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Tabla de Productos
 CREATE TABLE IF NOT EXISTS `inva-productos` (
     id INT AUTO_INCREMENT PRIMARY KEY,
     codigo VARCHAR(50) UNIQUE NOT NULL,
     nombre VARCHAR(100) NOT NULL,
-    categoria ENUM('veterinario', 'shampoo') NOT NULL,
+    categoria VARCHAR(50) NOT NULL,
     precio DECIMAL(10,2) NOT NULL,
     stock INT DEFAULT 0,
     descripcion TEXT,
@@ -103,6 +113,13 @@ VALUES
     ('VET003', 'Antipulgas Tópico', 'veterinario', 48.00, 35, 'Tratamiento antipulgas de larga duración', TRUE),
     ('VET004', 'Suplemento Articular', 'veterinario', 72.00, 25, 'Para salud de articulaciones y huesos', TRUE)
 ON DUPLICATE KEY UPDATE codigo=codigo;
+
+-- Insertar categorias base
+INSERT INTO `inva-categorias` (nombre, activo)
+VALUES
+    ('Veterinario', TRUE),
+    ('Shampoo', TRUE)
+ON DUPLICATE KEY UPDATE nombre=nombre;
 
 -- Insertar clientes de ejemplo
 INSERT INTO `inva-clientes` (nombre, ruc_dni, direccion, telefono, email)

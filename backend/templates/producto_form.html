@@ -49,8 +49,11 @@
             <label>
               <span>Categoria</span>
               <select name="categoria" required>
-                <option value="veterinario" {% if producto.categoria == 'veterinario' %}selected{% endif %}>Veterinario</option>
-                <option value="shampoo" {% if producto.categoria == 'shampoo' %}selected{% endif %}>Shampoo</option>
+                {% for categoria in categorias %}
+                  <option value="{{ categoria.nombre }}" {% if producto.categoria == categoria.nombre %}selected{% endif %}>
+                    {{ categoria.nombre }}
+                  </option>
+                {% endfor %}
               </select>
             </label>
             <label>

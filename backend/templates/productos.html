@@ -36,9 +36,14 @@
             <h1>Catalogo de productos</h1>
             <p>Administra productos veterinarios y shampoo especializados.</p>
           </div>
-          <button class="primary-button" type="button" data-modal-open>
-            Nuevo producto
-          </button>
+          <div class="header-actions">
+            <button class="secondary-button" type="button" data-category-open>
+              Nueva categoria
+            </button>
+            <button class="primary-button" type="button" data-modal-open>
+              Nuevo producto
+            </button>
+          </div>
         </section>
 
         {% if error %}
@@ -98,8 +103,9 @@
                 <span>Categoria</span>
                 <select name="categoria" required>
                   <option value="">Seleccionar</option>
-                  <option value="veterinario">Veterinario</option>
-                  <option value="shampoo">Shampoo</option>
+                  {% for categoria in categorias %}
+                    <option value="{{ categoria.nombre }}">{{ categoria.nombre }}</option>
+                  {% endfor %}
                 </select>
               </label>
               <label>
@@ -127,6 +133,44 @@
             </form>
           </div>
         </div>
+
+        <div class="modal" data-category>
+          <div class="modal-card">
+            <div class="modal-header">
+              <h3>Nueva categoria</h3>
+              <button class="modal-close" type="button" data-category-close>×</button>
+            </div>
+            <form class="module-form" method="post" action="/categorias">
+              <label class="span-2">
+                <span>Nombre</span>
+                <input type="text" name="nombre" required />
+              </label>
+              <div class="form-actions span-2">
+                <button class="primary-button" type="submit">Guardar</button>
+                <button class="secondary-button" type="button" data-category-close>
+                  Cancelar
+                </button>
+              </div>
+            </form>
+            <div class="category-list">
+              <h4>Categorias activas</h4>
+              {% if categorias %}
+                <ul>
+                  {% for categoria in categorias %}
+                    <li>
+                      <span>{{ categoria.nombre }}</span>
+                      <form method="post" action="/categorias/{{ categoria.id }}/delete">
+                        <button class="danger-button" type="submit">Eliminar</button>
+                      </form>
+                    </li>
+                  {% endfor %}
+                </ul>
+              {% else %}
+                <p>Sin categorias registradas.</p>
+              {% endif %}
+            </div>
+          </div>
+        </div>
       </main>
     </div>
   </div>
@@ -134,6 +178,9 @@
     const modal = document.querySelector("[data-modal]");
     const openButton = document.querySelector("[data-modal-open]");
     const closeButtons = document.querySelectorAll("[data-modal-close]");
+    const categoryModal = document.querySelector("[data-category]");
+    const categoryOpen = document.querySelector("[data-category-open]");
+    const categoryClose = document.querySelectorAll("[data-category-close]");
 
     if (openButton && modal) {
       openButton.addEventListener("click", () => modal.classList.add("open"));
@@ -143,6 +190,18 @@
       modal.addEventListener("click", (event) => {
         if (event.target === modal) {
           modal.classList.remove("open");
+        }
+      });
+    }
+
+    if (categoryOpen && categoryModal) {
+      categoryOpen.addEventListener("click", () => categoryModal.classList.add("open"));
+      categoryClose.forEach((button) => {
+        button.addEventListener("click", () => categoryModal.classList.remove("open"));
+      });
+      categoryModal.addEventListener("click", (event) => {
+        if (event.target === categoryModal) {
+          categoryModal.classList.remove("open");
         }
       });
     }

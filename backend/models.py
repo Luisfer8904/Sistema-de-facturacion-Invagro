@@ -38,8 +38,18 @@ class Producto(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     codigo = db.Column(db.String(50), unique=True, nullable=False)
     nombre = db.Column(db.String(100), nullable=False)
-    categoria = db.Column(db.Enum("veterinario", "shampoo"), nullable=False)
+    categoria = db.Column(db.String(50), nullable=False)
     precio = db.Column(db.Numeric(10, 2), nullable=False)
     stock = db.Column(db.Integer, default=0)
     descripcion = db.Column(db.Text)
     activo = db.Column(db.Boolean, default=True)
+
+
+class Categoria(db.Model):
+    __tablename__ = "inva-categorias"
+    __table_args__ = {"extend_existing": True}
+
+    id = db.Column(db.Integer, primary_key=True)
+    nombre = db.Column(db.String(100), unique=True, nullable=False)
+    activo = db.Column(db.Boolean, default=True)
+    fecha_creacion = db.Column(db.DateTime)

@@ -5,7 +5,7 @@ from flask import Flask, jsonify, redirect, render_template, request, session, u
 from sqlalchemy.exc import SQLAlchemyError
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from models import Cliente, Producto, User, db
+from models import Categoria, Cliente, Producto, User, db
 
 
 def create_app():
@@ -155,10 +155,14 @@ def create_app():
                     error = "No se pudo guardar el producto."
 
         productos_list = Producto.query.order_by(Producto.id.desc()).all()
+        categorias_list = Categoria.query.filter_by(activo=True).order_by(
+            Categoria.nombre.asc()
+        ).all()
         return render_template(
             "productos.html",
             user=session["user"],
             productos=productos_list,
+            categorias=categorias_list,
             error=error,
         )
 
@@ -225,6 +229,9 @@ def create_app():
             return redirect(url_for("login"))
 
         producto = Producto.query.get_or_404(producto_id)
+        categorias_list = Categoria.query.filter_by(activo=True).order_by(
+            Categoria.nombre.asc()
+        ).all()
         error = None
 
         if request.method == "POST":
@@ -257,6 +264,7 @@ def create_app():
             "producto_form.html",
             user=session["user"],
             producto=producto,
+            categorias=categorias_list,
             error=error,
         )
 
@@ -268,6 +276,36 @@ def create_app():
         producto = Producto.query.get_or_404(producto_id)
         try:
             db.session.delete(producto)
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+        return redirect(url_for("productos"))
+
+    @app.post("/categorias")
+    def crear_categoria():
+        if not session.get("user"):
+            return redirect(url_for("login"))
+
+        nombre = request.form.get("nombre", "").strip()
+        if not nombre:
+            return redirect(url_for("productos"))
+
+        try:
+            categoria = Categoria(nombre=nombre, activo=True)
+            db.session.add(categoria)
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+        return redirect(url_for("productos"))
+
+    @app.post("/categorias/<int:categoria_id>/delete")
+    def eliminar_categoria(categoria_id):
+        if not session.get("user"):
+            return redirect(url_for("login"))
+
+        categoria = Categoria.query.get_or_404(categoria_id)
+        try:
+            categoria.activo = False
             db.session.commit()
         except SQLAlchemyError:
             db.session.rollback()

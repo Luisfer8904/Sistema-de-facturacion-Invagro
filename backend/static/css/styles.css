@@ -709,6 +709,12 @@ body {
   margin: 0 0 6px;
 }
 
+.header-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 .module-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -739,6 +745,30 @@ body {
 .table-row {
   border-top: 1px solid #eef2f1;
   color: #4a5568;
+}
+
+.category-list {
+  margin-top: 16px;
+  display: grid;
+  gap: 10px;
+}
+
+.category-list ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.category-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  background: #f5f6fa;
+  border-radius: 10px;
 }
 
 .pos-layout {
