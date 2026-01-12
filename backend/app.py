@@ -43,6 +43,34 @@ def create_app():
 
         return render_template("dashboard.html", user=session["user"])
 
+    @app.get("/clientes")
+    def clientes():
+        if not session.get("user"):
+            return redirect(url_for("login"))
+
+        return render_template("clientes.html", user=session["user"])
+
+    @app.get("/facturacion")
+    def facturacion():
+        if not session.get("user"):
+            return redirect(url_for("login"))
+
+        return render_template("facturacion.html", user=session["user"])
+
+    @app.get("/productos")
+    def productos():
+        if not session.get("user"):
+            return redirect(url_for("login"))
+
+        return render_template("productos.html", user=session["user"])
+
+    @app.get("/reportes")
+    def reportes():
+        if not session.get("user"):
+            return redirect(url_for("login"))
+
+        return render_template("reportes.html", user=session["user"])
+
     @app.get("/health")
     def health_check():
         return jsonify({"status": "ok"})

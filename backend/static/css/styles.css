@@ -595,15 +595,60 @@ body {
   color: #2c7a3f;
 }
 
-.module-status {
+.module-link {
   align-self: start;
   background: rgba(44, 122, 63, 0.12);
   color: #2c7a3f;
   font-weight: 700;
   font-size: 0.85rem;
-  padding: 4px 10px;
+  padding: 6px 12px;
   border-radius: 999px;
   width: fit-content;
+  text-decoration: none;
+}
+
+.module-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.module-header h1 {
+  margin: 0 0 6px;
+}
+
+.module-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.module-table {
+  background: #ffffff;
+  border-radius: 14px;
+  box-shadow: 0 8px 18px rgba(12, 32, 28, 0.08);
+  overflow: hidden;
+}
+
+.table-header,
+.table-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  padding: 14px 18px;
+}
+
+.table-header {
+  background: #f5f6fa;
+  font-weight: 700;
+  color: #2c3e50;
+}
+
+.table-row {
+  border-top: 1px solid #eef2f1;
+  color: #4a5568;
 }
 
 .stats-grid {
