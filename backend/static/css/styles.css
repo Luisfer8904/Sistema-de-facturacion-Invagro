@@ -741,6 +741,179 @@ body {
   color: #4a5568;
 }
 
+.pos-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.pos-search {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.pos-search input {
+  flex: 1;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 2px solid #e0e0e0;
+}
+
+.pos-tabs {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.pos-tabs .tab {
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid #dfe6e5;
+  background: #ffffff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.pos-tabs .tab.active {
+  background: #2c7a3f;
+  color: #ffffff;
+  border-color: transparent;
+}
+
+.pos-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 14px;
+}
+
+.pos-product {
+  background: #ffffff;
+  border-radius: 14px;
+  padding: 12px;
+  box-shadow: 0 10px 24px rgba(12, 32, 28, 0.08);
+  display: grid;
+  gap: 10px;
+}
+
+.pos-product img {
+  width: 100%;
+  height: 110px;
+  object-fit: cover;
+  border-radius: 10px;
+}
+
+.pos-product h4 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.pos-product span {
+  color: #2c7a3f;
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.pos-product button {
+  border: none;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: #eef2f1;
+  color: #2c3e50;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.pos-right {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 18px;
+  box-shadow: 0 12px 28px rgba(12, 32, 28, 0.1);
+  display: grid;
+  gap: 16px;
+}
+
+.pos-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.pos-header span {
+  color: #7f8c8d;
+}
+
+.pos-type {
+  display: flex;
+  gap: 10px;
+}
+
+.pos-type label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+}
+
+.pos-client {
+  display: grid;
+  gap: 10px;
+}
+
+.pos-client label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.pos-client input {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 2px solid #e0e0e0;
+}
+
+.pos-table {
+  background: #f9fbfa;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.pos-summary {
+  display: grid;
+  gap: 10px;
+  background: #f5f6fa;
+  padding: 12px;
+  border-radius: 12px;
+}
+
+.pos-summary div {
+  display: flex;
+  justify-content: space-between;
+  font-weight: 600;
+}
+
+.pos-total strong {
+  font-size: 1.2rem;
+  color: #2c7a3f;
+}
+
+.pos-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+@media (max-width: 1024px) {
+  .pos-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
 .modal {
   position: fixed;
   inset: 0;

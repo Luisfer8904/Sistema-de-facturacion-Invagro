@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Facturacion | Invagro{% endblock %}
-{% block body_class %}page dashboard-page{% endblock %}
+{% block body_class %}page dashboard-page pos-page{% endblock %}
 {% block content %}
   <div class="dashboard-container">
     <aside class="sidebar">
@@ -30,40 +30,112 @@
         </div>
       </div>
 
-      <main class="content-area">
-        <section class="module-header">
-          <div>
-            <h1>Emision de comprobantes</h1>
-            <p>Genera facturas, boletas y controla estados de pago.</p>
+      <main class="content-area pos-layout">
+        <section class="pos-left">
+          <div class="pos-search">
+            <input type="text" placeholder="Buscar producto por codigo o nombre" />
+            <button class="primary-button">Buscar</button>
           </div>
-          <button class="primary-button">Nueva factura</button>
+
+          <div class="pos-tabs">
+            <button class="tab active">General</button>
+            <button class="tab">Veterinario</button>
+            <button class="tab">Shampoo</button>
+            <button class="tab">Promociones</button>
+          </div>
+
+          <div class="pos-grid">
+            <article class="pos-product">
+              <img src="/static/assets/shampoo.jpeg" alt="Shampoo" />
+              <div>
+                <h4>Shampoo Premium</h4>
+                <span>S/ 45.00</span>
+              </div>
+              <button>Agregar</button>
+            </article>
+            <article class="pos-product">
+              <img src="/static/assets/shampoo.jpeg" alt="Producto" />
+              <div>
+                <h4>Suplemento Canino</h4>
+                <span>S/ 65.00</span>
+              </div>
+              <button>Agregar</button>
+            </article>
+            <article class="pos-product">
+              <img src="/static/assets/shampoo.jpeg" alt="Producto" />
+              <div>
+                <h4>Antipulgas Topico</h4>
+                <span>S/ 48.00</span>
+              </div>
+              <button>Agregar</button>
+            </article>
+          </div>
         </section>
 
-        <section class="module-grid">
-          <div class="module-card">
-            <h3>Plantillas</h3>
-            <p>Configura series, impuestos y formatos de impresion.</p>
+        <section class="pos-right">
+          <div class="pos-header">
+            <div>
+              <h3>Documento</h3>
+              <span>F001-000012</span>
+            </div>
+            <div class="pos-type">
+              <label>
+                <input type="radio" name="tipo" checked />
+                Contado
+              </label>
+              <label>
+                <input type="radio" name="tipo" />
+                Credito
+              </label>
+            </div>
           </div>
-          <div class="module-card">
-            <h3>Estados</h3>
-            <p>Seguimiento de facturas pendientes y pagadas.</p>
-          </div>
-          <div class="module-card">
-            <h3>Envio</h3>
-            <p>Comparte comprobantes por correo o PDF.</p>
-          </div>
-        </section>
 
-        <section class="module-table">
-          <div class="table-header">
-            <span>Factura</span>
-            <span>Cliente</span>
-            <span>Estado</span>
+          <div class="pos-client">
+            <div>
+              <label>Cliente</label>
+              <input type="text" placeholder="Selecciona un cliente" />
+            </div>
+            <div>
+              <label>Documento</label>
+              <input type="text" placeholder="RUC/DNI" />
+            </div>
           </div>
-          <div class="table-row">
-            <span>Sin registros</span>
-            <span>-</span>
-            <span>-</span>
+
+          <div class="pos-table">
+            <div class="table-header table-five">
+              <span>Descripcion</span>
+              <span>Cant.</span>
+              <span>Precio</span>
+              <span>Desc.</span>
+              <span>Total</span>
+            </div>
+            <div class="table-row table-five">
+              <span>Sin productos</span>
+              <span>-</span>
+              <span>-</span>
+              <span>-</span>
+              <span>-</span>
+            </div>
+          </div>
+
+          <div class="pos-summary">
+            <div>
+              <span>Subtotal</span>
+              <strong>S/ 0.00</strong>
+            </div>
+            <div>
+              <span>IGV</span>
+              <strong>S/ 0.00</strong>
+            </div>
+            <div class="pos-total">
+              <span>Total</span>
+              <strong>S/ 0.00</strong>
+            </div>
+          </div>
+
+          <div class="pos-actions">
+            <button class="secondary-button">Guardar borrador</button>
+            <button class="primary-button">Emitir factura</button>
           </div>
         </section>
       </main>

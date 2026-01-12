@@ -36,50 +36,14 @@
             <h1>Catalogo de productos</h1>
             <p>Administra productos veterinarios y shampoo especializados.</p>
           </div>
+          <button class="primary-button" type="button" data-modal-open>
+            Nuevo producto
+          </button>
         </section>
 
         {% if error %}
           <div class="form-error">{{ error }}</div>
         {% endif %}
-
-        <section class="form-card">
-          <h3>Nuevo producto</h3>
-          <form class="module-form" method="post" action="/productos">
-            <label>
-              <span>Codigo</span>
-              <input type="text" name="codigo" required />
-            </label>
-            <label>
-              <span>Nombre</span>
-              <input type="text" name="nombre" required />
-            </label>
-            <label>
-              <span>Categoria</span>
-              <select name="categoria" required>
-                <option value="">Seleccionar</option>
-                <option value="veterinario">Veterinario</option>
-                <option value="shampoo">Shampoo</option>
-              </select>
-            </label>
-            <label>
-              <span>Precio</span>
-              <input type="number" step="0.01" name="precio" required />
-            </label>
-            <label>
-              <span>Stock</span>
-              <input type="number" name="stock" />
-            </label>
-            <label class="span-2">
-              <span>Descripcion</span>
-              <textarea name="descripcion" rows="2"></textarea>
-            </label>
-            <label class="check span-2">
-              <input type="checkbox" name="activo" checked />
-              <span>Activo</span>
-            </label>
-            <button class="primary-button" type="submit">Guardar</button>
-          </form>
-        </section>
 
         <section class="module-table">
           <div class="table-header table-five">
@@ -114,7 +78,73 @@
             </div>
           {% endif %}
         </section>
+
+        <div class="modal" data-modal>
+          <div class="modal-card">
+            <div class="modal-header">
+              <h3>Nuevo producto</h3>
+              <button class="modal-close" type="button" data-modal-close>×</button>
+            </div>
+            <form class="module-form" method="post" action="/productos">
+              <label>
+                <span>Codigo</span>
+                <input type="text" name="codigo" required />
+              </label>
+              <label>
+                <span>Nombre</span>
+                <input type="text" name="nombre" required />
+              </label>
+              <label>
+                <span>Categoria</span>
+                <select name="categoria" required>
+                  <option value="">Seleccionar</option>
+                  <option value="veterinario">Veterinario</option>
+                  <option value="shampoo">Shampoo</option>
+                </select>
+              </label>
+              <label>
+                <span>Precio</span>
+                <input type="number" step="0.01" name="precio" required />
+              </label>
+              <label>
+                <span>Stock</span>
+                <input type="number" name="stock" />
+              </label>
+              <label class="span-2">
+                <span>Descripcion</span>
+                <textarea name="descripcion" rows="2"></textarea>
+              </label>
+              <label class="check span-2">
+                <input type="checkbox" name="activo" checked />
+                <span>Activo</span>
+              </label>
+              <div class="form-actions span-2">
+                <button class="primary-button" type="submit">Guardar</button>
+                <button class="secondary-button" type="button" data-modal-close>
+                  Cancelar
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       </main>
     </div>
   </div>
+  <script>
+    const modal = document.querySelector("[data-modal]");
+    const openButton = document.querySelector("[data-modal-open]");
+    const closeButtons = document.querySelectorAll("[data-modal-close]");
+
+    if (openButton && modal) {
+      openButton.addEventListener("click", () => modal.classList.add("open"));
+      closeButtons.forEach((button) => {
+        button.addEventListener("click", () => modal.classList.remove("open"));
+      });
+      modal.addEventListener("click", (event) => {
+        if (event.target === modal) {
+          modal.classList.remove("open");
+        }
+      });
+    }
+  </script>
 {% endblock %}
