@@ -36,38 +36,14 @@
             <h1>Gestion de clientes</h1>
             <p>Registra, edita y consulta clientes para el proceso de facturacion.</p>
           </div>
+          <button class="primary-button" type="button" data-modal-open>
+            Nuevo cliente
+          </button>
         </section>
 
         {% if error %}
           <div class="form-error">{{ error }}</div>
         {% endif %}
-
-        <section class="form-card">
-          <h3>Nuevo cliente</h3>
-          <form class="module-form" method="post" action="/clientes">
-            <label>
-              <span>Nombre</span>
-              <input type="text" name="nombre" required />
-            </label>
-            <label>
-              <span>RUC/DNI</span>
-              <input type="text" name="ruc_dni" />
-            </label>
-            <label>
-              <span>Direccion</span>
-              <input type="text" name="direccion" />
-            </label>
-            <label>
-              <span>Telefono</span>
-              <input type="text" name="telefono" />
-            </label>
-            <label>
-              <span>Email</span>
-              <input type="email" name="email" />
-            </label>
-            <button class="primary-button" type="submit">Guardar</button>
-          </form>
-        </section>
 
         <section class="module-table">
           <div class="table-header table-four">
@@ -99,7 +75,61 @@
             </div>
           {% endif %}
         </section>
+
+        <div class="modal" data-modal>
+          <div class="modal-card">
+            <div class="modal-header">
+              <h3>Nuevo cliente</h3>
+              <button class="modal-close" type="button" data-modal-close>×</button>
+            </div>
+            <form class="module-form" method="post" action="/clientes">
+              <label>
+                <span>Nombre</span>
+                <input type="text" name="nombre" required />
+              </label>
+              <label>
+                <span>RUC/DNI</span>
+                <input type="text" name="ruc_dni" />
+              </label>
+              <label>
+                <span>Direccion</span>
+                <input type="text" name="direccion" />
+              </label>
+              <label>
+                <span>Telefono</span>
+                <input type="text" name="telefono" />
+              </label>
+              <label>
+                <span>Email</span>
+                <input type="email" name="email" />
+              </label>
+              <div class="form-actions span-2">
+                <button class="primary-button" type="submit">Guardar</button>
+                <button class="secondary-button" type="button" data-modal-close>
+                  Cancelar
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       </main>
     </div>
   </div>
+  <script>
+    const modal = document.querySelector("[data-modal]");
+    const openButton = document.querySelector("[data-modal-open]");
+    const closeButtons = document.querySelectorAll("[data-modal-close]");
+
+    if (openButton && modal) {
+      openButton.addEventListener("click", () => modal.classList.add("open"));
+      closeButtons.forEach((button) => {
+        button.addEventListener("click", () => modal.classList.remove("open"));
+      });
+      modal.addEventListener("click", (event) => {
+        if (event.target === modal) {
+          modal.classList.remove("open");
+        }
+      });
+    }
+  </script>
 {% endblock %}
