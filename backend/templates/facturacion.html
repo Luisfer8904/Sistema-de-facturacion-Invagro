@@ -45,8 +45,14 @@
 
           <div class="pos-tabs">
             <button class="tab active" data-filter="todos">Todos</button>
-            <button class="tab" data-filter="veterinario">Veterinario</button>
-            <button class="tab" data-filter="shampoo">Shampoo</button>
+            {% for categoria in categorias %}
+              <button
+                class="tab"
+                data-filter="{{ categoria.nombre|lower|replace(' ', '-') }}"
+              >
+                {{ categoria.nombre }}
+              </button>
+            {% endfor %}
           </div>
 
           <div class="pos-grid">
@@ -56,7 +62,7 @@
                 data-id="{{ producto.id }}"
                 data-name="{{ producto.nombre }}"
                 data-price="{{ producto.precio }}"
-                data-category="{{ producto.categoria }}"
+                data-category="{{ producto.categoria|lower|replace(' ', '-') }}"
               >
                 <img src="/static/assets/shampoo.jpeg" alt="{{ producto.nombre }}" />
                 <div>
