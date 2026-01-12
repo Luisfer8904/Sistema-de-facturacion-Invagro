@@ -33,42 +33,39 @@
       <main class="content-area pos-layout">
         <section class="pos-left">
           <div class="pos-search">
-            <input type="text" placeholder="Buscar producto por codigo o nombre" />
-            <button class="primary-button">Buscar</button>
+            <input
+              type="text"
+              placeholder="Buscar producto por codigo o nombre"
+              id="product-search"
+            />
+            <button class="primary-button" type="button" id="clear-search">
+              Limpiar
+            </button>
           </div>
 
           <div class="pos-tabs">
-            <button class="tab active">Todos</button>
-            <button class="tab">Veterinario</button>
-            <button class="tab">Shampoo</button>
-            <button class="tab">Promociones</button>
+            <button class="tab active" data-filter="todos">Todos</button>
+            <button class="tab" data-filter="veterinario">Veterinario</button>
+            <button class="tab" data-filter="shampoo">Shampoo</button>
           </div>
 
           <div class="pos-grid">
-            <article class="pos-product">
-              <img src="/static/assets/shampoo.jpeg" alt="Shampoo" />
-              <div>
-                <h4>Shampoo Premium</h4>
-                <span>L 45.00</span>
-              </div>
-              <button>Agregar</button>
-            </article>
-            <article class="pos-product">
-              <img src="/static/assets/shampoo.jpeg" alt="Producto" />
-              <div>
-                <h4>Suplemento Canino</h4>
-                <span>L 65.00</span>
-              </div>
-              <button>Agregar</button>
-            </article>
-            <article class="pos-product">
-              <img src="/static/assets/shampoo.jpeg" alt="Producto" />
-              <div>
-                <h4>Antipulgas Topico</h4>
-                <span>L 48.00</span>
-              </div>
-              <button>Agregar</button>
-            </article>
+            {% for producto in productos %}
+              <article
+                class="pos-product"
+                data-id="{{ producto.id }}"
+                data-name="{{ producto.nombre }}"
+                data-price="{{ producto.precio }}"
+                data-category="{{ producto.categoria }}"
+              >
+                <img src="/static/assets/shampoo.jpeg" alt="{{ producto.nombre }}" />
+                <div>
+                  <h4>{{ producto.nombre }}</h4>
+                  <span>L {{ "%.2f"|format(producto.precio) }}</span>
+                </div>
+                <button type="button" class="add-product">Agregar</button>
+              </article>
+            {% endfor %}
           </div>
         </section>
 
@@ -106,16 +103,18 @@
             </div>
           </div>
 
-          <div class="pos-table">
-            <div class="table-header table-five">
+          <div class="pos-table" id="invoice-table">
+            <div class="table-header table-six">
               <span>Descripcion</span>
               <span>Cant.</span>
               <span>Precio</span>
-              <span>Desc.</span>
+              <span>ISV</span>
               <span>Total</span>
+              <span>Quitar</span>
             </div>
-            <div class="table-row table-five">
+            <div class="table-row table-six empty-row">
               <span>Sin productos</span>
+              <span>-</span>
               <span>-</span>
               <span>-</span>
               <span>-</span>
@@ -126,24 +125,140 @@
           <div class="pos-summary">
             <div>
               <span>Subtotal</span>
-              <strong>L 0.00</strong>
+              <strong id="subtotal">L 0.00</strong>
             </div>
             <div>
-              <span>IGV</span>
-              <strong>L 0.00</strong>
+              <span>ISV (15%)</span>
+              <strong id="isv">L 0.00</strong>
             </div>
             <div class="pos-total">
               <span>Total</span>
-              <strong>L 0.00</strong>
+              <strong id="total">L 0.00</strong>
             </div>
           </div>
 
           <div class="pos-actions">
-            <button class="secondary-button">Guardar borrador</button>
-            <button class="primary-button">Emitir factura</button>
+            <button class="secondary-button" type="button">Guardar borrador</button>
+            <button class="primary-button" type="button">Emitir factura</button>
           </div>
         </section>
       </main>
     </div>
   </div>
+  <script>
+    const taxRate = 0.15;
+    const productCards = Array.from(document.querySelectorAll(".pos-product"));
+    const invoiceTable = document.getElementById("invoice-table");
+    const emptyRow = invoiceTable.querySelector(".empty-row");
+    const subtotalEl = document.getElementById("subtotal");
+    const isvEl = document.getElementById("isv");
+    const totalEl = document.getElementById("total");
+    const searchInput = document.getElementById("product-search");
+    const clearSearch = document.getElementById("clear-search");
+    const tabs = document.querySelectorAll(".pos-tabs .tab");
+
+    const formatCurrency = (value) => `L ${value.toFixed(2)}`;
+
+    const updateTotals = () => {
+      const rows = invoiceTable.querySelectorAll(".invoice-row");
+      let subtotal = 0;
+      let isv = 0;
+
+      rows.forEach((row) => {
+        const qty = Number(row.querySelector(".qty-input").value || 0);
+        const price = Number(row.dataset.price || 0);
+        const line = qty * price;
+        const applyTax = row.querySelector(".tax-checkbox").checked;
+        subtotal += line;
+        if (applyTax) {
+          isv += line * taxRate;
+        }
+        row.querySelector(".line-total").textContent = formatCurrency(line);
+      });
+
+      subtotalEl.textContent = formatCurrency(subtotal);
+      isvEl.textContent = formatCurrency(isv);
+      totalEl.textContent = formatCurrency(subtotal + isv);
+    };
+
+    const ensureEmptyState = () => {
+      const rows = invoiceTable.querySelectorAll(".invoice-row");
+      if (rows.length === 0) {
+        emptyRow.style.display = "grid";
+      } else {
+        emptyRow.style.display = "none";
+      }
+    };
+
+    const addRow = (card) => {
+      const id = card.dataset.id;
+      const existing = invoiceTable.querySelector(`.invoice-row[data-id="${id}"]`);
+      if (existing) {
+        const qtyInput = existing.querySelector(".qty-input");
+        qtyInput.value = Number(qtyInput.value || 0) + 1;
+        updateTotals();
+        return;
+      }
+
+      const row = document.createElement("div");
+      row.className = "table-row table-six invoice-row";
+      row.dataset.id = id;
+      row.dataset.price = card.dataset.price;
+      row.innerHTML = `
+        <span>${card.dataset.name}</span>
+        <input class="qty-input" type="number" min="1" value="1" />
+        <span>${formatCurrency(Number(card.dataset.price))}</span>
+        <label class="tax-toggle">
+          <input class="tax-checkbox" type="checkbox" checked />
+          <span>ISV</span>
+        </label>
+        <span class="line-total">${formatCurrency(Number(card.dataset.price))}</span>
+        <button class="remove-button" type="button">×</button>
+      `;
+
+      invoiceTable.appendChild(row);
+      row.querySelector(".qty-input").addEventListener("input", updateTotals);
+      row.querySelector(".tax-checkbox").addEventListener("change", updateTotals);
+      row.querySelector(".remove-button").addEventListener("click", () => {
+        row.remove();
+        ensureEmptyState();
+        updateTotals();
+      });
+
+      ensureEmptyState();
+      updateTotals();
+    };
+
+    productCards.forEach((card) => {
+      card.querySelector(".add-product").addEventListener("click", () => addRow(card));
+    });
+
+    const applyFilters = () => {
+      const query = searchInput.value.trim().toLowerCase();
+      const activeTab = document.querySelector(".pos-tabs .tab.active");
+      const filter = activeTab ? activeTab.dataset.filter : "todos";
+
+      productCards.forEach((card) => {
+        const name = card.dataset.name.toLowerCase();
+        const category = card.dataset.category.toLowerCase();
+        const matchesSearch = !query || name.includes(query);
+        const matchesCategory = filter === "todos" || category === filter;
+        card.style.display = matchesSearch && matchesCategory ? "grid" : "none";
+      });
+    };
+
+    searchInput.addEventListener("input", applyFilters);
+    clearSearch.addEventListener("click", () => {
+      searchInput.value = "";
+      applyFilters();
+    });
+
+    tabs.forEach((tab) => {
+      tab.addEventListener("click", () => {
+        tabs.forEach((item) => item.classList.remove("active"));
+        tab.classList.add("active");
+        applyFilters();
+      });
+    });
+  </script>
 {% endblock %}

@@ -826,6 +826,39 @@ body {
   cursor: pointer;
 }
 
+.table-six {
+  grid-template-columns: 2fr 0.7fr 0.9fr 0.8fr 0.9fr 0.6fr;
+}
+
+.invoice-row {
+  align-items: center;
+}
+
+.qty-input {
+  width: 80px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid #dfe6e5;
+}
+
+.tax-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.remove-button {
+  border: none;
+  background: #f8d7da;
+  color: #7d1a1a;
+  border-radius: 8px;
+  padding: 4px 10px;
+  cursor: pointer;
+  font-weight: 700;
+}
+
 .pos-right {
   background: #ffffff;
   border-radius: 16px;

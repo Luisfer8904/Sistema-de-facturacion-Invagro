@@ -111,10 +111,12 @@ def create_app():
             return redirect(url_for("login"))
 
         clientes_list = Cliente.query.order_by(Cliente.nombre.asc()).all()
+        productos_list = Producto.query.filter_by(activo=True).order_by(Producto.nombre.asc()).all()
         return render_template(
             "facturacion.html",
             user=session["user"],
             clientes=clientes_list,
+            productos=productos_list,
         )
 
     @app.route("/productos", methods=["GET", "POST"])
