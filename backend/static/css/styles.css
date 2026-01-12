@@ -209,6 +209,42 @@ body {
   color: #2c7a3f;
 }
 
+.landing-contact {
+  padding: 0 8vw 48px;
+  text-align: center;
+}
+
+.landing-contact h2 {
+  margin-bottom: 8px;
+  color: #2c3e50;
+}
+
+.contact-grid {
+  margin-top: 18px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.contact-grid div {
+  background: #ffffff;
+  padding: 16px;
+  border-radius: 12px;
+  box-shadow: 0 8px 18px rgba(12, 32, 28, 0.08);
+  display: grid;
+  gap: 6px;
+}
+
+.contact-grid span {
+  color: #7f8c8d;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.contact-grid strong {
+  color: #2c3e50;
+}
+
 .hero-content h1 {
   font-size: clamp(2rem, 4vw, 3rem);
   margin-bottom: 12px;
@@ -389,13 +425,12 @@ body {
 }
 
 .login-logo-footer {
-  width: 96px;
-  height: 96px;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 3px solid #2c7a3f;
+  width: 160px;
+  height: auto;
+  border-radius: 0;
+  object-fit: contain;
+  border: none;
   justify-self: center;
-  background: #ffffff;
 }
 
 .product-line {
@@ -537,6 +572,38 @@ body {
   border-radius: 16px;
   box-shadow: 0 10px 24px rgba(12, 32, 28, 0.08);
   margin-bottom: 24px;
+}
+
+.modules-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.module-card {
+  background: #ffffff;
+  border-radius: 14px;
+  padding: 18px;
+  box-shadow: 0 8px 18px rgba(12, 32, 28, 0.08);
+  display: grid;
+  gap: 8px;
+}
+
+.module-card h3 {
+  margin: 0;
+  color: #2c7a3f;
+}
+
+.module-status {
+  align-self: start;
+  background: rgba(44, 122, 63, 0.12);
+  color: #2c7a3f;
+  font-weight: 700;
+  font-size: 0.85rem;
+  padding: 4px 10px;
+  border-radius: 999px;
+  width: fit-content;
 }
 
 .stats-grid {
