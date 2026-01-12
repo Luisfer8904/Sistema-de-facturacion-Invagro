@@ -2,33 +2,60 @@
 {% block title %}Sistema de Facturacion Invagro{% endblock %}
 {% block body_class %}page landing-page{% endblock %}
 {% block content %}
-  <main class="hero">
-    <div class="hero-content">
-      <h1>Sistema de Facturacion Invagro</h1>
+  <main class="landing-hero">
+    <div class="landing-hero-content">
+      <span class="landing-badge">Sistema de Facturacion</span>
+      <h1>Invagro impulsa tu facturacion diaria</h1>
       <p>
-        Gestiona ventas, clientes y reportes de manera simple y segura para
-        impulsar el crecimiento de Invagro.
+        Una plataforma clara para ventas, clientes y reportes con el sello
+        agroindustrial de Invagro.
       </p>
-      <a class="primary-button" href="/login">Iniciar sesion</a>
+      <div class="landing-actions">
+        <a class="primary-button" href="/login">Iniciar sesion</a>
+        <a class="ghost-button" href="/login">Ver demo</a>
+      </div>
     </div>
-    <div class="hero-card">
-      <div class="accent">Facturacion inteligente</div>
-      <p>Centraliza tus operaciones en una plataforma clara y ordenada.</p>
+    <div class="landing-panel">
+      <div class="landing-panel-header">
+        <img src="/static/assets/logo.jpg" alt="Invagro" />
+        <div>
+          <strong>Invagro</strong>
+          <span>Inversiones Agroindustriales</span>
+        </div>
+      </div>
+      <div class="landing-panel-body">
+        <div class="panel-item">
+          <span>Facturas emitidas</span>
+          <strong>+150</strong>
+        </div>
+        <div class="panel-item">
+          <span>Clientes activos</span>
+          <strong>32</strong>
+        </div>
+        <div class="panel-item">
+          <span>Productos en catalogo</span>
+          <strong>48</strong>
+        </div>
+      </div>
+      <div class="landing-panel-footer">
+        <img src="/static/assets/mascota.jpeg" alt="Mascota Invagro" />
+        <p>Veterinarios y shampoo para perros.</p>
+      </div>
     </div>
   </main>
 
-  <section class="benefits">
-    <article class="benefit-card">
+  <section class="landing-benefits">
+    <article>
       <h3>Facturacion rapida</h3>
-      <p>Emite comprobantes en segundos con una interfaz enfocada en agilidad.</p>
+      <p>Emite comprobantes en segundos con flujos simples y claros.</p>
     </article>
-    <article class="benefit-card">
+    <article>
       <h3>Control de clientes</h3>
-      <p>Organiza historiales, contacto y seguimiento sin perder informacion.</p>
+      <p>Organiza historiales y seguimiento sin perder informacion.</p>
     </article>
-    <article class="benefit-card">
-      <h3>Reportes claros</h3>
-      <p>Visualiza indicadores clave para tomar decisiones informadas.</p>
+    <article>
+      <h3>Reportes visuales</h3>
+      <p>Analiza resultados con indicadores listos para decisiones.</p>
     </article>
   </section>
 
