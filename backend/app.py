@@ -5,7 +5,7 @@ from flask import Flask, jsonify, redirect, render_template, request, session, u
 from sqlalchemy.exc import SQLAlchemyError
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from models import User, db
+from models import Cliente, Producto, User, db
 
 
 def create_app():
@@ -66,12 +66,44 @@ def create_app():
         session.pop("user", None)
         return redirect(url_for("login"))
 
-    @app.get("/clientes")
+    @app.route("/clientes", methods=["GET", "POST"])
     def clientes():
         if not session.get("user"):
             return redirect(url_for("login"))
 
-        return render_template("clientes.html", user=session["user"])
+        error = None
+        if request.method == "POST":
+            nombre = request.form.get("nombre", "").strip()
+            ruc_dni = request.form.get("ruc_dni", "").strip() or None
+            direccion = request.form.get("direccion", "").strip() or None
+            telefono = request.form.get("telefono", "").strip() or None
+            email = request.form.get("email", "").strip() or None
+
+            if not nombre:
+                error = "El nombre del cliente es obligatorio."
+            else:
+                try:
+                    cliente = Cliente(
+                        nombre=nombre,
+                        ruc_dni=ruc_dni,
+                        direccion=direccion,
+                        telefono=telefono,
+                        email=email,
+                    )
+                    db.session.add(cliente)
+                    db.session.commit()
+                    return redirect(url_for("clientes"))
+                except SQLAlchemyError:
+                    db.session.rollback()
+                    error = "No se pudo guardar el cliente."
+
+        clientes_list = Cliente.query.order_by(Cliente.id.desc()).all()
+        return render_template(
+            "clientes.html",
+            user=session["user"],
+            clientes=clientes_list,
+            error=error,
+        )
 
     @app.get("/facturacion")
     def facturacion():
@@ -80,12 +112,48 @@ def create_app():
 
         return render_template("facturacion.html", user=session["user"])
 
-    @app.get("/productos")
+    @app.route("/productos", methods=["GET", "POST"])
     def productos():
         if not session.get("user"):
             return redirect(url_for("login"))
 
-        return render_template("productos.html", user=session["user"])
+        error = None
+        if request.method == "POST":
+            codigo = request.form.get("codigo", "").strip()
+            nombre = request.form.get("nombre", "").strip()
+            categoria = request.form.get("categoria", "").strip()
+            precio = request.form.get("precio", "").strip()
+            stock = request.form.get("stock", "").strip()
+            descripcion = request.form.get("descripcion", "").strip() or None
+            activo = request.form.get("activo") == "on"
+
+            if not codigo or not nombre or not categoria or not precio:
+                error = "Completa codigo, nombre, categoria y precio."
+            else:
+                try:
+                    producto = Producto(
+                        codigo=codigo,
+                        nombre=nombre,
+                        categoria=categoria,
+                        precio=precio,
+                        stock=stock or 0,
+                        descripcion=descripcion,
+                        activo=activo,
+                    )
+                    db.session.add(producto)
+                    db.session.commit()
+                    return redirect(url_for("productos"))
+                except SQLAlchemyError:
+                    db.session.rollback()
+                    error = "No se pudo guardar el producto."
+
+        productos_list = Producto.query.order_by(Producto.id.desc()).all()
+        return render_template(
+            "productos.html",
+            user=session["user"],
+            productos=productos_list,
+            error=error,
+        )
 
     @app.get("/reportes")
     def reportes():
@@ -93,6 +161,110 @@ def create_app():
             return redirect(url_for("login"))
 
         return render_template("reportes.html", user=session["user"])
+
+    @app.route("/clientes/<int:cliente_id>/edit", methods=["GET", "POST"])
+    def editar_cliente(cliente_id):
+        if not session.get("user"):
+            return redirect(url_for("login"))
+
+        cliente = Cliente.query.get_or_404(cliente_id)
+        error = None
+
+        if request.method == "POST":
+            nombre = request.form.get("nombre", "").strip()
+            ruc_dni = request.form.get("ruc_dni", "").strip() or None
+            direccion = request.form.get("direccion", "").strip() or None
+            telefono = request.form.get("telefono", "").strip() or None
+            email = request.form.get("email", "").strip() or None
+
+            if not nombre:
+                error = "El nombre del cliente es obligatorio."
+            else:
+                try:
+                    cliente.nombre = nombre
+                    cliente.ruc_dni = ruc_dni
+                    cliente.direccion = direccion
+                    cliente.telefono = telefono
+                    cliente.email = email
+                    db.session.commit()
+                    return redirect(url_for("clientes"))
+                except SQLAlchemyError:
+                    db.session.rollback()
+                    error = "No se pudo actualizar el cliente."
+
+        return render_template(
+            "cliente_form.html",
+            user=session["user"],
+            cliente=cliente,
+            error=error,
+        )
+
+    @app.post("/clientes/<int:cliente_id>/delete")
+    def eliminar_cliente(cliente_id):
+        if not session.get("user"):
+            return redirect(url_for("login"))
+
+        cliente = Cliente.query.get_or_404(cliente_id)
+        try:
+            db.session.delete(cliente)
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+        return redirect(url_for("clientes"))
+
+    @app.route("/productos/<int:producto_id>/edit", methods=["GET", "POST"])
+    def editar_producto(producto_id):
+        if not session.get("user"):
+            return redirect(url_for("login"))
+
+        producto = Producto.query.get_or_404(producto_id)
+        error = None
+
+        if request.method == "POST":
+            codigo = request.form.get("codigo", "").strip()
+            nombre = request.form.get("nombre", "").strip()
+            categoria = request.form.get("categoria", "").strip()
+            precio = request.form.get("precio", "").strip()
+            stock = request.form.get("stock", "").strip()
+            descripcion = request.form.get("descripcion", "").strip() or None
+            activo = request.form.get("activo") == "on"
+
+            if not codigo or not nombre or not categoria or not precio:
+                error = "Completa codigo, nombre, categoria y precio."
+            else:
+                try:
+                    producto.codigo = codigo
+                    producto.nombre = nombre
+                    producto.categoria = categoria
+                    producto.precio = precio
+                    producto.stock = stock or 0
+                    producto.descripcion = descripcion
+                    producto.activo = activo
+                    db.session.commit()
+                    return redirect(url_for("productos"))
+                except SQLAlchemyError:
+                    db.session.rollback()
+                    error = "No se pudo actualizar el producto."
+
+        return render_template(
+            "producto_form.html",
+            user=session["user"],
+            producto=producto,
+            error=error,
+        )
+
+    @app.post("/productos/<int:producto_id>/delete")
+    def eliminar_producto(producto_id):
+        if not session.get("user"):
+            return redirect(url_for("login"))
+
+        producto = Producto.query.get_or_404(producto_id)
+        try:
+            db.session.delete(producto)
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+        return redirect(url_for("productos"))
 
     @app.get("/health")
     def health_check():

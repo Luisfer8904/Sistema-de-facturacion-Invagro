@@ -36,35 +36,68 @@
             <h1>Gestion de clientes</h1>
             <p>Registra, edita y consulta clientes para el proceso de facturacion.</p>
           </div>
-          <button class="primary-button">Nuevo cliente</button>
         </section>
 
-        <section class="module-grid">
-          <div class="module-card">
-            <h3>Listado</h3>
-            <p>Visualiza clientes con filtros por estado y categoria.</p>
-          </div>
-          <div class="module-card">
-            <h3>Contactos</h3>
-            <p>Gestiona telefonos, correos y direcciones.</p>
-          </div>
-          <div class="module-card">
-            <h3>Historial</h3>
-            <p>Revisa compras y frecuencia de facturacion.</p>
-          </div>
+        {% if error %}
+          <div class="form-error">{{ error }}</div>
+        {% endif %}
+
+        <section class="form-card">
+          <h3>Nuevo cliente</h3>
+          <form class="module-form" method="post" action="/clientes">
+            <label>
+              <span>Nombre</span>
+              <input type="text" name="nombre" required />
+            </label>
+            <label>
+              <span>RUC/DNI</span>
+              <input type="text" name="ruc_dni" />
+            </label>
+            <label>
+              <span>Direccion</span>
+              <input type="text" name="direccion" />
+            </label>
+            <label>
+              <span>Telefono</span>
+              <input type="text" name="telefono" />
+            </label>
+            <label>
+              <span>Email</span>
+              <input type="email" name="email" />
+            </label>
+            <button class="primary-button" type="submit">Guardar</button>
+          </form>
         </section>
 
         <section class="module-table">
-          <div class="table-header">
+          <div class="table-header table-four">
             <span>Cliente</span>
             <span>Documento</span>
-            <span>Estado</span>
+            <span>Contacto</span>
+            <span>Acciones</span>
           </div>
-          <div class="table-row">
-            <span>Sin registros</span>
-            <span>-</span>
-            <span>-</span>
-          </div>
+          {% if clientes %}
+            {% for cliente in clientes %}
+              <div class="table-row table-four">
+                <span>{{ cliente.nombre }}</span>
+                <span>{{ cliente.ruc_dni or '-' }}</span>
+                <span>{{ cliente.telefono or cliente.email or '-' }}</span>
+                <span class="table-actions">
+                  <a class="secondary-button" href="/clientes/{{ cliente.id }}/edit">Editar</a>
+                  <form method="post" action="/clientes/{{ cliente.id }}/delete">
+                    <button class="danger-button" type="submit">Eliminar</button>
+                  </form>
+                </span>
+              </div>
+            {% endfor %}
+          {% else %}
+            <div class="table-row table-four">
+              <span>Sin registros</span>
+              <span>-</span>
+              <span>-</span>
+              <span>-</span>
+            </div>
+          {% endif %}
         </section>
       </main>
     </div>

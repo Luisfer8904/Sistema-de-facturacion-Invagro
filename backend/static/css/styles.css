@@ -607,6 +607,96 @@ body {
   text-decoration: none;
 }
 
+.module-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.module-form label {
+  display: grid;
+  gap: 6px;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.module-form input,
+.module-form select,
+.module-form textarea {
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 2px solid #e0e0e0;
+  font-size: 0.95rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.module-form input:focus,
+.module-form select:focus,
+.module-form textarea:focus {
+  border-color: #2c7a3f;
+  box-shadow: 0 0 0 3px rgba(44, 122, 63, 0.1);
+  outline: none;
+}
+
+.form-card {
+  background: #ffffff;
+  padding: 20px;
+  border-radius: 14px;
+  box-shadow: 0 10px 24px rgba(12, 32, 28, 0.08);
+  margin-bottom: 24px;
+}
+
+.form-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.span-2 {
+  grid-column: span 2;
+}
+
+.secondary-button,
+.danger-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 16px;
+  border-radius: 999px;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.secondary-button {
+  background: #eef2f1;
+  color: #2c3e50;
+}
+
+.danger-button {
+  background: #f8d7da;
+  color: #7d1a1a;
+}
+
+.table-actions {
+  display: inline-flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.table-actions form {
+  margin: 0;
+}
+
+.table-four {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.table-five {
+  grid-template-columns: repeat(5, 1fr);
+}
+
 .module-header {
   display: flex;
   align-items: center;

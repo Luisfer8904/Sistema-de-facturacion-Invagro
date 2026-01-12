@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Editar producto | Invagro{% endblock %}
+{% block body_class %}page dashboard-page{% endblock %}
+{% block content %}
+  <div class="dashboard-container">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <img class="sidebar-logo" src="/static/assets/logo.jpg" alt="Invagro" />
+        <h3>Invagro</h3>
+      </div>
+      <nav class="sidebar-nav">
+        <a class="nav-item" href="/dashboard">Dashboard</a>
+        <a class="nav-item" href="/facturacion">Facturacion</a>
+        <a class="nav-item" href="/clientes">Clientes</a>
+        <a class="nav-item active" href="/productos">Productos</a>
+        <a class="nav-item" href="/reportes">Reportes</a>
+      </nav>
+      <div class="sidebar-footer">
+        <img class="sidebar-mascot" src="/static/assets/mascota.jpeg" alt="Mascota" />
+      </div>
+    </aside>
+
+    <div class="main-content">
+      <div class="topbar">
+        <div class="topbar-left">
+          <h2>Editar producto</h2>
+        </div>
+        <div class="topbar-right">
+          <span class="user-pill">Sesion: {{ user }}</span>
+        </div>
+      </div>
+
+      <main class="content-area">
+        {% if error %}
+          <div class="form-error">{{ error }}</div>
+        {% endif %}
+
+        <section class="form-card">
+          <h3>Datos del producto</h3>
+          <form class="module-form" method="post">
+            <label>
+              <span>Codigo</span>
+              <input type="text" name="codigo" value="{{ producto.codigo }}" required />
+            </label>
+            <label>
+              <span>Nombre</span>
+              <input type="text" name="nombre" value="{{ producto.nombre }}" required />
+            </label>
+            <label>
+              <span>Categoria</span>
+              <select name="categoria" required>
+                <option value="veterinario" {% if producto.categoria == 'veterinario' %}selected{% endif %}>Veterinario</option>
+                <option value="shampoo" {% if producto.categoria == 'shampoo' %}selected{% endif %}>Shampoo</option>
+              </select>
+            </label>
+            <label>
+              <span>Precio</span>
+              <input type="number" step="0.01" name="precio" value="{{ producto.precio }}" required />
+            </label>
+            <label>
+              <span>Stock</span>
+              <input type="number" name="stock" value="{{ producto.stock }}" />
+            </label>
+            <label class="span-2">
+              <span>Descripcion</span>
+              <textarea name="descripcion" rows="2">{{ producto.descripcion or '' }}</textarea>
+            </label>
+            <label class="check span-2">
+              <input type="checkbox" name="activo" {% if producto.activo %}checked{% endif %} />
+              <span>Activo</span>
+            </label>
+            <div class="form-actions">
+              <button class="primary-button" type="submit">Guardar cambios</button>
+              <a class="secondary-button" href="/productos">Volver</a>
+            </div>
+          </form>
+        </section>
+      </main>
+    </div>
+  </div>
+{% endblock %}
