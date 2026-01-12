@@ -314,20 +314,20 @@ body {
   text-align: center;
 }
 
-.login-logo {
-  width: 120px;
-  height: 120px;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 5px solid #2c7a3f;
-  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
-  margin-bottom: 16px;
-}
-
 .login-header h1 {
   margin: 0 0 6px;
   color: #2c7a3f;
   letter-spacing: 2px;
+}
+
+.login-mascot {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 5px solid #f39c12;
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+  margin-bottom: 16px;
 }
 
 .subtitle {
@@ -388,13 +388,14 @@ body {
   gap: 10px;
 }
 
-.mascot {
+.login-logo-footer {
   width: 96px;
   height: 96px;
   border-radius: 50%;
   object-fit: cover;
-  border: 3px solid #f39c12;
+  border: 3px solid #2c7a3f;
   justify-self: center;
+  background: #ffffff;
 }
 
 .product-line {
