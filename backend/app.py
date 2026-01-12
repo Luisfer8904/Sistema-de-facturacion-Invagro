@@ -110,7 +110,12 @@ def create_app():
         if not session.get("user"):
             return redirect(url_for("login"))
 
-        return render_template("facturacion.html", user=session["user"])
+        clientes_list = Cliente.query.order_by(Cliente.nombre.asc()).all()
+        return render_template(
+            "facturacion.html",
+            user=session["user"],
+            clientes=clientes_list,
+        )
 
     @app.route("/productos", methods=["GET", "POST"])
     def productos():

@@ -38,7 +38,7 @@
           </div>
 
           <div class="pos-tabs">
-            <button class="tab active">General</button>
+            <button class="tab active">Todos</button>
             <button class="tab">Veterinario</button>
             <button class="tab">Shampoo</button>
             <button class="tab">Promociones</button>
@@ -49,7 +49,7 @@
               <img src="/static/assets/shampoo.jpeg" alt="Shampoo" />
               <div>
                 <h4>Shampoo Premium</h4>
-                <span>S/ 45.00</span>
+                <span>L 45.00</span>
               </div>
               <button>Agregar</button>
             </article>
@@ -57,7 +57,7 @@
               <img src="/static/assets/shampoo.jpeg" alt="Producto" />
               <div>
                 <h4>Suplemento Canino</h4>
-                <span>S/ 65.00</span>
+                <span>L 65.00</span>
               </div>
               <button>Agregar</button>
             </article>
@@ -65,7 +65,7 @@
               <img src="/static/assets/shampoo.jpeg" alt="Producto" />
               <div>
                 <h4>Antipulgas Topico</h4>
-                <span>S/ 48.00</span>
+                <span>L 48.00</span>
               </div>
               <button>Agregar</button>
             </article>
@@ -93,7 +93,12 @@
           <div class="pos-client">
             <div>
               <label>Cliente</label>
-              <input type="text" placeholder="Selecciona un cliente" />
+              <select>
+                <option value="">Selecciona un cliente</option>
+                {% for cliente in clientes %}
+                  <option value="{{ cliente.id }}">{{ cliente.nombre }}</option>
+                {% endfor %}
+              </select>
             </div>
             <div>
               <label>Documento</label>
@@ -121,15 +126,15 @@
           <div class="pos-summary">
             <div>
               <span>Subtotal</span>
-              <strong>S/ 0.00</strong>
+              <strong>L 0.00</strong>
             </div>
             <div>
               <span>IGV</span>
-              <strong>S/ 0.00</strong>
+              <strong>L 0.00</strong>
             </div>
             <div class="pos-total">
               <span>Total</span>
-              <strong>S/ 0.00</strong>
+              <strong>L 0.00</strong>
             </div>
           </div>
 

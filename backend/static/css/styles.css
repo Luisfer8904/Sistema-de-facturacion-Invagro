@@ -876,6 +876,14 @@ body {
   border: 2px solid #e0e0e0;
 }
 
+.pos-client select {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 2px solid #e0e0e0;
+  background: #ffffff;
+}
+
 .pos-table {
   background: #f9fbfa;
   border-radius: 12px;
