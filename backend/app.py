@@ -1,6 +1,6 @@
 import logging
 
-from flask import Flask
+from flask import Flask, jsonify, render_template
 
 
 def create_app():
@@ -14,8 +14,16 @@ def create_app():
         )
 
     @app.get("/")
+    def landing():
+        return render_template("landing.html")
+
+    @app.get("/login")
+    def login():
+        return render_template("login.html")
+
+    @app.get("/health")
     def health_check():
-        return "Sistema de facturacion Invagro activo"
+        return jsonify({"status": "ok"})
 
     return app
 

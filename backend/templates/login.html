@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sistema de Facturacion Invagro</title>
+    <link rel="stylesheet" href="/static/css/styles.css" />
+  </head>
+  <body class="page login-page">
+    <header class="site-header">
+      <div class="logo">Invagro</div>
+      <nav class="menu">
+        <a href="/">Inicio</a>
+        <a href="/login" class="active">Ingresar</a>
+      </nav>
+    </header>
+
+    <main class="login-wrapper">
+      <form class="login-card" method="post" action="/login">
+        <h1>Bienvenido</h1>
+        <p>Ingresa tus credenciales para continuar.</p>
+
+        <label class="field">
+          <span>Usuario</span>
+          <input type="text" name="username" placeholder="usuario" required />
+        </label>
+
+        <label class="field">
+          <span>Contrasena</span>
+          <input type="password" name="password" placeholder="••••••••" required />
+        </label>
+
+        <button type="submit" class="primary-button">Entrar</button>
+        <a class="link" href="/">Ir al inicio</a>
+      </form>
+    </main>
+  </body>
+</html>

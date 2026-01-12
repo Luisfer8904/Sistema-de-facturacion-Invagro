@@ -1,0 +1,183 @@
+:root {
+  color-scheme: light;
+  font-family: "Trebuchet MS", "Lucida Sans Unicode", "Lucida Grande",
+    "Lucida Sans", Arial, sans-serif;
+  background-color: #eef2f1;
+  color: #1c2b2a;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+.page {
+  background: radial-gradient(circle at top, #f7fbfa 0%, #e4eceb 40%, #d5dfde 100%);
+}
+
+.site-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24px 8vw;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(8px);
+}
+
+.logo {
+  font-size: 1.4rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: #0f4c3a;
+}
+
+.menu a {
+  margin-left: 18px;
+  text-decoration: none;
+  color: #1c2b2a;
+  font-weight: 600;
+}
+
+.menu a.active,
+.menu a:hover {
+  color: #0f4c3a;
+}
+
+.hero {
+  display: grid;
+  gap: 32px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  padding: 48px 8vw 32px;
+  align-items: center;
+}
+
+.hero-content h1 {
+  font-size: clamp(2rem, 4vw, 3rem);
+  margin-bottom: 12px;
+}
+
+.hero-content p {
+  max-width: 520px;
+  line-height: 1.6;
+  margin-bottom: 20px;
+  color: #3b4a49;
+}
+
+.primary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 28px;
+  background: #0f4c3a;
+  color: #ffffff;
+  text-decoration: none;
+  border: none;
+  border-radius: 999px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 12px 20px rgba(15, 76, 58, 0.25);
+}
+
+.hero-card {
+  padding: 28px;
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 16px 28px rgba(15, 76, 58, 0.1);
+}
+
+.hero-card .accent {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #0f4c3a;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 12px;
+}
+
+.benefits {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 20px;
+  padding: 0 8vw 48px;
+}
+
+.benefit-card {
+  background: #ffffff;
+  padding: 20px;
+  border-radius: 14px;
+  box-shadow: 0 12px 24px rgba(28, 43, 42, 0.08);
+}
+
+.benefit-card h3 {
+  margin-top: 0;
+  margin-bottom: 10px;
+  color: #0f4c3a;
+}
+
+.site-footer {
+  text-align: center;
+  padding: 20px;
+  background: #0f4c3a;
+  color: #ffffff;
+}
+
+.login-page .login-wrapper {
+  display: flex;
+  justify-content: center;
+  padding: 40px 8vw 80px;
+}
+
+.login-card {
+  width: min(420px, 100%);
+  background: #ffffff;
+  padding: 32px;
+  border-radius: 16px;
+  box-shadow: 0 18px 36px rgba(12, 32, 28, 0.15);
+  display: grid;
+  gap: 16px;
+}
+
+.login-card h1 {
+  margin: 0;
+}
+
+.login-card p {
+  margin: 0;
+  color: #3b4a49;
+}
+
+.field {
+  display: grid;
+  gap: 8px;
+  font-weight: 600;
+  color: #1c2b2a;
+}
+
+.field input {
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid #c5d4d2;
+  font-size: 1rem;
+}
+
+.link {
+  color: #0f4c3a;
+  text-decoration: none;
+  font-weight: 600;
+  text-align: center;
+}
+
+@media (max-width: 640px) {
+  .site-header {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .menu a {
+    margin: 0 10px;
+  }
+}
