@@ -63,6 +63,7 @@
                 data-name="{{ producto.nombre }}"
                 data-price="{{ producto.precio }}"
                 data-category="{{ producto.categoria|lower|replace(' ', '-') }}"
+                data-isv="{{ 1 if producto.isv_aplica else 0 }}"
               >
                 <img src="/static/assets/shampoo.jpeg" alt="{{ producto.nombre }}" />
                 <div>
@@ -215,7 +216,7 @@
         <input class="qty-input" type="number" min="1" value="1" />
         <span>${formatCurrency(Number(card.dataset.price))}</span>
         <label class="tax-toggle">
-          <input class="tax-checkbox" type="checkbox" checked />
+          <input class="tax-checkbox" type="checkbox" ${card.dataset.isv === "1" ? "checked" : ""} />
           <span>ISV</span>
         </label>
         <span class="line-total">${formatCurrency(Number(card.dataset.price))}</span>

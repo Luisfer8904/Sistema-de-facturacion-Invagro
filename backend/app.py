@@ -137,6 +137,7 @@ def create_app():
             stock = request.form.get("stock", "").strip()
             descripcion = request.form.get("descripcion", "").strip() or None
             activo = request.form.get("activo") == "on"
+            isv_aplica = request.form.get("isv_aplica") == "on"
 
             if not codigo or not nombre or not categoria or not precio:
                 error = "Completa codigo, nombre, categoria y precio."
@@ -150,6 +151,7 @@ def create_app():
                         stock=stock or 0,
                         descripcion=descripcion,
                         activo=activo,
+                        isv_aplica=isv_aplica,
                     )
                     db.session.add(producto)
                     db.session.commit()
@@ -246,6 +248,7 @@ def create_app():
             stock = request.form.get("stock", "").strip()
             descripcion = request.form.get("descripcion", "").strip() or None
             activo = request.form.get("activo") == "on"
+            isv_aplica = request.form.get("isv_aplica") == "on"
 
             if not codigo or not nombre or not categoria or not precio:
                 error = "Completa codigo, nombre, categoria y precio."
@@ -258,6 +261,7 @@ def create_app():
                     producto.stock = stock or 0
                     producto.descripcion = descripcion
                     producto.activo = activo
+                    producto.isv_aplica = isv_aplica
                     db.session.commit()
                     return redirect(url_for("productos"))
                 except SQLAlchemyError:

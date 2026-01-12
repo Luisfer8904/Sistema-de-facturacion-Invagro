@@ -43,6 +43,7 @@ class Producto(db.Model):
     stock = db.Column(db.Integer, default=0)
     descripcion = db.Column(db.Text)
     activo = db.Column(db.Boolean, default=True)
+    isv_aplica = db.Column(db.Boolean, default=False)
 
 
 class Categoria(db.Model):

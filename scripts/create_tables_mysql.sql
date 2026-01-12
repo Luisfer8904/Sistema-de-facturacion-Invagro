@@ -53,6 +53,7 @@ CREATE TABLE IF NOT EXISTS `inva-productos` (
     stock INT DEFAULT 0,
     descripcion TEXT,
     activo BOOLEAN DEFAULT TRUE,
+    isv_aplica BOOLEAN DEFAULT FALSE,
     INDEX idx_codigo (codigo),
     INDEX idx_categoria (categoria),
     INDEX idx_activo (activo)

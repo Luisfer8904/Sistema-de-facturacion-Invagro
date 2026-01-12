@@ -72,6 +72,10 @@
               <input type="checkbox" name="activo" {% if producto.activo %}checked{% endif %} />
               <span>Activo</span>
             </label>
+            <label class="check span-2">
+              <input type="checkbox" name="isv_aplica" {% if producto.isv_aplica %}checked{% endif %} />
+              <span>Aplica ISV (15%)</span>
+            </label>
             <div class="form-actions">
               <button class="primary-button" type="submit">Guardar cambios</button>
               <a class="secondary-button" href="/productos">Volver</a>
