@@ -1,28 +1,55 @@
 {% extends "base.html" %}
-{% block title %}Ingresar | Sistema de Facturacion Invagro{% endblock %}
+{% block title %}Login - Invagro{% endblock %}
+{% block body_class %}login-page{% endblock %}
 {% block content %}
-  <main class="login-wrapper login-page">
-    <form class="login-card" method="post" action="/login">
-      <img class="login-logo" src="/static/assets/logo.jpg" alt="Invagro" />
-      <h1>Bienvenido</h1>
-      <p>Ingresa tus credenciales para continuar.</p>
+  <main class="login-container">
+    <div class="login-box">
+      <div class="login-header">
+        <img class="login-logo" src="/static/assets/logo.jpg" alt="Invagro" />
+        <h1>INVAGRO</h1>
+        <p class="subtitle">Inversiones Agroindustriales</p>
+        <p class="tagline">Sistema de Facturacion</p>
+      </div>
 
       {% if error %}
         <div class="form-error">{{ error }}</div>
       {% endif %}
 
-      <label class="field">
-        <span>Correo o usuario</span>
-        <input type="text" name="email" placeholder="correo@invagro.com" />
-      </label>
+      <form class="login-form" method="post" action="/login">
+        <label class="field">
+          <span>Usuario</span>
+          <input
+            type="text"
+            name="username"
+            placeholder="Ingresa tu usuario"
+            required
+          />
+        </label>
 
-      <label class="field">
-        <span>Contrasena</span>
-        <input type="password" name="password" placeholder="••••••••" required />
-      </label>
+        <label class="field">
+          <span>Contrasena</span>
+          <input
+            type="password"
+            name="password"
+            placeholder="Ingresa tu contrasena"
+            required
+          />
+        </label>
 
-      <button type="submit" class="primary-button">Entrar</button>
-      <a class="link" href="/">Ir al inicio</a>
-    </form>
+        <label class="check">
+          <input type="checkbox" name="remember" />
+          <span>Recordarme</span>
+        </label>
+
+        <button type="submit" class="primary-button">Iniciar sesion</button>
+        <a class="link" href="/">Ir al inicio</a>
+      </form>
+
+      <div class="login-footer">
+        <img class="mascot" src="/static/assets/mascota.jpeg" alt="Mascota Invagro" />
+        <p class="product-line">Productos Veterinarios y Shampoo para Perros</p>
+        <p class="copyright">© 2024 Invagro. Todos los derechos reservados.</p>
+      </div>
+    </div>
   </main>
 {% endblock %}
