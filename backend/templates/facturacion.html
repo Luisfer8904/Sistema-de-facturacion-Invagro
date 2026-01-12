@@ -111,17 +111,15 @@
           </div>
 
           <div class="pos-table" id="invoice-table">
-            <div class="table-header table-six">
+            <div class="table-header table-five">
               <span>Descripcion</span>
               <span>Cant.</span>
               <span>Precio</span>
-              <span>ISV</span>
               <span>Total</span>
               <span>Quitar</span>
             </div>
-            <div class="table-row table-six empty-row">
+            <div class="table-row table-five empty-row">
               <span>Sin productos</span>
-              <span>-</span>
               <span>-</span>
               <span>-</span>
               <span>-</span>
@@ -175,7 +173,7 @@
         const qty = Number(row.querySelector(".qty-input").value || 0);
         const price = Number(row.dataset.price || 0);
         const line = qty * price;
-        const applyTax = row.querySelector(".tax-checkbox").checked;
+        const applyTax = row.dataset.isv === "1";
         subtotal += line;
         if (applyTax) {
           isv += line * taxRate;
@@ -208,24 +206,20 @@
       }
 
       const row = document.createElement("div");
-      row.className = "table-row table-six invoice-row";
+      row.className = "table-row table-five invoice-row";
       row.dataset.id = id;
       row.dataset.price = card.dataset.price;
+      row.dataset.isv = card.dataset.isv;
       row.innerHTML = `
         <span>${card.dataset.name}</span>
         <input class="qty-input" type="number" min="1" value="1" />
         <span>${formatCurrency(Number(card.dataset.price))}</span>
-        <label class="tax-toggle">
-          <input class="tax-checkbox" type="checkbox" ${card.dataset.isv === "1" ? "checked" : ""} />
-          <span>ISV</span>
-        </label>
         <span class="line-total">${formatCurrency(Number(card.dataset.price))}</span>
         <button class="remove-button" type="button">×</button>
       `;
 
       invoiceTable.appendChild(row);
       row.querySelector(".qty-input").addEventListener("input", updateTotals);
-      row.querySelector(".tax-checkbox").addEventListener("change", updateTotals);
       row.querySelector(".remove-button").addEventListener("click", () => {
         row.remove();
         ensureEmptyState();
