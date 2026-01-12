@@ -1,46 +1,28 @@
-<!doctype html>
-<html lang="es">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Sistema de Facturacion Invagro</title>
-    <link rel="stylesheet" href="/static/css/styles.css" />
-  </head>
-  <body class="page login-page">
-    <header class="site-header">
-      <div class="logo">
-        <img src="/static/assets/logo.jpg" alt="Logo Invagro" class="logo-image" />
-        <span>Invagro</span>
-      </div>
-      <nav class="menu">
-        <a href="/">Inicio</a>
-        <a href="/login" class="active">Ingresar</a>
-      </nav>
-    </header>
+{% extends "base.html" %}
+{% block title %}Ingresar | Sistema de Facturacion Invagro{% endblock %}
+{% block content %}
+  <main class="login-wrapper login-page">
+    <form class="login-card" method="post" action="/login">
+      <img class="login-logo" src="/static/assets/logo.jpg" alt="Invagro" />
+      <h1>Bienvenido</h1>
+      <p>Ingresa tus credenciales para continuar.</p>
 
-    <main class="login-wrapper">
-      <form class="login-card" method="post" action="/login">
-        <img
-          class="login-logo"
-          src="/static/assets/logo.jpg"
-          alt="Invagro"
-        />
-        <h1>Bienvenido</h1>
-        <p>Ingresa tus credenciales para continuar.</p>
+      {% if error %}
+        <div class="form-error">{{ error }}</div>
+      {% endif %}
 
-        <label class="field">
-          <span>Usuario</span>
-          <input type="text" name="username" placeholder="usuario" required />
-        </label>
+      <label class="field">
+        <span>Correo o usuario</span>
+        <input type="text" name="email" placeholder="correo@invagro.com" />
+      </label>
 
-        <label class="field">
-          <span>Contrasena</span>
-          <input type="password" name="password" placeholder="••••••••" required />
-        </label>
+      <label class="field">
+        <span>Contrasena</span>
+        <input type="password" name="password" placeholder="••••••••" required />
+      </label>
 
-        <button type="submit" class="primary-button">Entrar</button>
-        <a class="link" href="/">Ir al inicio</a>
-      </form>
-    </main>
-  </body>
-</html>
+      <button type="submit" class="primary-button">Entrar</button>
+      <a class="link" href="/">Ir al inicio</a>
+    </form>
+  </main>
+{% endblock %}

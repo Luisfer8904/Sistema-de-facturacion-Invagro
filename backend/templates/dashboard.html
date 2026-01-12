@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Dashboard | Sistema de Facturacion Invagro{% endblock %}
+{% block content %}
+  <main class="dashboard">
+    <section class="dashboard-card">
+      <h1>Bienvenido</h1>
+      <p>Sesion activa para {{ user }}.</p>
+      <div class="dashboard-links">
+        <a href="#">Facturacion</a>
+        <a href="#">Clientes</a>
+        <a href="#">Productos</a>
+        <a href="#">Reportes</a>
+      </div>
+    </section>
+  </main>
+{% endblock %}
