@@ -43,6 +43,20 @@ CREATE TABLE IF NOT EXISTS `inva-categorias` (
     INDEX idx_activo (activo)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Tabla de Ajustes del Negocio
+CREATE TABLE IF NOT EXISTS `inva-ajustes_negocio` (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    nombre VARCHAR(150) NOT NULL,
+    rtn VARCHAR(30),
+    telefono VARCHAR(30),
+    email VARCHAR(120),
+    direccion VARCHAR(255),
+    cai VARCHAR(60),
+    rango_autorizado VARCHAR(120),
+    fecha_limite_emision VARCHAR(30),
+    mensaje VARCHAR(255)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Tabla de Productos
 CREATE TABLE IF NOT EXISTS `inva-productos` (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -92,6 +106,7 @@ CREATE TABLE IF NOT EXISTS `inva-facturas_contado` (
     pago DECIMAL(10,2),
     cambio DECIMAL(10,2),
     estado ENUM('pagada', 'anulada') DEFAULT 'pagada',
+    pdf_filename VARCHAR(255),
     FOREIGN KEY (cliente_id) REFERENCES `inva-clientes`(id) ON DELETE SET NULL,
     FOREIGN KEY (usuario_id) REFERENCES `inva-usuarios`(id) ON DELETE SET NULL,
     INDEX idx_numero_factura_contado (numero_factura),
@@ -112,6 +127,7 @@ CREATE TABLE IF NOT EXISTS `inva-facturas_credito` (
     pago_inicial DECIMAL(10,2),
     saldo DECIMAL(10,2),
     estado ENUM('pendiente', 'pagada', 'anulada') DEFAULT 'pendiente',
+    pdf_filename VARCHAR(255),
     FOREIGN KEY (cliente_id) REFERENCES `inva-clientes`(id) ON DELETE SET NULL,
     FOREIGN KEY (usuario_id) REFERENCES `inva-usuarios`(id) ON DELETE SET NULL,
     INDEX idx_numero_factura_credito (numero_factura),

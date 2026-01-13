@@ -45,6 +45,7 @@ env/
 instance/
 .webassets-cache
 backend/static/uploads/
+backend/static/invoices/
 
 # IDE / OS
 .vscode/

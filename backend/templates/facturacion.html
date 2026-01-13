@@ -11,9 +11,12 @@
       <nav class="sidebar-nav">
         <a class="nav-item" href="/dashboard">Dashboard</a>
         <a class="nav-item active" href="/facturacion">Facturacion</a>
+        <a class="nav-item" href="/facturas/credito">Facturas credito</a>
+        <a class="nav-item" href="/facturas/historial">Historial facturas</a>
         <a class="nav-item" href="/clientes">Clientes</a>
         <a class="nav-item" href="/productos">Productos</a>
         <a class="nav-item" href="/reportes">Reportes</a>
+        <a class="nav-item" href="/ajustes">Ajustes</a>
       </nav>
       <div class="sidebar-footer">
         <img class="sidebar-mascot" src="/static/assets/mascota.jpeg" alt="Mascota" />
@@ -201,6 +204,9 @@
       <div class="form-actions">
         <button class="secondary-button" type="button" data-invoice-close>Cancelar</button>
         <button class="primary-button" type="button" id="confirm-invoice">Confirmar</button>
+        <a class="secondary-button" id="invoice-pdf-link" href="#" target="_blank" style="display:none;">
+          Ver PDF
+        </a>
       </div>
     </div>
   </div>
@@ -234,6 +240,7 @@
     const invoiceBalanceRow = document.getElementById("invoice-balance-row");
     const invoiceBalance = document.getElementById("invoice-balance");
     const confirmInvoice = document.getElementById("confirm-invoice");
+    const invoicePdfLink = document.getElementById("invoice-pdf-link");
     let modalTotalValue = 0;
     let modalInvoiceType = "contado";
 
@@ -419,6 +426,10 @@
       if (invoiceModal) {
         invoiceModal.classList.add("open");
       }
+      if (invoicePdfLink) {
+        invoicePdfLink.style.display = "none";
+        invoicePdfLink.href = "#";
+      }
     };
 
     const updateChange = () => {
@@ -504,6 +515,11 @@
             return;
           }
           alert(`Factura guardada: ${result.numero_factura}`);
+          if (result.pdf_url && invoicePdfLink) {
+            invoicePdfLink.href = result.pdf_url;
+            invoicePdfLink.style.display = "inline-flex";
+            return;
+          }
           if (invoiceModal) {
             invoiceModal.classList.remove("open");
           }

@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}Ajustes | Invagro{% endblock %}
+{% block body_class %}page dashboard-page{% endblock %}
+{% block content %}
+  <div class="dashboard-container">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <img class="sidebar-logo" src="/static/assets/logo.jpg" alt="Invagro" />
+        <h3>Invagro</h3>
+      </div>
+      <nav class="sidebar-nav">
+        <a class="nav-item" href="/dashboard">Dashboard</a>
+        <a class="nav-item" href="/facturacion">Facturacion</a>
+        <a class="nav-item" href="/facturas/credito">Facturas credito</a>
+        <a class="nav-item" href="/facturas/historial">Historial facturas</a>
+        <a class="nav-item" href="/clientes">Clientes</a>
+        <a class="nav-item" href="/productos">Productos</a>
+        <a class="nav-item" href="/reportes">Reportes</a>
+        <a class="nav-item active" href="/ajustes">Ajustes</a>
+      </nav>
+      <div class="sidebar-footer">
+        <img class="sidebar-mascot" src="/static/assets/mascota.jpeg" alt="Mascota" />
+      </div>
+    </aside>
+
+    <div class="main-content">
+      <div class="topbar">
+        <div class="topbar-left">
+          <h2>Ajustes</h2>
+        </div>
+        <div class="topbar-right">
+          <span class="user-pill">Sesion: {{ user }}</span>
+        </div>
+      </div>
+
+      <main class="content-area">
+        <section class="form-card">
+          <h3>Informacion del negocio</h3>
+          <form class="module-form" method="post">
+            <label class="span-2">
+              <span>Nombre del negocio</span>
+              <input type="text" name="nombre" value="{{ settings.nombre }}" required />
+            </label>
+            <label>
+              <span>RTN</span>
+              <input type="text" name="rtn" value="{{ settings.rtn or '' }}" />
+            </label>
+            <label>
+              <span>Telefono</span>
+              <input type="text" name="telefono" value="{{ settings.telefono or '' }}" />
+            </label>
+            <label>
+              <span>Email</span>
+              <input type="email" name="email" value="{{ settings.email or '' }}" />
+            </label>
+            <label class="span-2">
+              <span>Direccion</span>
+              <input type="text" name="direccion" value="{{ settings.direccion or '' }}" />
+            </label>
+            <label>
+              <span>CAI</span>
+              <input type="text" name="cai" value="{{ settings.cai or '' }}" />
+            </label>
+            <label>
+              <span>Rango autorizado</span>
+              <input
+                type="text"
+                name="rango_autorizado"
+                value="{{ settings.rango_autorizado or '' }}"
+              />
+            </label>
+            <label>
+              <span>Fecha limite de emision</span>
+              <input
+                type="text"
+                name="fecha_limite_emision"
+                value="{{ settings.fecha_limite_emision or '' }}"
+              />
+            </label>
+            <label class="span-2">
+              <span>Mensaje en factura</span>
+              <input type="text" name="mensaje" value="{{ settings.mensaje or '' }}" />
+            </label>
+            <div class="form-actions span-2">
+              <button class="primary-button" type="submit">Guardar ajustes</button>
+            </div>
+          </form>
+        </section>
+      </main>
+    </div>
+  </div>
+{% endblock %}

@@ -57,6 +57,22 @@ class Categoria(db.Model):
     fecha_creacion = db.Column(db.DateTime)
 
 
+class AjustesNegocio(db.Model):
+    __tablename__ = "inva-ajustes_negocio"
+    __table_args__ = {"extend_existing": True}
+
+    id = db.Column(db.Integer, primary_key=True)
+    nombre = db.Column(db.String(150), nullable=False)
+    rtn = db.Column(db.String(30))
+    telefono = db.Column(db.String(30))
+    email = db.Column(db.String(120))
+    direccion = db.Column(db.String(255))
+    cai = db.Column(db.String(60))
+    rango_autorizado = db.Column(db.String(120))
+    fecha_limite_emision = db.Column(db.String(30))
+    mensaje = db.Column(db.String(255))
+
+
 class FacturaContado(db.Model):
     __tablename__ = "inva-facturas_contado"
     __table_args__ = {"extend_existing": True}
@@ -73,6 +89,7 @@ class FacturaContado(db.Model):
     pago = db.Column(db.Numeric(10, 2))
     cambio = db.Column(db.Numeric(10, 2))
     estado = db.Column(db.Enum("pagada", "anulada"), default="pagada")
+    pdf_filename = db.Column(db.String(255))
 
 
 class DetalleFacturaContado(db.Model):
@@ -110,6 +127,7 @@ class FacturaCredito(db.Model):
     estado = db.Column(
         db.Enum("pendiente", "pagada", "anulada"), default="pendiente"
     )
+    pdf_filename = db.Column(db.String(255))
 
 
 class DetalleFacturaCredito(db.Model):

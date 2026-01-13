@@ -9,8 +9,13 @@ from flask import Flask, jsonify, redirect, render_template, request, session, u
 from sqlalchemy.exc import SQLAlchemyError
 from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 from models import (
+    AjustesNegocio,
     Categoria,
     Cliente,
     DetalleFacturaContado,
@@ -29,8 +34,17 @@ def create_app():
     db.init_app(app)
 
     upload_folder = os.path.join(app.static_folder, "uploads", "productos")
-    os.makedirs(upload_folder, exist_ok=True)
+    try:
+        os.makedirs(upload_folder, exist_ok=True)
+    except PermissionError:
+        app.logger.warning("No se pudo crear la carpeta de uploads.")
     app.config["PRODUCT_UPLOAD_FOLDER"] = upload_folder
+    invoice_folder = os.path.join(app.static_folder, "invoices")
+    try:
+        os.makedirs(invoice_folder, exist_ok=True)
+    except PermissionError:
+        app.logger.warning("No se pudo crear la carpeta de facturas.")
+    app.config["INVOICE_PDF_FOLDER"] = invoice_folder
 
     allowed_extensions = {"jpg", "jpeg", "png", "webp"}
 
@@ -50,6 +64,134 @@ def create_app():
 
     def generate_invoice_number():
         return f"F001-{datetime.utcnow():%Y%m%d%H%M%S}"
+
+    def get_business_settings():
+        settings = AjustesNegocio.query.first()
+        if settings:
+            return settings
+        settings = AjustesNegocio(
+            nombre="Invagro",
+            rtn="",
+            telefono="",
+            email="",
+            direccion="",
+            cai="",
+            rango_autorizado="",
+            fecha_limite_emision="",
+            mensaje="",
+        )
+        db.session.add(settings)
+        db.session.commit()
+        return settings
+
+    def create_invoice_pdf(file_path, settings, invoice, detalles, tipo, cliente, usuario):
+        styles = getSampleStyleSheet()
+        doc = SimpleDocTemplate(
+            file_path,
+            pagesize=letter,
+            leftMargin=36,
+            rightMargin=36,
+            topMargin=36,
+            bottomMargin=36,
+        )
+        story = []
+        header_left = f"<b>{settings.nombre}</b><br/>RTN: {settings.rtn or '-'}<br/>TEL: {settings.telefono or '-'}<br/>{settings.email or ''}"
+        header_right = (
+            f"<b>FACTURA</b><br/>{invoice.numero_factura}<br/>FECHA: "
+            f"{invoice.fecha.strftime('%d/%m/%Y %I:%M %p')}"
+        )
+        header_table = Table(
+            [[Paragraph(header_left, styles["Normal"]), Paragraph(header_right, styles["Normal"])]],
+            colWidths=[320, 200],
+        )
+        header_table.setStyle(
+            TableStyle(
+                [
+                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                    ("ALIGN", (1, 0), (1, 0), "RIGHT"),
+                ]
+            )
+        )
+        story.append(header_table)
+        story.append(Spacer(1, 12))
+
+        cliente_nombre = cliente.nombre if cliente else "N/A"
+        cliente_telefono = cliente.telefono if cliente else "-"
+        cliente_line = (
+            f"<b>CLIENTE:</b> {cliente_nombre} "
+            f"<b>RTN:</b> {invoice.rtn or '-'} "
+            f"<b>TEL:</b> {cliente_telefono}"
+        )
+        story.append(Paragraph(cliente_line, styles["Normal"]))
+        story.append(Spacer(1, 8))
+
+        tipo_texto = "CONTADO" if tipo == "contado" else "CREDITO"
+        vendedor = usuario.nombre_completo if usuario and usuario.nombre_completo else "General"
+        meta_line = f"<b>CAJERO:</b> {vendedor} &nbsp;&nbsp; <b>TERMINOS:</b> {tipo_texto}"
+        story.append(Paragraph(meta_line, styles["Normal"]))
+        story.append(Spacer(1, 10))
+
+        data = [
+            [
+                "CODIGO",
+                "DESCRIPCION",
+                "CANTIDAD",
+                "PRECIO UNIT.",
+                "ISV",
+                "TOTAL",
+            ]
+        ]
+        for detalle in detalles:
+            producto = detalle["producto"]
+            isv_text = "15%" if detalle["isv_aplica"] else "0%"
+            data.append(
+                [
+                    producto.codigo,
+                    producto.nombre,
+                    str(detalle["cantidad"]),
+                    f"L {detalle['precio']:.2f}",
+                    isv_text,
+                    f"L {detalle['subtotal']:.2f}",
+                ]
+            )
+        table = Table(data, colWidths=[60, 200, 70, 80, 50, 70])
+        table.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
+                    ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ]
+            )
+        )
+        story.append(table)
+        story.append(Spacer(1, 12))
+
+        totals_table = Table(
+            [
+                ["SUBTOTAL", f"L {invoice.subtotal:.2f}"],
+                ["ISV", f"L {invoice.isv:.2f}"],
+                ["TOTAL A PAGAR", f"L {invoice.total:.2f}"],
+            ],
+            colWidths=[120, 120],
+            hAlign="RIGHT",
+        )
+        totals_table.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, -1), (-1, -1), colors.lightgrey),
+                    ("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"),
+                    ("ALIGN", (1, 0), (1, -1), "RIGHT"),
+                ]
+            )
+        )
+        story.append(totals_table)
+        story.append(Spacer(1, 12))
+
+        if settings.mensaje:
+            story.append(Paragraph(settings.mensaje, styles["Normal"]))
+        doc.build(story)
 
     if not app.debug and not app.testing:
         logging.basicConfig(
@@ -221,6 +363,62 @@ def create_app():
             return redirect(url_for("login"))
 
         return render_template("reportes.html", user=session["user"])
+
+    @app.route("/ajustes", methods=["GET", "POST"])
+    def ajustes():
+        if not session.get("user"):
+            return redirect(url_for("login"))
+
+        settings = AjustesNegocio.query.first()
+        if not settings:
+            settings = AjustesNegocio(nombre="Invagro")
+            db.session.add(settings)
+            db.session.commit()
+
+        if request.method == "POST":
+            settings.nombre = request.form.get("nombre", "").strip() or "Invagro"
+            settings.rtn = request.form.get("rtn", "").strip()
+            settings.telefono = request.form.get("telefono", "").strip()
+            settings.email = request.form.get("email", "").strip()
+            settings.direccion = request.form.get("direccion", "").strip()
+            settings.cai = request.form.get("cai", "").strip()
+            settings.rango_autorizado = request.form.get("rango_autorizado", "").strip()
+            settings.fecha_limite_emision = request.form.get("fecha_limite_emision", "").strip()
+            settings.mensaje = request.form.get("mensaje", "").strip()
+            db.session.commit()
+            return redirect(url_for("ajustes"))
+
+        return render_template("ajustes.html", user=session["user"], settings=settings)
+
+    @app.get("/facturas/credito")
+    def facturas_credito():
+        if not session.get("user"):
+            return redirect(url_for("login"))
+
+        facturas = FacturaCredito.query.order_by(FacturaCredito.fecha.desc()).all()
+        clientes = Cliente.query.all()
+        clientes_map = {cliente.id: cliente.nombre for cliente in clientes}
+        return render_template(
+            "facturas_credito.html",
+            user=session["user"],
+            facturas=facturas,
+            clientes_map=clientes_map,
+        )
+
+    @app.get("/facturas/historial")
+    def facturas_historial():
+        if not session.get("user"):
+            return redirect(url_for("login"))
+
+        facturas = FacturaContado.query.order_by(FacturaContado.fecha.desc()).all()
+        clientes = Cliente.query.all()
+        clientes_map = {cliente.id: cliente.nombre for cliente in clientes}
+        return render_template(
+            "facturas_historial.html",
+            user=session["user"],
+            facturas=facturas,
+            clientes_map=clientes_map,
+        )
 
     @app.route("/clientes/<int:cliente_id>/edit", methods=["GET", "POST"])
     def editar_cliente(cliente_id):
@@ -502,11 +700,35 @@ def create_app():
             db.session.rollback()
             return jsonify({"error": "No se pudo guardar la factura."}), 500
 
+        pdf_url = None
+        try:
+            settings = get_business_settings()
+            cliente = Cliente.query.get(cliente_id) if cliente_id else None
+            detalles_pdf = [
+                {
+                    "producto": producto,
+                    "cantidad": cantidad,
+                    "precio": float(precio),
+                    "subtotal": float(linea),
+                    "isv_aplica": producto.isv_aplica,
+                }
+                for producto, cantidad, precio, linea in detalles
+            ]
+            pdf_filename = f"{numero_factura}.pdf"
+            pdf_path = os.path.join(app.config["INVOICE_PDF_FOLDER"], pdf_filename)
+            create_invoice_pdf(pdf_path, settings, factura, detalles_pdf, tipo, cliente, usuario)
+            factura.pdf_filename = pdf_filename
+            db.session.commit()
+            pdf_url = url_for("static", filename=f"invoices/{pdf_filename}")
+        except Exception:
+            app.logger.exception("No se pudo generar el PDF de la factura.")
+
         return jsonify(
             {
                 "numero_factura": numero_factura,
                 "total": float(total),
                 "tipo": tipo,
+                "pdf_url": pdf_url,
             }
         )
 
