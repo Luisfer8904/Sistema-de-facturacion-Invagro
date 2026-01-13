@@ -147,10 +147,56 @@
 
           <div class="pos-actions">
             <button class="secondary-button" type="button">Guardar borrador</button>
-            <button class="primary-button" type="button">Emitir factura</button>
+            <button class="primary-button" type="button" id="emit-invoice">Emitir factura</button>
           </div>
         </section>
       </main>
+    </div>
+  </div>
+
+  <div class="modal" id="invoice-modal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div>
+          <h3>Resumen de factura</h3>
+          <span id="invoice-client">Cliente: -</span>
+        </div>
+        <button class="modal-close" type="button" data-invoice-close>×</button>
+      </div>
+      <div class="invoice-modal-body">
+        <div class="invoice-meta">
+          <span id="invoice-rtn">RTN: -</span>
+        </div>
+        <div class="invoice-items" id="invoice-items"></div>
+        <div class="invoice-modal-summary">
+          <div>
+            <span>Subtotal</span>
+            <strong id="invoice-subtotal">L 0.00</strong>
+          </div>
+          <div>
+            <span>ISV</span>
+            <strong id="invoice-isv">L 0.00</strong>
+          </div>
+          <div class="invoice-total">
+            <span>Total</span>
+            <strong id="invoice-total">L 0.00</strong>
+          </div>
+        </div>
+        <div class="invoice-payment">
+          <label>
+            <span>Paga con</span>
+            <input type="number" min="0" step="0.01" id="invoice-paid" />
+          </label>
+          <div class="change-box">
+            <span>Cambio</span>
+            <strong id="invoice-change">L 0.00</strong>
+          </div>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button class="secondary-button" type="button" data-invoice-close>Cancelar</button>
+        <button class="primary-button" type="button">Confirmar</button>
+      </div>
     </div>
   </div>
   <script>
@@ -166,6 +212,20 @@
     const tabs = document.querySelectorAll(".pos-tabs .tab");
     const clientSelect = document.getElementById("cliente-select");
     const clientRtnInput = document.getElementById("cliente-rtn");
+    const emitButton = document.getElementById("emit-invoice");
+    const invoiceModal = document.getElementById("invoice-modal");
+    const invoiceCloseButtons = invoiceModal
+      ? invoiceModal.querySelectorAll("[data-invoice-close]")
+      : [];
+    const invoiceItems = document.getElementById("invoice-items");
+    const invoiceSubtotal = document.getElementById("invoice-subtotal");
+    const invoiceIsv = document.getElementById("invoice-isv");
+    const invoiceTotal = document.getElementById("invoice-total");
+    const invoicePaid = document.getElementById("invoice-paid");
+    const invoiceChange = document.getElementById("invoice-change");
+    const invoiceClient = document.getElementById("invoice-client");
+    const invoiceRtn = document.getElementById("invoice-rtn");
+    let modalTotalValue = 0;
 
     const formatCurrency = (value) => `L ${value.toFixed(2)}`;
 
@@ -272,6 +332,103 @@
         const option = clientSelect.options[clientSelect.selectedIndex];
         clientRtnInput.value = option ? option.dataset.rtn || "" : "";
       });
+    }
+
+    const openInvoiceModal = () => {
+      const rows = invoiceTable.querySelectorAll(".invoice-row");
+      if (!rows.length) {
+        alert("Agrega productos antes de emitir la factura.");
+        return;
+      }
+
+      const selectedOption = clientSelect ? clientSelect.options[clientSelect.selectedIndex] : null;
+      const clientName = selectedOption && selectedOption.value ? selectedOption.textContent.trim() : "-";
+      const rtnValue = clientRtnInput ? clientRtnInput.value.trim() : "";
+      if (invoiceClient) {
+        invoiceClient.textContent = `Cliente: ${clientName || "-"}`;
+      }
+      if (invoiceRtn) {
+        invoiceRtn.textContent = `RTN: ${rtnValue || "-"}`;
+      }
+
+      let subtotal = 0;
+      let isv = 0;
+      const itemsHtml = Array.from(rows)
+        .map((row) => {
+          const qty = Number(row.querySelector(".qty-input").value || 0);
+          const price = Number(row.dataset.price || 0);
+          const line = qty * price;
+          const applyTax = row.dataset.isv === "1";
+          if (applyTax) {
+            isv += line * taxRate;
+          }
+          subtotal += line;
+          return `
+            <div class="invoice-item">
+              <span>${row.querySelector("span").textContent}</span>
+              <span>${qty} x ${formatCurrency(price)}</span>
+              <strong>${formatCurrency(line)}</strong>
+            </div>
+          `;
+        })
+        .join("");
+
+      modalTotalValue = subtotal + isv;
+      if (invoiceItems) {
+        invoiceItems.innerHTML = itemsHtml;
+      }
+      if (invoiceSubtotal) {
+        invoiceSubtotal.textContent = formatCurrency(subtotal);
+      }
+      if (invoiceIsv) {
+        invoiceIsv.textContent = formatCurrency(isv);
+      }
+      if (invoiceTotal) {
+        invoiceTotal.textContent = formatCurrency(modalTotalValue);
+      }
+      if (invoicePaid) {
+        invoicePaid.value = modalTotalValue.toFixed(2);
+      }
+      if (invoiceChange) {
+        invoiceChange.textContent = formatCurrency(0);
+      }
+
+      if (invoiceModal) {
+        invoiceModal.classList.add("open");
+      }
+    };
+
+    const updateChange = () => {
+      if (!invoicePaid || !invoiceChange) {
+        return;
+      }
+      const paid = Number(invoicePaid.value || 0);
+      const change = Math.max(0, paid - modalTotalValue);
+      invoiceChange.textContent = formatCurrency(change);
+    };
+
+    if (emitButton) {
+      emitButton.addEventListener("click", openInvoiceModal);
+    }
+
+    invoiceCloseButtons.forEach((button) => {
+      button.addEventListener("click", () => {
+        if (invoiceModal) {
+          invoiceModal.classList.remove("open");
+        }
+      });
+    });
+
+    if (invoiceModal) {
+      invoiceModal.addEventListener("click", (event) => {
+        if (event.target === invoiceModal) {
+          invoiceModal.classList.remove("open");
+        }
+      });
+    }
+
+    if (invoicePaid) {
+      invoicePaid.addEventListener("input", updateChange);
     }
   </script>
 {% endblock %}

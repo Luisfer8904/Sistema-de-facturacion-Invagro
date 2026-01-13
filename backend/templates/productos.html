@@ -50,28 +50,51 @@
           <div class="form-error">{{ error }}</div>
         {% endif %}
 
-        <section class="module-table">
-          <div class="table-header table-five">
-            <span>Codigo</span>
-            <span>Producto</span>
-            <span>Categoria</span>
-            <span>Stock</span>
-            <span>Acciones</span>
-          </div>
+        <section class="pos-search">
+          <input
+            type="text"
+            placeholder="Buscar producto por codigo o nombre"
+            id="product-search"
+          />
+          <button class="primary-button" type="button" id="clear-search">
+            Limpiar
+          </button>
+        </section>
+
+        <section class="pos-tabs">
+          <button class="tab active" data-filter="todos">Todos</button>
+          {% for categoria in categorias %}
+            <button class="tab" data-filter="{{ categoria.nombre|lower|replace(' ', '-') }}">
+              {{ categoria.nombre }}
+            </button>
+          {% endfor %}
+        </section>
+
+        <section class="pos-grid" id="productos-grid">
           {% if productos %}
             {% for producto in productos %}
-              <div class="table-row table-five">
-                <span>{{ producto.codigo }}</span>
-                <span>{{ producto.nombre }}</span>
-                <span>{{ producto.categoria }}</span>
-                <span>{{ producto.stock }}</span>
-                <span class="table-actions">
+              <article
+                class="pos-product product-card"
+                data-name="{{ producto.nombre }}"
+                data-code="{{ producto.codigo }}"
+                data-category="{{ producto.categoria|lower|replace(' ', '-') }}"
+              >
+                {% set product_image = url_for('static', filename='uploads/productos/' ~ producto.foto) if producto.foto else url_for('static', filename='assets/shampoo.jpeg') %}
+                <img src="{{ product_image }}" alt="{{ producto.nombre }}" />
+                <div class="product-meta">
+                  <h4>{{ producto.nombre }}</h4>
+                  <span class="product-price">L {{ "%.2f"|format(producto.precio) }}</span>
+                  <small>Codigo: {{ producto.codigo }}</small>
+                  <small>Categoria: {{ producto.categoria }}</small>
+                  <small>Stock: {{ producto.stock }}</small>
+                </div>
+                <div class="product-actions">
                   <a class="secondary-button" href="/productos/{{ producto.id }}/edit">Editar</a>
                   <form method="post" action="/productos/{{ producto.id }}/delete">
                     <button class="danger-button" type="submit">Eliminar</button>
                   </form>
-                </span>
-              </div>
+                </div>
+              </article>
             {% endfor %}
           {% else %}
             <div class="table-row table-five">
@@ -189,6 +212,10 @@
     const categoryModal = document.querySelector("[data-category]");
     const categoryOpen = document.querySelector("[data-category-open]");
     const categoryClose = document.querySelectorAll("[data-category-close]");
+    const searchInput = document.getElementById("product-search");
+    const clearSearch = document.getElementById("clear-search");
+    const tabs = document.querySelectorAll(".pos-tabs .tab");
+    const productCards = Array.from(document.querySelectorAll(".product-card"));
 
     if (openButton && modal) {
       openButton.addEventListener("click", () => modal.classList.add("open"));
@@ -213,5 +240,41 @@
         }
       });
     }
+
+    const applyFilters = () => {
+      const query = searchInput ? searchInput.value.trim().toLowerCase() : "";
+      const activeTab = document.querySelector(".pos-tabs .tab.active");
+      const filter = activeTab ? activeTab.dataset.filter : "todos";
+
+      productCards.forEach((card) => {
+        const name = card.dataset.name.toLowerCase();
+        const code = card.dataset.code.toLowerCase();
+        const category = card.dataset.category.toLowerCase();
+        const matchesSearch = !query || name.includes(query) || code.includes(query);
+        const matchesCategory = filter === "todos" || category === filter;
+        card.style.display = matchesSearch && matchesCategory ? "grid" : "none";
+      });
+    };
+
+    if (searchInput) {
+      searchInput.addEventListener("input", applyFilters);
+    }
+
+    if (clearSearch) {
+      clearSearch.addEventListener("click", () => {
+        if (searchInput) {
+          searchInput.value = "";
+        }
+        applyFilters();
+      });
+    }
+
+    tabs.forEach((tab) => {
+      tab.addEventListener("click", () => {
+        tabs.forEach((item) => item.classList.remove("active"));
+        tab.classList.add("active");
+        applyFilters();
+      });
+    });
   </script>
 {% endblock %}
