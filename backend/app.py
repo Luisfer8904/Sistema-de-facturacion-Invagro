@@ -94,6 +94,12 @@ def create_app():
 
     def create_invoice_pdf(file_path, settings, invoice, detalles, tipo, cliente, usuario):
         styles = getSampleStyleSheet()
+        base_style = styles["Normal"]
+        base_style.fontSize = 9
+        base_style.leading = 10
+        small_style = styles["Normal"].clone("small")
+        small_style.fontSize = 8
+        small_style.leading = 9
         doc = SimpleDocTemplate(
             file_path,
             pagesize=letter,
@@ -101,6 +107,7 @@ def create_app():
             rightMargin=22,
             topMargin=22,
             bottomMargin=22,
+            allowSplitting=0,
         )
         story = []
         usable_height = doc.height
@@ -120,7 +127,7 @@ def create_app():
             f"FECHA: {invoice.fecha.strftime('%d/%m/%Y %I:%M %p')}"
         )
         header_table = Table(
-            [[logo_image or "", Paragraph(header_center, styles["Normal"]), Paragraph(header_right, styles["Normal"])]],
+            [[logo_image or "", Paragraph(header_center, base_style), Paragraph(header_right, base_style)]],
             colWidths=[90, 300, 130],
         )
         header_table.setStyle(
@@ -142,7 +149,7 @@ def create_app():
             f"<b>RTN:</b> {invoice.rtn or '-'} &nbsp;&nbsp; "
             f"<b>TEL:</b> {cliente_telefono}"
         )
-        cliente_paragraph = Paragraph(cliente_line, styles["Normal"])
+        cliente_paragraph = Paragraph(cliente_line, base_style)
         story.append(cliente_paragraph)
         story.append(Spacer(1, 4))
 
@@ -155,7 +162,7 @@ def create_app():
             f"<b>TERMINOS:</b> {tipo_texto} &nbsp;&nbsp; "
             f"<b>ESTADO:</b> {estado}"
         )
-        meta_paragraph = Paragraph(meta_line, styles["Normal"])
+        meta_paragraph = Paragraph(meta_line, base_style)
         story.append(meta_paragraph)
         story.append(Spacer(1, 6))
 
@@ -192,7 +199,7 @@ def create_app():
                     f"L {detalle['subtotal']:.2f}",
                 ]
             )
-        def build_product_table(rows, header_font_size, body_font_size):
+        def build_product_table(rows, header_font_size, body_font_size, padding):
             table_instance = Table(rows, colWidths=[50, 195, 50, 50, 68, 45, 35, 45])
             table_instance.setStyle(
                 TableStyle(
@@ -205,10 +212,10 @@ def create_app():
                         ("FONTSIZE", (0, 1), (-1, -1), body_font_size),
                         ("ALIGN", (2, 1), (-1, -1), "RIGHT"),
                         ("BACKGROUND", (0, 0), (-1, 0), colors.whitesmoke),
-                        ("LEFTPADDING", (0, 0), (-1, -1), 3),
-                        ("RIGHTPADDING", (0, 0), (-1, -1), 3),
-                        ("TOPPADDING", (0, 0), (-1, -1), 2),
-                        ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+                        ("LEFTPADDING", (0, 0), (-1, -1), padding),
+                        ("RIGHTPADDING", (0, 0), (-1, -1), padding),
+                        ("TOPPADDING", (0, 0), (-1, -1), padding),
+                        ("BOTTOMPADDING", (0, 0), (-1, -1), padding),
                     ]
                 )
             )
@@ -231,10 +238,11 @@ def create_app():
                 [
                     ("BOX", (0, 0), (-1, -1), 0.75, colors.black),
                     ("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"),
+                    ("FONTSIZE", (0, 0), (-1, -1), 8),
                     ("ALIGN", (1, 0), (1, -1), "RIGHT"),
                     ("BACKGROUND", (0, -1), (-1, -1), colors.whitesmoke),
-                    ("LEFTPADDING", (0, 0), (-1, -1), 3),
-                    ("RIGHTPADDING", (0, 0), (-1, -1), 3),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 2),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 2),
                     ("TOPPADDING", (0, 0), (-1, -1), 2),
                     ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
                 ]
@@ -247,7 +255,7 @@ def create_app():
             "N° CONST. REGISTRO EXONERADO:<br/>"
             "N° REGISTRO SAG:"
         )
-        notes_paragraph = Paragraph(notes_text, styles["Normal"])
+        notes_paragraph = Paragraph(notes_text, small_style)
         bottom_block = Table(
             [[notes_paragraph, totals_table]],
             colWidths=[doc.width - 215, 215],
@@ -268,46 +276,75 @@ def create_app():
         bottom_height = bottom_block.wrap(doc.width, usable_height)[1]
 
         item_count = max(0, len(data) - 1)
+        header_font_size = 8
+        body_font_size = 9
         if item_count > 18:
             header_font_size = 7
             body_font_size = 8
-        elif item_count > 12:
-            header_font_size = 8
-            body_font_size = 9
-        else:
-            header_font_size = 8
-            body_font_size = 9
-
-        product_table = build_product_table(data, header_font_size, body_font_size)
-        product_table.wrap(doc.width, usable_height)
-        base_table_height = product_table._height
-        row_height = product_table._rowHeights[1] if len(product_table._rowHeights) > 1 else 18
-        reserved_spacing = 6 + 4 + 6  # spacers after header, cliente y meta
-        target_table_height = max(
-            0,
-            usable_height - (header_height + cliente_height + meta_height + bottom_height + reserved_spacing),
-        )
-        if base_table_height < target_table_height and row_height:
-            extra_rows = int((target_table_height - base_table_height) / row_height)
-            if extra_rows > 0:
-                data.extend([["", "", "", "", "", "", "", ""]] * extra_rows)
-                product_table = build_product_table(data, header_font_size, body_font_size)
-
-        story.append(product_table)
-        story.append(Spacer(1, 4))
-        story.append(KeepTogether([bottom_block]))
-        story.append(Spacer(1, 4))
+        if item_count > 24:
+            header_font_size = 6
+            body_font_size = 7
+        padding = 2
 
         footer_blocks = []
         if settings.mensaje:
-            footer_blocks.append(Paragraph(settings.mensaje, styles["Normal"]))
+            footer_blocks.append(Paragraph(settings.mensaje, small_style))
         if settings.cai or settings.rango_autorizado or settings.fecha_limite_emision:
             footer_text = (
                 f"CAI: {settings.cai or '-'}<br/>"
                 f"RANGO AUTORIZADO: {settings.rango_autorizado or '-'}<br/>"
                 f"FECHA LIMITE DE EMISION: {settings.fecha_limite_emision or '-'}"
             )
-            footer_blocks.append(Paragraph(footer_text, styles["Normal"]))
+            footer_blocks.append(Paragraph(footer_text, small_style))
+        footer_height = 0
+        for block in footer_blocks:
+            footer_height += block.wrap(doc.width, usable_height)[1]
+
+        reserved_spacing = 6 + 4 + 6 + 4 + (4 if footer_blocks else 0)
+        target_table_height = max(
+            0,
+            usable_height
+            - (
+                header_height
+                + cliente_height
+                + meta_height
+                + bottom_height
+                + footer_height
+                + reserved_spacing
+            ),
+        )
+
+        def fit_table():
+            nonlocal header_font_size, body_font_size, padding
+            for _ in range(6):
+                table_instance = build_product_table(data, header_font_size, body_font_size, padding)
+                table_instance.wrap(doc.width, usable_height)
+                if table_instance._height <= target_table_height:
+                    return table_instance
+                if body_font_size > 7:
+                    body_font_size -= 1
+                    header_font_size = max(6, header_font_size - 1)
+                elif padding > 1:
+                    padding -= 1
+                else:
+                    return table_instance
+            return build_product_table(data, header_font_size, body_font_size, padding)
+
+        product_table = fit_table()
+        product_table.wrap(doc.width, usable_height)
+        base_table_height = product_table._height
+        row_height = product_table._rowHeights[1] if len(product_table._rowHeights) > 1 else 18
+        if base_table_height < target_table_height and row_height:
+            extra_rows = int((target_table_height - base_table_height) / row_height)
+            if extra_rows > 0:
+                data.extend([["", "", "", "", "", "", "", ""]] * extra_rows)
+                product_table = build_product_table(data, header_font_size, body_font_size, padding)
+
+        story.append(product_table)
+        story.append(Spacer(1, 4))
+        story.append(KeepTogether([bottom_block]))
+        story.append(Spacer(1, 4))
+
         if footer_blocks:
             story.append(KeepTogether(footer_blocks))
         doc.build(story)
