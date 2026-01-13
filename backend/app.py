@@ -283,9 +283,12 @@ def create_app():
         base_table_height = product_table._height
         row_height = product_table._rowHeights[1] if len(product_table._rowHeights) > 1 else 18
         reserved_spacing = 6 + 4 + 6  # spacers after header, cliente y meta
+        extra_bottom_space = 142  # ~5 cm to leave room for legal/footer lines
         target_table_height = max(
             0,
-            usable_height - (header_height + cliente_height + meta_height + bottom_height + reserved_spacing),
+            usable_height
+            - (header_height + cliente_height + meta_height + bottom_height + reserved_spacing)
+            - extra_bottom_space,
         )
         if base_table_height < target_table_height and row_height:
             extra_rows = int((target_table_height - base_table_height) / row_height)
