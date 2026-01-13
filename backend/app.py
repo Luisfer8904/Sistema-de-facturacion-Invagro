@@ -1,5 +1,7 @@
 import logging
 import os
+from datetime import datetime
+from decimal import Decimal
 from uuid import uuid4
 
 import click
@@ -8,7 +10,17 @@ from sqlalchemy.exc import SQLAlchemyError
 from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
 
-from models import Categoria, Cliente, Producto, User, db
+from models import (
+    Categoria,
+    Cliente,
+    DetalleFacturaContado,
+    DetalleFacturaCredito,
+    FacturaContado,
+    FacturaCredito,
+    Producto,
+    User,
+    db,
+)
 
 
 def create_app():
@@ -35,6 +47,9 @@ def create_app():
         file_path = os.path.join(app.config["PRODUCT_UPLOAD_FOLDER"], unique_name)
         file_storage.save(file_path)
         return unique_name
+
+    def generate_invoice_number():
+        return f"F001-{datetime.utcnow():%Y%m%d%H%M%S}"
 
     if not app.debug and not app.testing:
         logging.basicConfig(
@@ -358,6 +373,142 @@ def create_app():
         except SQLAlchemyError:
             db.session.rollback()
         return redirect(url_for("productos"))
+
+    @app.post("/facturas")
+    def crear_factura():
+        if not session.get("user"):
+            return jsonify({"error": "No autorizado."}), 401
+
+        data = request.get_json(silent=True) or {}
+        tipo = (data.get("tipo") or "").strip().lower()
+        cliente_id = data.get("cliente_id") or None
+        rtn = (data.get("rtn") or "").strip() or None
+        pago_raw = data.get("pago", 0)
+        items = data.get("items") or []
+
+        if tipo not in {"contado", "credito"}:
+            return jsonify({"error": "Tipo de factura invalido."}), 400
+        if not items:
+            return jsonify({"error": "No hay productos en la factura."}), 400
+
+        try:
+            pago = Decimal(str(pago_raw))
+        except Exception:
+            return jsonify({"error": "Pago invalido."}), 400
+
+        producto_ids = []
+        parsed_items = []
+        for item in items:
+            try:
+                producto_id = int(item.get("producto_id"))
+                cantidad = int(item.get("cantidad"))
+            except (TypeError, ValueError):
+                return jsonify({"error": "Producto o cantidad invalida."}), 400
+            if cantidad <= 0:
+                return jsonify({"error": "Cantidad invalida."}), 400
+            producto_ids.append(producto_id)
+            parsed_items.append((producto_id, cantidad))
+
+        productos = Producto.query.filter(Producto.id.in_(producto_ids)).all()
+        productos_map = {producto.id: producto for producto in productos}
+        if len(productos_map) != len(set(producto_ids)):
+            return jsonify({"error": "Producto no encontrado."}), 400
+
+        subtotal = Decimal("0")
+        isv = Decimal("0")
+        detalles = []
+        for producto_id, cantidad in parsed_items:
+            producto = productos_map[producto_id]
+            precio = Decimal(str(producto.precio))
+            linea = precio * Decimal(cantidad)
+            subtotal += linea
+            if producto.isv_aplica:
+                isv += linea * Decimal("0.15")
+            detalles.append((producto, cantidad, precio, linea))
+
+        total = subtotal + isv
+        if pago < 0:
+            return jsonify({"error": "Pago invalido."}), 400
+        if tipo == "contado" and pago < total:
+            return jsonify({"error": "Pago insuficiente para contado."}), 400
+
+        usuario = User.query.filter_by(username=session["user"]).first()
+        usuario_id = usuario.id if usuario else None
+        numero_factura = generate_invoice_number()
+
+        try:
+            if tipo == "contado":
+                cambio = pago - total
+                factura = FacturaContado(
+                    numero_factura=numero_factura,
+                    cliente_id=cliente_id,
+                    usuario_id=usuario_id,
+                    rtn=rtn,
+                    fecha=datetime.utcnow(),
+                    subtotal=subtotal,
+                    isv=isv,
+                    total=total,
+                    pago=pago,
+                    cambio=cambio,
+                    estado="pagada",
+                )
+                db.session.add(factura)
+                db.session.flush()
+                for producto, cantidad, precio, linea in detalles:
+                    db.session.add(
+                        DetalleFacturaContado(
+                            factura_id=factura.id,
+                            producto_id=producto.id,
+                            cantidad=cantidad,
+                            precio_unitario=precio,
+                            subtotal=linea,
+                            isv_aplica=producto.isv_aplica,
+                        )
+                    )
+            else:
+                saldo = total - pago
+                if saldo < 0:
+                    saldo = Decimal("0")
+                estado = "pagada" if saldo == 0 else "pendiente"
+                factura = FacturaCredito(
+                    numero_factura=numero_factura,
+                    cliente_id=cliente_id,
+                    usuario_id=usuario_id,
+                    rtn=rtn,
+                    fecha=datetime.utcnow(),
+                    subtotal=subtotal,
+                    isv=isv,
+                    total=total,
+                    pago_inicial=pago,
+                    saldo=saldo,
+                    estado=estado,
+                )
+                db.session.add(factura)
+                db.session.flush()
+                for producto, cantidad, precio, linea in detalles:
+                    db.session.add(
+                        DetalleFacturaCredito(
+                            factura_id=factura.id,
+                            producto_id=producto.id,
+                            cantidad=cantidad,
+                            precio_unitario=precio,
+                            subtotal=linea,
+                            isv_aplica=producto.isv_aplica,
+                        )
+                    )
+
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            return jsonify({"error": "No se pudo guardar la factura."}), 500
+
+        return jsonify(
+            {
+                "numero_factura": numero_factura,
+                "total": float(total),
+                "tipo": tipo,
+            }
+        )
 
     @app.get("/health")
     def health_check():

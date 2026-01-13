@@ -78,6 +78,46 @@ CREATE TABLE IF NOT EXISTS `inva-facturas` (
     INDEX idx_estado (estado)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Tabla de Facturas Contado
+CREATE TABLE IF NOT EXISTS `inva-facturas_contado` (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    numero_factura VARCHAR(50) UNIQUE NOT NULL,
+    cliente_id INT,
+    usuario_id INT,
+    rtn VARCHAR(20),
+    fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    subtotal DECIMAL(10,2),
+    isv DECIMAL(10,2),
+    total DECIMAL(10,2),
+    pago DECIMAL(10,2),
+    cambio DECIMAL(10,2),
+    estado ENUM('pagada', 'anulada') DEFAULT 'pagada',
+    FOREIGN KEY (cliente_id) REFERENCES `inva-clientes`(id) ON DELETE SET NULL,
+    FOREIGN KEY (usuario_id) REFERENCES `inva-usuarios`(id) ON DELETE SET NULL,
+    INDEX idx_numero_factura_contado (numero_factura),
+    INDEX idx_fecha_contado (fecha)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Tabla de Facturas Credito
+CREATE TABLE IF NOT EXISTS `inva-facturas_credito` (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    numero_factura VARCHAR(50) UNIQUE NOT NULL,
+    cliente_id INT,
+    usuario_id INT,
+    rtn VARCHAR(20),
+    fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    subtotal DECIMAL(10,2),
+    isv DECIMAL(10,2),
+    total DECIMAL(10,2),
+    pago_inicial DECIMAL(10,2),
+    saldo DECIMAL(10,2),
+    estado ENUM('pendiente', 'pagada', 'anulada') DEFAULT 'pendiente',
+    FOREIGN KEY (cliente_id) REFERENCES `inva-clientes`(id) ON DELETE SET NULL,
+    FOREIGN KEY (usuario_id) REFERENCES `inva-usuarios`(id) ON DELETE SET NULL,
+    INDEX idx_numero_factura_credito (numero_factura),
+    INDEX idx_fecha_credito (fecha)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Tabla de Detalle de Facturas
 CREATE TABLE IF NOT EXISTS `inva-detalle_facturas` (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -90,6 +130,36 @@ CREATE TABLE IF NOT EXISTS `inva-detalle_facturas` (
     FOREIGN KEY (producto_id) REFERENCES `inva-productos`(id) ON DELETE RESTRICT,
     INDEX idx_factura_id (factura_id),
     INDEX idx_producto_id (producto_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Tabla de Detalle Facturas Contado
+CREATE TABLE IF NOT EXISTS `inva-detalle_facturas_contado` (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    factura_id INT NOT NULL,
+    producto_id INT NOT NULL,
+    cantidad INT NOT NULL,
+    precio_unitario DECIMAL(10,2) NOT NULL,
+    subtotal DECIMAL(10,2) NOT NULL,
+    isv_aplica BOOLEAN DEFAULT FALSE,
+    FOREIGN KEY (factura_id) REFERENCES `inva-facturas_contado`(id) ON DELETE CASCADE,
+    FOREIGN KEY (producto_id) REFERENCES `inva-productos`(id) ON DELETE RESTRICT,
+    INDEX idx_factura_id_contado (factura_id),
+    INDEX idx_producto_id_contado (producto_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Tabla de Detalle Facturas Credito
+CREATE TABLE IF NOT EXISTS `inva-detalle_facturas_credito` (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    factura_id INT NOT NULL,
+    producto_id INT NOT NULL,
+    cantidad INT NOT NULL,
+    precio_unitario DECIMAL(10,2) NOT NULL,
+    subtotal DECIMAL(10,2) NOT NULL,
+    isv_aplica BOOLEAN DEFAULT FALSE,
+    FOREIGN KEY (factura_id) REFERENCES `inva-facturas_credito`(id) ON DELETE CASCADE,
+    FOREIGN KEY (producto_id) REFERENCES `inva-productos`(id) ON DELETE RESTRICT,
+    INDEX idx_factura_id_credito (factura_id),
+    INDEX idx_producto_id_credito (producto_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Insertar usuario administrador por defecto

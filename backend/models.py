@@ -55,3 +55,75 @@ class Categoria(db.Model):
     nombre = db.Column(db.String(100), unique=True, nullable=False)
     activo = db.Column(db.Boolean, default=True)
     fecha_creacion = db.Column(db.DateTime)
+
+
+class FacturaContado(db.Model):
+    __tablename__ = "inva-facturas_contado"
+    __table_args__ = {"extend_existing": True}
+
+    id = db.Column(db.Integer, primary_key=True)
+    numero_factura = db.Column(db.String(50), unique=True, nullable=False)
+    cliente_id = db.Column(db.Integer, db.ForeignKey("inva-clientes.id"))
+    usuario_id = db.Column(db.Integer, db.ForeignKey("inva-usuarios.id"))
+    rtn = db.Column(db.String(20))
+    fecha = db.Column(db.DateTime)
+    subtotal = db.Column(db.Numeric(10, 2))
+    isv = db.Column(db.Numeric(10, 2))
+    total = db.Column(db.Numeric(10, 2))
+    pago = db.Column(db.Numeric(10, 2))
+    cambio = db.Column(db.Numeric(10, 2))
+    estado = db.Column(db.Enum("pagada", "anulada"), default="pagada")
+
+
+class DetalleFacturaContado(db.Model):
+    __tablename__ = "inva-detalle_facturas_contado"
+    __table_args__ = {"extend_existing": True}
+
+    id = db.Column(db.Integer, primary_key=True)
+    factura_id = db.Column(
+        db.Integer, db.ForeignKey("inva-facturas_contado.id"), nullable=False
+    )
+    producto_id = db.Column(
+        db.Integer, db.ForeignKey("inva-productos.id"), nullable=False
+    )
+    cantidad = db.Column(db.Integer, nullable=False)
+    precio_unitario = db.Column(db.Numeric(10, 2), nullable=False)
+    subtotal = db.Column(db.Numeric(10, 2), nullable=False)
+    isv_aplica = db.Column(db.Boolean, default=False)
+
+
+class FacturaCredito(db.Model):
+    __tablename__ = "inva-facturas_credito"
+    __table_args__ = {"extend_existing": True}
+
+    id = db.Column(db.Integer, primary_key=True)
+    numero_factura = db.Column(db.String(50), unique=True, nullable=False)
+    cliente_id = db.Column(db.Integer, db.ForeignKey("inva-clientes.id"))
+    usuario_id = db.Column(db.Integer, db.ForeignKey("inva-usuarios.id"))
+    rtn = db.Column(db.String(20))
+    fecha = db.Column(db.DateTime)
+    subtotal = db.Column(db.Numeric(10, 2))
+    isv = db.Column(db.Numeric(10, 2))
+    total = db.Column(db.Numeric(10, 2))
+    pago_inicial = db.Column(db.Numeric(10, 2))
+    saldo = db.Column(db.Numeric(10, 2))
+    estado = db.Column(
+        db.Enum("pendiente", "pagada", "anulada"), default="pendiente"
+    )
+
+
+class DetalleFacturaCredito(db.Model):
+    __tablename__ = "inva-detalle_facturas_credito"
+    __table_args__ = {"extend_existing": True}
+
+    id = db.Column(db.Integer, primary_key=True)
+    factura_id = db.Column(
+        db.Integer, db.ForeignKey("inva-facturas_credito.id"), nullable=False
+    )
+    producto_id = db.Column(
+        db.Integer, db.ForeignKey("inva-productos.id"), nullable=False
+    )
+    cantidad = db.Column(db.Integer, nullable=False)
+    precio_unitario = db.Column(db.Numeric(10, 2), nullable=False)
+    subtotal = db.Column(db.Numeric(10, 2), nullable=False)
+    isv_aplica = db.Column(db.Boolean, default=False)

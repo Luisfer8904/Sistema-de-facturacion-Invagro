@@ -85,11 +85,11 @@
             </div>
             <div class="pos-type">
               <label>
-                <input type="radio" name="tipo" checked />
+                <input type="radio" name="tipo" value="contado" checked />
                 Contado
               </label>
               <label>
-                <input type="radio" name="tipo" />
+                <input type="radio" name="tipo" value="credito" />
                 Credito
               </label>
             </div>
@@ -166,6 +166,7 @@
       <div class="invoice-modal-body">
         <div class="invoice-meta">
           <span id="invoice-rtn">RTN: -</span>
+          <span id="invoice-type">Tipo: Contado</span>
         </div>
         <div class="invoice-items" id="invoice-items"></div>
         <div class="invoice-modal-summary">
@@ -176,6 +177,10 @@
           <div>
             <span>ISV</span>
             <strong id="invoice-isv">L 0.00</strong>
+          </div>
+          <div id="invoice-balance-row">
+            <span>Saldo</span>
+            <strong id="invoice-balance">L 0.00</strong>
           </div>
           <div class="invoice-total">
             <span>Total</span>
@@ -195,7 +200,7 @@
       </div>
       <div class="form-actions">
         <button class="secondary-button" type="button" data-invoice-close>Cancelar</button>
-        <button class="primary-button" type="button">Confirmar</button>
+        <button class="primary-button" type="button" id="confirm-invoice">Confirmar</button>
       </div>
     </div>
   </div>
@@ -225,7 +230,12 @@
     const invoiceChange = document.getElementById("invoice-change");
     const invoiceClient = document.getElementById("invoice-client");
     const invoiceRtn = document.getElementById("invoice-rtn");
+    const invoiceType = document.getElementById("invoice-type");
+    const invoiceBalanceRow = document.getElementById("invoice-balance-row");
+    const invoiceBalance = document.getElementById("invoice-balance");
+    const confirmInvoice = document.getElementById("confirm-invoice");
     let modalTotalValue = 0;
+    let modalInvoiceType = "contado";
 
     const formatCurrency = (value) => `L ${value.toFixed(2)}`;
 
@@ -334,6 +344,11 @@
       });
     }
 
+    const getInvoiceType = () => {
+      const selected = document.querySelector('input[name="tipo"]:checked');
+      return selected ? selected.value : "contado";
+    };
+
     const openInvoiceModal = () => {
       const rows = invoiceTable.querySelectorAll(".invoice-row");
       if (!rows.length) {
@@ -349,6 +364,10 @@
       }
       if (invoiceRtn) {
         invoiceRtn.textContent = `RTN: ${rtnValue || "-"}`;
+      }
+      modalInvoiceType = getInvoiceType();
+      if (invoiceType) {
+        invoiceType.textContent = `Tipo: ${modalInvoiceType === "credito" ? "Credito" : "Contado"}`;
       }
 
       let subtotal = 0;
@@ -392,6 +411,10 @@
       if (invoiceChange) {
         invoiceChange.textContent = formatCurrency(0);
       }
+      if (invoiceBalanceRow && invoiceBalance) {
+        invoiceBalanceRow.style.display = modalInvoiceType === "credito" ? "flex" : "none";
+        invoiceBalance.textContent = formatCurrency(0);
+      }
 
       if (invoiceModal) {
         invoiceModal.classList.add("open");
@@ -404,7 +427,18 @@
       }
       const paid = Number(invoicePaid.value || 0);
       const change = Math.max(0, paid - modalTotalValue);
-      invoiceChange.textContent = formatCurrency(change);
+      if (modalInvoiceType === "credito") {
+        invoiceChange.textContent = formatCurrency(0);
+        if (invoiceBalance) {
+          const balance = Math.max(0, modalTotalValue - paid);
+          invoiceBalance.textContent = formatCurrency(balance);
+        }
+      } else {
+        invoiceChange.textContent = formatCurrency(change);
+        if (invoiceBalance) {
+          invoiceBalance.textContent = formatCurrency(0);
+        }
+      }
     };
 
     if (emitButton) {
@@ -429,6 +463,54 @@
 
     if (invoicePaid) {
       invoicePaid.addEventListener("input", updateChange);
+    }
+
+    if (confirmInvoice) {
+      confirmInvoice.addEventListener("click", async () => {
+        const rows = invoiceTable.querySelectorAll(".invoice-row");
+        if (!rows.length) {
+          alert("Agrega productos antes de emitir la factura.");
+          return;
+        }
+        const selectedOption = clientSelect ? clientSelect.options[clientSelect.selectedIndex] : null;
+        const clienteId = selectedOption && selectedOption.value ? Number(selectedOption.value) : null;
+        const rtnValue = clientRtnInput ? clientRtnInput.value.trim() : "";
+        const paid = Number(invoicePaid ? invoicePaid.value : 0);
+        const tipo = modalInvoiceType;
+        if (tipo === "contado" && paid < modalTotalValue) {
+          alert("En contado, el pago debe ser igual o mayor al total.");
+          return;
+        }
+        const items = Array.from(rows).map((row) => ({
+          producto_id: Number(row.dataset.id),
+          cantidad: Number(row.querySelector(".qty-input").value || 0),
+        }));
+
+        try {
+          const response = await fetch("/facturas", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              tipo,
+              cliente_id: clienteId,
+              rtn: rtnValue,
+              pago: paid,
+              items,
+            }),
+          });
+          const result = await response.json();
+          if (!response.ok) {
+            alert(result.error || "No se pudo guardar la factura.");
+            return;
+          }
+          alert(`Factura guardada: ${result.numero_factura}`);
+          if (invoiceModal) {
+            invoiceModal.classList.remove("open");
+          }
+        } catch (error) {
+          alert("No se pudo guardar la factura.");
+        }
+      });
     }
   </script>
 {% endblock %}

@@ -1041,6 +1041,8 @@ body {
 .invoice-meta {
   color: #7f8c8d;
   font-weight: 600;
+  display: grid;
+  gap: 6px;
 }
 
 .invoice-items {
