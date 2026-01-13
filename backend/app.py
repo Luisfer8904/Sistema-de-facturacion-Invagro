@@ -96,16 +96,16 @@ def create_app():
         doc = SimpleDocTemplate(
             file_path,
             pagesize=letter,
-            leftMargin=36,
-            rightMargin=36,
-            topMargin=36,
-            bottomMargin=36,
+            leftMargin=24,
+            rightMargin=24,
+            topMargin=24,
+            bottomMargin=24,
         )
         story = []
         logo_path = os.path.join(app.static_folder, "assets", "logo.jpg")
         logo_image = None
         if os.path.exists(logo_path):
-            logo_image = Image(logo_path, width=80, height=80)
+            logo_image = Image(logo_path, width=70, height=70)
 
         header_center = (
             f"<b>{settings.nombre}</b><br/>"
@@ -188,13 +188,15 @@ def create_app():
                     f"L {detalle['subtotal']:.2f}",
                 ]
             )
-        table = Table(data, colWidths=[50, 170, 55, 55, 65, 50, 40, 55])
+        table = Table(data, colWidths=[50, 200, 55, 55, 70, 50, 40, 40])
         table.setStyle(
             TableStyle(
                 [
                     ("GRID", (0, 0), (-1, -1), 0.75, colors.black),
                     ("VALIGN", (0, 0), (-1, -1), "TOP"),
                     ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("FONTSIZE", (0, 0), (-1, 0), 8),
+                    ("FONTSIZE", (0, 1), (-1, -1), 9),
                     ("ALIGN", (2, 1), (-1, -1), "RIGHT"),
                     ("BACKGROUND", (0, 0), (-1, 0), colors.whitesmoke),
                     ("LEFTPADDING", (0, 0), (-1, -1), 6),
