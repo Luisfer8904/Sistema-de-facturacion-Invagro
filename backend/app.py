@@ -102,6 +102,7 @@ def create_app():
             bottomMargin=24,
         )
         story = []
+        usable_height = doc.height
         logo_path = os.path.join(app.static_folder, "assets", "logo.jpg")
         logo_image = None
         if os.path.exists(logo_path):
@@ -131,7 +132,7 @@ def create_app():
             )
         )
         story.append(header_table)
-        story.append(Spacer(1, 10))
+        story.append(Spacer(1, 8))
 
         cliente_nombre = cliente.nombre if cliente else "N/A"
         cliente_telefono = cliente.telefono if cliente else "-"
@@ -140,8 +141,9 @@ def create_app():
             f"<b>RTN:</b> {invoice.rtn or '-'} &nbsp;&nbsp; "
             f"<b>TEL:</b> {cliente_telefono}"
         )
-        story.append(Paragraph(cliente_line, styles["Normal"]))
-        story.append(Spacer(1, 8))
+        cliente_paragraph = Paragraph(cliente_line, styles["Normal"])
+        story.append(cliente_paragraph)
+        story.append(Spacer(1, 6))
 
         tipo_texto = "CONTADO" if tipo == "contado" else "CREDITO"
         vendedor = usuario.nombre_completo if usuario and usuario.nombre_completo else "General"
@@ -152,8 +154,9 @@ def create_app():
             f"<b>TERMINOS:</b> {tipo_texto} &nbsp;&nbsp; "
             f"<b>ESTADO:</b> {estado}"
         )
-        story.append(Paragraph(meta_line, styles["Normal"]))
-        story.append(Spacer(1, 10))
+        meta_paragraph = Paragraph(meta_line, styles["Normal"])
+        story.append(meta_paragraph)
+        story.append(Spacer(1, 8))
 
         data = [
             [
@@ -188,24 +191,24 @@ def create_app():
                     f"L {detalle['subtotal']:.2f}",
                 ]
             )
-        table = Table(data, colWidths=[50, 200, 55, 55, 70, 50, 40, 40])
-        table.setStyle(
-            TableStyle(
-                [
-                    ("GRID", (0, 0), (-1, -1), 0.75, colors.black),
-                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                    ("FONTSIZE", (0, 0), (-1, 0), 8),
-                    ("FONTSIZE", (0, 1), (-1, -1), 9),
-                    ("ALIGN", (2, 1), (-1, -1), "RIGHT"),
-                    ("BACKGROUND", (0, 0), (-1, 0), colors.whitesmoke),
-                    ("LEFTPADDING", (0, 0), (-1, -1), 6),
-                    ("RIGHTPADDING", (0, 0), (-1, -1), 6),
-                ]
+        def build_product_table(rows):
+            table_instance = Table(rows, colWidths=[50, 200, 55, 55, 70, 50, 40, 40])
+            table_instance.setStyle(
+                TableStyle(
+                    [
+                        ("GRID", (0, 0), (-1, -1), 0.75, colors.black),
+                        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                        ("FONTSIZE", (0, 0), (-1, 0), 8),
+                        ("FONTSIZE", (0, 1), (-1, -1), 9),
+                        ("ALIGN", (2, 1), (-1, -1), "RIGHT"),
+                        ("BACKGROUND", (0, 0), (-1, 0), colors.whitesmoke),
+                        ("LEFTPADDING", (0, 0), (-1, -1), 6),
+                        ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+                    ]
+                )
             )
-        )
-        story.append(table)
-        story.append(Spacer(1, 10))
+            return table_instance
 
         isv_total = gravado_total * Decimal("0.15")
         total_final = exento_total + gravado_total + isv_total
@@ -229,8 +232,52 @@ def create_app():
                 ]
             )
         )
-        story.append(totals_table)
-        story.append(Spacer(1, 12))
+
+        notes_text = (
+            "<b>DATOS DEL ADQUIRENTE EXONERADO</b><br/>"
+            "N° ORDEN DE COMPRA EXENTA:<br/>"
+            "N° CONST. REGISTRO EXONERADO:<br/>"
+            "N° REGISTRO SAG:"
+        )
+        notes_paragraph = Paragraph(notes_text, styles["Normal"])
+        bottom_block = Table(
+            [[notes_paragraph, totals_table]],
+            colWidths=[doc.width - 230, 230],
+        )
+        bottom_block.setStyle(
+            TableStyle(
+                [
+                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                    ("ALIGN", (1, 0), (1, 0), "RIGHT"),
+                ]
+            )
+        )
+
+        # Calculate heights to stretch the product table and pin footer to the page bottom.
+        header_height = header_table.wrap(doc.width, usable_height)[1]
+        cliente_height = cliente_paragraph.wrap(doc.width, usable_height)[1]
+        meta_height = meta_paragraph.wrap(doc.width, usable_height)[1]
+        bottom_height = bottom_block.wrap(doc.width, usable_height)[1]
+
+        product_table = build_product_table(data)
+        product_table.wrap(doc.width, usable_height)
+        base_table_height = product_table._height
+        row_height = product_table._rowHeights[1] if len(product_table._rowHeights) > 1 else 18
+        reserved_spacing = 8 + 6 + 8  # spacers after header, cliente y meta
+        target_table_height = max(
+            0,
+            usable_height - (header_height + cliente_height + meta_height + bottom_height + reserved_spacing),
+        )
+        if base_table_height < target_table_height and row_height:
+            extra_rows = int((target_table_height - base_table_height) / row_height)
+            if extra_rows > 0:
+                data.extend([["", "", "", "", "", "", "", ""]] * extra_rows)
+                product_table = build_product_table(data)
+
+        story.append(product_table)
+        story.append(Spacer(1, 6))
+        story.append(bottom_block)
+        story.append(Spacer(1, 8))
 
         if settings.mensaje:
             story.append(Paragraph(settings.mensaje, styles["Normal"]))
