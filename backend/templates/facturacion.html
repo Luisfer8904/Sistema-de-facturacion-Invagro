@@ -189,6 +189,10 @@
             <span>ISV</span>
             <strong id="invoice-isv">L 0.00</strong>
           </div>
+          <div>
+            <span>Descuento</span>
+            <strong id="invoice-discount">L 0.00</strong>
+          </div>
           <div id="invoice-balance-row">
             <span>Saldo</span>
             <strong id="invoice-balance">L 0.00</strong>
@@ -202,6 +206,10 @@
           <label>
             <span>Paga con</span>
             <input type="number" min="0" step="0.01" id="invoice-paid" />
+          </label>
+          <label>
+            <span>Descuento</span>
+            <input type="number" min="0" step="0.01" id="invoice-discount-input" />
           </label>
           <div class="change-box">
             <span>Cambio</span>
@@ -244,6 +252,8 @@
     const invoiceExento = document.getElementById("invoice-exento");
     const invoiceGravado = document.getElementById("invoice-gravado");
     const invoiceIsv = document.getElementById("invoice-isv");
+    const invoiceDiscount = document.getElementById("invoice-discount");
+    const invoiceDiscountInput = document.getElementById("invoice-discount-input");
     const invoiceTotal = document.getElementById("invoice-total");
     const invoicePaid = document.getElementById("invoice-paid");
     const invoiceChange = document.getElementById("invoice-change");
@@ -277,9 +287,15 @@
         row.querySelector(".line-total").textContent = formatCurrency(line);
       });
 
+      const discountValue = Number(invoiceDiscountInput ? invoiceDiscountInput.value : 0) || 0;
+      const grossTotal = subtotal + isv;
+      const safeDiscount = Math.max(0, Math.min(discountValue, grossTotal));
       subtotalEl.textContent = formatCurrency(subtotal);
       isvEl.textContent = formatCurrency(isv);
-      totalEl.textContent = formatCurrency(subtotal + isv);
+      totalEl.textContent = formatCurrency(Math.max(0, grossTotal - safeDiscount));
+      if (invoiceModal && invoiceModal.classList.contains("open")) {
+        openInvoiceModal();
+      }
     };
 
     const ensureEmptyState = () => {
@@ -419,6 +435,9 @@
         .join("");
 
       modalTotalValue = subtotal + isv;
+      const discountValue = Number(invoiceDiscountInput ? invoiceDiscountInput.value : 0) || 0;
+      const safeDiscount = Math.max(0, Math.min(discountValue, modalTotalValue));
+      modalTotalValue = Math.max(0, modalTotalValue - safeDiscount);
       if (invoiceItems) {
         invoiceItems.innerHTML = itemsHtml;
       }
@@ -434,11 +453,17 @@
       if (invoiceIsv) {
         invoiceIsv.textContent = formatCurrency(isv);
       }
+      if (invoiceDiscount) {
+        invoiceDiscount.textContent = formatCurrency(safeDiscount);
+      }
       if (invoiceTotal) {
         invoiceTotal.textContent = formatCurrency(modalTotalValue);
       }
       if (invoicePaid) {
         invoicePaid.value = modalTotalValue.toFixed(2);
+      }
+      if (invoiceDiscountInput && !invoiceDiscountInput.value) {
+        invoiceDiscountInput.value = "0.00";
       }
       if (invoiceChange) {
         invoiceChange.textContent = formatCurrency(0);
@@ -507,6 +532,14 @@
     if (invoicePaid) {
       invoicePaid.addEventListener("input", updateChange);
     }
+    if (invoiceDiscountInput) {
+      invoiceDiscountInput.addEventListener("input", () => {
+        updateTotals();
+        if (invoiceModal && invoiceModal.classList.contains("open")) {
+          openInvoiceModal();
+        }
+      });
+    }
 
     if (confirmInvoice) {
       confirmInvoice.addEventListener("click", async () => {
@@ -519,6 +552,7 @@
         const clienteId = selectedOption && selectedOption.value ? Number(selectedOption.value) : null;
         const rtnValue = clientRtnInput ? clientRtnInput.value.trim() : "";
         const paid = Number(invoicePaid ? invoicePaid.value : 0);
+        const discountValue = Number(invoiceDiscountInput ? invoiceDiscountInput.value : 0) || 0;
         const tipo = modalInvoiceType;
         if (tipo === "contado" && paid < modalTotalValue) {
           alert("En contado, el pago debe ser igual o mayor al total.");
@@ -538,6 +572,7 @@
               cliente_id: clienteId,
               rtn: rtnValue,
               pago: paid,
+              descuento: discountValue,
               items,
             }),
           });

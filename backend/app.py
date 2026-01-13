@@ -216,14 +216,15 @@ def create_app():
 
         isv_total = gravado_total * Decimal("0.15")
         total_final = exento_total + gravado_total + isv_total
+        descuento_valor = Decimal(str(getattr(invoice, "descuento", 0) or 0))
         totals_data = [
-            ["DESCUENTOS Y REBAJAS", "L 0.00"],
+            ["DESCUENTOS Y REBAJAS", f"L {descuento_valor:.2f}"],
             ["SUBTOTAL", f"L {invoice.subtotal:.2f}"],
             ["IMPORTE EXENTO", f"L {exento_total:.2f}"],
             ["IMPORTE EXONERADO", "L 0.00"],
             ["IMPORTE GRAVADO 15%", f"L {gravado_total:.2f}"],
             ["ISV 15.00%", f"L {isv_total:.2f}"],
-            ["TOTAL A PAGAR", f"L {total_final:.2f}"],
+            ["TOTAL A PAGAR", f"L {(total_final - descuento_valor):.2f}"],
         ]
         totals_table = Table(totals_data, colWidths=[130, 85], hAlign="RIGHT")
         totals_table.setStyle(
@@ -704,6 +705,7 @@ def create_app():
         cliente_id = data.get("cliente_id") or None
         rtn = (data.get("rtn") or "").strip() or None
         pago_raw = data.get("pago", 0)
+        descuento_raw = data.get("descuento", 0)
         items = data.get("items") or []
 
         if tipo not in {"contado", "credito"}:
@@ -713,6 +715,7 @@ def create_app():
 
         try:
             pago = Decimal(str(pago_raw))
+            descuento = Decimal(str(descuento_raw))
         except Exception:
             return jsonify({"error": "Pago invalido."}), 400
 
@@ -749,6 +752,11 @@ def create_app():
         total = subtotal + isv
         if pago < 0:
             return jsonify({"error": "Pago invalido."}), 400
+        if descuento < 0:
+            return jsonify({"error": "Descuento invalido."}), 400
+        if descuento > total:
+            descuento = total
+        total = total - descuento
         if tipo == "contado" and pago < total:
             return jsonify({"error": "Pago insuficiente para contado."}), 400
 
@@ -767,6 +775,7 @@ def create_app():
                     fecha=datetime.utcnow(),
                     subtotal=subtotal,
                     isv=isv,
+                    descuento=descuento,
                     total=total,
                     pago=pago,
                     cambio=cambio,
@@ -798,6 +807,7 @@ def create_app():
                     fecha=datetime.utcnow(),
                     subtotal=subtotal,
                     isv=isv,
+                    descuento=descuento,
                     total=total,
                     pago_inicial=pago,
                     saldo=saldo,
