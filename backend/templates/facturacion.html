@@ -541,9 +541,7 @@
             invoiceWhatsappLink.href = `https://wa.me/?text=${message}`;
             invoiceWhatsappLink.style.display = "inline-flex";
           }
-          if (invoiceModal) {
-            invoiceModal.classList.remove("open");
-          }
+          // Mantener modal abierto para que pueda ver PDF/WhatsApp.
         } catch (error) {
           alert("No se pudo guardar la factura.");
         }
