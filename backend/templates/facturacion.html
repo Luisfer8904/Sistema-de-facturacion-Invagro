@@ -178,6 +178,14 @@
             <strong id="invoice-subtotal">L 0.00</strong>
           </div>
           <div>
+            <span>Importe exento</span>
+            <strong id="invoice-exento">L 0.00</strong>
+          </div>
+          <div>
+            <span>Importe gravado</span>
+            <strong id="invoice-gravado">L 0.00</strong>
+          </div>
+          <div>
             <span>ISV</span>
             <strong id="invoice-isv">L 0.00</strong>
           </div>
@@ -233,6 +241,8 @@
       : [];
     const invoiceItems = document.getElementById("invoice-items");
     const invoiceSubtotal = document.getElementById("invoice-subtotal");
+    const invoiceExento = document.getElementById("invoice-exento");
+    const invoiceGravado = document.getElementById("invoice-gravado");
     const invoiceIsv = document.getElementById("invoice-isv");
     const invoiceTotal = document.getElementById("invoice-total");
     const invoicePaid = document.getElementById("invoice-paid");
@@ -383,6 +393,8 @@
 
       let subtotal = 0;
       let isv = 0;
+      let exento = 0;
+      let gravado = 0;
       const itemsHtml = Array.from(rows)
         .map((row) => {
           const qty = Number(row.querySelector(".qty-input").value || 0);
@@ -391,6 +403,9 @@
           const applyTax = row.dataset.isv === "1";
           if (applyTax) {
             isv += line * taxRate;
+            gravado += line;
+          } else {
+            exento += line;
           }
           subtotal += line;
           return `
@@ -409,6 +424,12 @@
       }
       if (invoiceSubtotal) {
         invoiceSubtotal.textContent = formatCurrency(subtotal);
+      }
+      if (invoiceExento) {
+        invoiceExento.textContent = formatCurrency(exento);
+      }
+      if (invoiceGravado) {
+        invoiceGravado.textContent = formatCurrency(gravado);
       }
       if (invoiceIsv) {
         invoiceIsv.textContent = formatCurrency(isv);

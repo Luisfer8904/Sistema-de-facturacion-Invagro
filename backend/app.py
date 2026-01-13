@@ -167,9 +167,15 @@ def create_app():
                 "TOTAL",
             ]
         ]
+        exento_total = Decimal("0")
+        gravado_total = Decimal("0")
         for detalle in detalles:
             producto = detalle["producto"]
             isv_text = "15%" if detalle["isv_aplica"] else "0%"
+            if detalle["isv_aplica"]:
+                gravado_total += Decimal(str(detalle["subtotal"]))
+            else:
+                exento_total += Decimal(str(detalle["subtotal"]))
             data.append(
                 [
                     producto.codigo,
@@ -182,7 +188,7 @@ def create_app():
                     f"L {detalle['subtotal']:.2f}",
                 ]
             )
-        table = Table(data, colWidths=[55, 185, 60, 60, 70, 55, 45, 70])
+        table = Table(data, colWidths=[50, 170, 55, 55, 65, 50, 40, 55])
         table.setStyle(
             TableStyle(
                 [
@@ -191,20 +197,24 @@ def create_app():
                     ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
                     ("ALIGN", (2, 1), (-1, -1), "RIGHT"),
                     ("BACKGROUND", (0, 0), (-1, 0), colors.whitesmoke),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 6),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 6),
                 ]
             )
         )
         story.append(table)
         story.append(Spacer(1, 10))
 
+        isv_total = gravado_total * Decimal("0.15")
+        total_final = exento_total + gravado_total + isv_total
         totals_data = [
             ["DESCUENTOS Y REBAJAS", "L 0.00"],
             ["SUBTOTAL", f"L {invoice.subtotal:.2f}"],
-            ["IMPORTE EXENTO", "L 0.00"],
+            ["IMPORTE EXENTO", f"L {exento_total:.2f}"],
             ["IMPORTE EXONERADO", "L 0.00"],
-            ["IMPORTE GRAVADO 15%", f"L {invoice.subtotal:.2f}"],
-            ["ISV 15.00%", f"L {invoice.isv:.2f}"],
-            ["TOTAL A PAGAR", f"L {invoice.total:.2f}"],
+            ["IMPORTE GRAVADO 15%", f"L {gravado_total:.2f}"],
+            ["ISV 15.00%", f"L {isv_total:.2f}"],
+            ["TOTAL A PAGAR", f"L {total_final:.2f}"],
         ]
         totals_table = Table(totals_data, colWidths=[140, 90], hAlign="RIGHT")
         totals_table.setStyle(
