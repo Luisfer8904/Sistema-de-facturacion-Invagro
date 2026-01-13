@@ -277,12 +277,12 @@
         const qty = Number(row.querySelector(".qty-input").value || 0);
         const price = Number(row.dataset.price || 0);
         const line = qty * price;
-        const discount = Number(row.querySelector(".discount-input").value || 0);
-        const safeDiscount = Math.max(0, Math.min(discount, line));
-        const lineNet = Math.max(0, line - safeDiscount);
+        const discountUnit = Number(row.querySelector(".discount-input").value || 0);
+        const safeDiscountUnit = Math.max(0, Math.min(discountUnit, price));
+        const lineNet = Math.max(0, (price - safeDiscountUnit) * qty);
         const applyTax = row.dataset.isv === "1";
         grossSubtotal += line;
-        discountTotal += safeDiscount;
+        discountTotal += safeDiscountUnit * qty;
         if (applyTax) {
           isv += lineNet * taxRate;
         }
@@ -419,9 +419,9 @@
           const qty = Number(row.querySelector(".qty-input").value || 0);
           const price = Number(row.dataset.price || 0);
           const line = qty * price;
-          const discount = Number(row.querySelector(".discount-input").value || 0);
-          const safeDiscount = Math.max(0, Math.min(discount, line));
-          const lineNet = Math.max(0, line - safeDiscount);
+          const discountUnit = Number(row.querySelector(".discount-input").value || 0);
+          const safeDiscountUnit = Math.max(0, Math.min(discountUnit, price));
+          const lineNet = Math.max(0, (price - safeDiscountUnit) * qty);
           const applyTax = row.dataset.isv === "1";
           if (applyTax) {
             isv += lineNet * taxRate;
@@ -430,7 +430,7 @@
             exento += lineNet;
           }
           subtotal += line;
-          descuento += safeDiscount;
+          descuento += safeDiscountUnit * qty;
           return `
             <div class="invoice-item">
               <span>${row.querySelector("span").textContent}</span>

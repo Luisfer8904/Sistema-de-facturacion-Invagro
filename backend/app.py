@@ -747,13 +747,14 @@ def create_app():
             producto = productos_map[producto_id]
             precio = Decimal(str(producto.precio))
             linea_bruta = precio * Decimal(cantidad)
-            descuento_aplicado = min(descuento, linea_bruta)
-            linea_neta = max(Decimal("0"), linea_bruta - descuento_aplicado)
+            descuento_unit = min(descuento, precio)
+            descuento_aplicado = descuento_unit * Decimal(cantidad)
+            linea_neta = max(Decimal("0"), (precio - descuento_unit) * Decimal(cantidad))
             subtotal += linea_bruta
             descuento_total += descuento_aplicado
             if producto.isv_aplica:
                 isv += linea_neta * Decimal("0.15")
-            detalles.append((producto, cantidad, precio, linea_neta, descuento_aplicado))
+            detalles.append((producto, cantidad, precio, linea_neta, descuento_unit))
 
         total = max(Decimal("0"), subtotal - descuento_total) + isv
         if pago < 0:
@@ -784,7 +785,7 @@ def create_app():
                 )
                 db.session.add(factura)
                 db.session.flush()
-                for producto, cantidad, precio, linea, descuento_aplicado in detalles:
+                for producto, cantidad, precio, linea, descuento_unit in detalles:
                     db.session.add(
                         DetalleFacturaContado(
                             factura_id=factura.id,
@@ -792,7 +793,7 @@ def create_app():
                             cantidad=cantidad,
                             precio_unitario=precio,
                             subtotal=linea,
-                            descuento=descuento_aplicado,
+                            descuento=descuento_unit,
                             isv_aplica=producto.isv_aplica,
                         )
                     )
@@ -817,7 +818,7 @@ def create_app():
                 )
                 db.session.add(factura)
                 db.session.flush()
-                for producto, cantidad, precio, linea, descuento_aplicado in detalles:
+                for producto, cantidad, precio, linea, descuento_unit in detalles:
                     db.session.add(
                         DetalleFacturaCredito(
                             factura_id=factura.id,
@@ -825,7 +826,7 @@ def create_app():
                             cantidad=cantidad,
                             precio_unitario=precio,
                             subtotal=linea,
-                            descuento=descuento_aplicado,
+                            descuento=descuento_unit,
                             isv_aplica=producto.isv_aplica,
                         )
                     )
@@ -845,10 +846,10 @@ def create_app():
                     "cantidad": cantidad,
                     "precio": float(precio),
                     "subtotal": float(linea),
-                    "descuento": float(descuento_aplicado),
+                    "descuento": float(descuento_unit),
                     "isv_aplica": producto.isv_aplica,
                 }
-                for producto, cantidad, precio, linea, descuento_aplicado in detalles
+                for producto, cantidad, precio, linea, descuento_unit in detalles
             ]
             pdf_filename = f"{numero_factura}.pdf"
             pdf_path = os.path.join(app.config["INVOICE_PDF_FOLDER"], pdf_filename)
