@@ -207,6 +207,9 @@
         <a class="secondary-button" id="invoice-pdf-link" href="#" target="_blank" style="display:none;">
           Ver PDF
         </a>
+        <a class="secondary-button" id="invoice-whatsapp-link" href="#" target="_blank" style="display:none;">
+          Enviar WhatsApp
+        </a>
       </div>
     </div>
   </div>
@@ -241,6 +244,7 @@
     const invoiceBalance = document.getElementById("invoice-balance");
     const confirmInvoice = document.getElementById("confirm-invoice");
     const invoicePdfLink = document.getElementById("invoice-pdf-link");
+    const invoiceWhatsappLink = document.getElementById("invoice-whatsapp-link");
     let modalTotalValue = 0;
     let modalInvoiceType = "contado";
 
@@ -430,6 +434,13 @@
         invoicePdfLink.style.display = "none";
         invoicePdfLink.href = "#";
       }
+      if (invoiceWhatsappLink) {
+        invoiceWhatsappLink.style.display = "none";
+        invoiceWhatsappLink.href = "#";
+      }
+      if (confirmInvoice) {
+        confirmInvoice.style.display = "inline-flex";
+      }
     };
 
     const updateChange = () => {
@@ -515,10 +526,20 @@
             return;
           }
           alert(`Factura guardada: ${result.numero_factura}`);
+          if (confirmInvoice) {
+            confirmInvoice.style.display = "none";
+          }
           if (result.pdf_url && invoicePdfLink) {
             invoicePdfLink.href = result.pdf_url;
             invoicePdfLink.style.display = "inline-flex";
-            return;
+          }
+          if (invoiceWhatsappLink) {
+            const message = encodeURIComponent(
+              `Factura ${result.numero_factura} - Total L ${modalTotalValue.toFixed(2)}. ` +
+                (result.pdf_url ? `PDF: ${window.location.origin}${result.pdf_url}` : "")
+            );
+            invoiceWhatsappLink.href = `https://wa.me/?text=${message}`;
+            invoiceWhatsappLink.style.display = "inline-flex";
           }
           if (invoiceModal) {
             invoiceModal.classList.remove("open");
