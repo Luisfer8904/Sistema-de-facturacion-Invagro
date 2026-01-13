@@ -54,6 +54,7 @@ CREATE TABLE IF NOT EXISTS `inva-productos` (
     descripcion TEXT,
     activo BOOLEAN DEFAULT TRUE,
     isv_aplica BOOLEAN DEFAULT FALSE,
+    foto VARCHAR(255),
     INDEX idx_codigo (codigo),
     INDEX idx_categoria (categoria),
     INDEX idx_activo (activo)

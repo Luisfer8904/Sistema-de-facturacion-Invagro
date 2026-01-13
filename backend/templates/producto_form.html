@@ -37,7 +37,7 @@
 
         <section class="form-card">
           <h3>Datos del producto</h3>
-          <form class="module-form" method="post">
+          <form class="module-form" method="post" enctype="multipart/form-data">
             <label>
               <span>Codigo</span>
               <input type="text" name="codigo" value="{{ producto.codigo }}" required />
@@ -67,6 +67,13 @@
             <label class="span-2">
               <span>Descripcion</span>
               <textarea name="descripcion" rows="2">{{ producto.descripcion or '' }}</textarea>
+            </label>
+            <label class="span-2">
+              <span>Foto</span>
+              <input type="file" name="foto" accept="image/*" />
+              {% if producto.foto %}
+                <small>Actual: {{ producto.foto }}</small>
+              {% endif %}
             </label>
             <label class="check span-2">
               <input type="checkbox" name="activo" {% if producto.activo %}checked{% endif %} />

@@ -1,9 +1,12 @@
 import logging
+import os
+from uuid import uuid4
 
 import click
 from flask import Flask, jsonify, redirect, render_template, request, session, url_for
 from sqlalchemy.exc import SQLAlchemyError
 from werkzeug.security import check_password_hash, generate_password_hash
+from werkzeug.utils import secure_filename
 
 from models import Categoria, Cliente, Producto, User, db
 
@@ -12,6 +15,26 @@ def create_app():
     app = Flask(__name__)
     app.config.from_object("config.Config")
     db.init_app(app)
+
+    upload_folder = os.path.join(app.static_folder, "uploads", "productos")
+    os.makedirs(upload_folder, exist_ok=True)
+    app.config["PRODUCT_UPLOAD_FOLDER"] = upload_folder
+
+    allowed_extensions = {"jpg", "jpeg", "png", "webp"}
+
+    def save_product_image(file_storage):
+        if not file_storage or not file_storage.filename:
+            return None
+
+        filename = secure_filename(file_storage.filename)
+        ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+        if ext not in allowed_extensions:
+            raise ValueError("Formato de imagen no permitido.")
+
+        unique_name = f"{uuid4().hex}.{ext}"
+        file_path = os.path.join(app.config["PRODUCT_UPLOAD_FOLDER"], unique_name)
+        file_storage.save(file_path)
+        return unique_name
 
     if not app.debug and not app.testing:
         logging.basicConfig(
@@ -138,11 +161,13 @@ def create_app():
             descripcion = request.form.get("descripcion", "").strip() or None
             activo = request.form.get("activo") == "on"
             isv_aplica = request.form.get("isv_aplica") == "on"
+            foto_file = request.files.get("foto")
 
             if not codigo or not nombre or not categoria or not precio:
                 error = "Completa codigo, nombre, categoria y precio."
             else:
                 try:
+                    foto_filename = save_product_image(foto_file)
                     producto = Producto(
                         codigo=codigo,
                         nombre=nombre,
@@ -152,10 +177,13 @@ def create_app():
                         descripcion=descripcion,
                         activo=activo,
                         isv_aplica=isv_aplica,
+                        foto=foto_filename,
                     )
                     db.session.add(producto)
                     db.session.commit()
                     return redirect(url_for("productos"))
+                except ValueError as exc:
+                    error = str(exc)
                 except SQLAlchemyError:
                     db.session.rollback()
                     error = "No se pudo guardar el producto."
@@ -249,6 +277,7 @@ def create_app():
             descripcion = request.form.get("descripcion", "").strip() or None
             activo = request.form.get("activo") == "on"
             isv_aplica = request.form.get("isv_aplica") == "on"
+            foto_file = request.files.get("foto")
 
             if not codigo or not nombre or not categoria or not precio:
                 error = "Completa codigo, nombre, categoria y precio."
@@ -262,8 +291,19 @@ def create_app():
                     producto.descripcion = descripcion
                     producto.activo = activo
                     producto.isv_aplica = isv_aplica
+                    if foto_file and foto_file.filename:
+                        foto_filename = save_product_image(foto_file)
+                        if producto.foto:
+                            old_path = os.path.join(
+                                app.config["PRODUCT_UPLOAD_FOLDER"], producto.foto
+                            )
+                            if os.path.exists(old_path):
+                                os.remove(old_path)
+                        producto.foto = foto_filename
                     db.session.commit()
                     return redirect(url_for("productos"))
+                except ValueError as exc:
+                    error = str(exc)
                 except SQLAlchemyError:
                     db.session.rollback()
                     error = "No se pudo actualizar el producto."

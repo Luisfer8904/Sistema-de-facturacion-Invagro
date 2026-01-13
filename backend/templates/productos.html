@@ -90,7 +90,7 @@
               <h3>Nuevo producto</h3>
               <button class="modal-close" type="button" data-modal-close>×</button>
             </div>
-            <form class="module-form" method="post" action="/productos">
+            <form class="module-form" method="post" action="/productos" enctype="multipart/form-data">
               <label>
                 <span>Codigo</span>
                 <input type="text" name="codigo" required />
@@ -119,6 +119,10 @@
               <label class="span-2">
                 <span>Descripcion</span>
                 <textarea name="descripcion" rows="2"></textarea>
+              </label>
+              <label class="span-2">
+                <span>Foto</span>
+                <input type="file" name="foto" accept="image/*" />
               </label>
               <label class="check span-2">
                 <input type="checkbox" name="activo" checked />

@@ -44,6 +44,7 @@ class Producto(db.Model):
     descripcion = db.Column(db.Text)
     activo = db.Column(db.Boolean, default=True)
     isv_aplica = db.Column(db.Boolean, default=False)
+    foto = db.Column(db.String(255))
 
 
 class Categoria(db.Model):

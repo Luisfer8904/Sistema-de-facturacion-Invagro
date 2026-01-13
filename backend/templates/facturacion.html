@@ -65,7 +65,8 @@
                 data-category="{{ producto.categoria|lower|replace(' ', '-') }}"
                 data-isv="{{ 1 if producto.isv_aplica else 0 }}"
               >
-                <img src="/static/assets/shampoo.jpeg" alt="{{ producto.nombre }}" />
+                {% set product_image = url_for('static', filename='uploads/productos/' ~ producto.foto) if producto.foto else url_for('static', filename='assets/shampoo.jpeg') %}
+                <img src="{{ product_image }}" alt="{{ producto.nombre }}" />
                 <div>
                   <h4>{{ producto.nombre }}</h4>
                   <span>L {{ "%.2f"|format(producto.precio) }}</span>
