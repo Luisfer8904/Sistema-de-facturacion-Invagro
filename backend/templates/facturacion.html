@@ -533,10 +533,10 @@
             invoicePdfLink.href = result.pdf_url;
             invoicePdfLink.style.display = "inline-flex";
           }
-          if (invoiceWhatsappLink) {
+          if (invoiceWhatsappLink && result.pdf_url) {
+            const pdfUrl = new URL(result.pdf_url, window.location.origin).toString();
             const message = encodeURIComponent(
-              `Factura ${result.numero_factura} - Total L ${modalTotalValue.toFixed(2)}. ` +
-                (result.pdf_url ? `PDF: ${window.location.origin}${result.pdf_url}` : "")
+              `Factura ${result.numero_factura} - Total L ${modalTotalValue.toFixed(2)} - PDF: ${pdfUrl}`
             );
             invoiceWhatsappLink.href = `https://wa.me/?text=${message}`;
             invoiceWhatsappLink.style.display = "inline-flex";
