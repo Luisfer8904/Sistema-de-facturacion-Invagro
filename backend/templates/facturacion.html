@@ -117,15 +117,17 @@
           </div>
 
           <div class="pos-table" id="invoice-table">
-            <div class="table-header table-five">
+            <div class="table-header table-six">
               <span>Descripcion</span>
               <span>Cant.</span>
               <span>Precio</span>
+              <span>Descto</span>
               <span>Total</span>
               <span>Quitar</span>
             </div>
-            <div class="table-row table-five empty-row">
+            <div class="table-row table-six empty-row">
               <span>Sin productos</span>
+              <span>-</span>
               <span>-</span>
               <span>-</span>
               <span>-</span>
@@ -207,10 +209,6 @@
             <span>Paga con</span>
             <input type="number" min="0" step="0.01" id="invoice-paid" />
           </label>
-          <label>
-            <span>Descuento</span>
-            <input type="number" min="0" step="0.01" id="invoice-discount-input" />
-          </label>
           <div class="change-box">
             <span>Cambio</span>
             <strong id="invoice-change">L 0.00</strong>
@@ -253,7 +251,6 @@
     const invoiceGravado = document.getElementById("invoice-gravado");
     const invoiceIsv = document.getElementById("invoice-isv");
     const invoiceDiscount = document.getElementById("invoice-discount");
-    const invoiceDiscountInput = document.getElementById("invoice-discount-input");
     const invoiceTotal = document.getElementById("invoice-total");
     const invoicePaid = document.getElementById("invoice-paid");
     const invoiceChange = document.getElementById("invoice-change");
@@ -272,27 +269,30 @@
 
     const updateTotals = () => {
       const rows = invoiceTable.querySelectorAll(".invoice-row");
-      let subtotal = 0;
+      let grossSubtotal = 0;
       let isv = 0;
+      let discountTotal = 0;
 
       rows.forEach((row) => {
         const qty = Number(row.querySelector(".qty-input").value || 0);
         const price = Number(row.dataset.price || 0);
         const line = qty * price;
+        const discount = Number(row.querySelector(".discount-input").value || 0);
+        const safeDiscount = Math.max(0, Math.min(discount, line));
+        const lineNet = Math.max(0, line - safeDiscount);
         const applyTax = row.dataset.isv === "1";
-        subtotal += line;
+        grossSubtotal += line;
+        discountTotal += safeDiscount;
         if (applyTax) {
-          isv += line * taxRate;
+          isv += lineNet * taxRate;
         }
-        row.querySelector(".line-total").textContent = formatCurrency(line);
+        row.querySelector(".line-total").textContent = formatCurrency(lineNet);
       });
 
-      const discountValue = Number(invoiceDiscountInput ? invoiceDiscountInput.value : 0) || 0;
-      const grossTotal = subtotal + isv;
-      const safeDiscount = Math.max(0, Math.min(discountValue, grossTotal));
-      subtotalEl.textContent = formatCurrency(subtotal);
+      const netSubtotal = Math.max(0, grossSubtotal - discountTotal);
+      subtotalEl.textContent = formatCurrency(grossSubtotal);
       isvEl.textContent = formatCurrency(isv);
-      totalEl.textContent = formatCurrency(Math.max(0, grossTotal - safeDiscount));
+      totalEl.textContent = formatCurrency(Math.max(0, netSubtotal + isv));
       if (invoiceModal && invoiceModal.classList.contains("open")) {
         openInvoiceModal();
       }
@@ -318,7 +318,7 @@
       }
 
       const row = document.createElement("div");
-      row.className = "table-row table-five invoice-row";
+      row.className = "table-row table-six invoice-row";
       row.dataset.id = id;
       row.dataset.price = card.dataset.price;
       row.dataset.isv = card.dataset.isv;
@@ -326,12 +326,14 @@
         <span>${card.dataset.name}</span>
         <input class="qty-input" type="number" min="1" value="1" />
         <span>${formatCurrency(Number(card.dataset.price))}</span>
+        <input class="discount-input" type="number" min="0" step="0.01" value="0" />
         <span class="line-total">${formatCurrency(Number(card.dataset.price))}</span>
         <button class="remove-button" type="button">×</button>
       `;
 
       invoiceTable.appendChild(row);
       row.querySelector(".qty-input").addEventListener("input", updateTotals);
+      row.querySelector(".discount-input").addEventListener("input", updateTotals);
       row.querySelector(".remove-button").addEventListener("click", () => {
         row.remove();
         ensureEmptyState();
@@ -411,33 +413,35 @@
       let isv = 0;
       let exento = 0;
       let gravado = 0;
+      let descuento = 0;
       const itemsHtml = Array.from(rows)
         .map((row) => {
           const qty = Number(row.querySelector(".qty-input").value || 0);
           const price = Number(row.dataset.price || 0);
           const line = qty * price;
+          const discount = Number(row.querySelector(".discount-input").value || 0);
+          const safeDiscount = Math.max(0, Math.min(discount, line));
+          const lineNet = Math.max(0, line - safeDiscount);
           const applyTax = row.dataset.isv === "1";
           if (applyTax) {
-            isv += line * taxRate;
-            gravado += line;
+            isv += lineNet * taxRate;
+            gravado += lineNet;
           } else {
-            exento += line;
+            exento += lineNet;
           }
           subtotal += line;
+          descuento += safeDiscount;
           return `
             <div class="invoice-item">
               <span>${row.querySelector("span").textContent}</span>
               <span>${qty} x ${formatCurrency(price)}</span>
-              <strong>${formatCurrency(line)}</strong>
+              <strong>${formatCurrency(lineNet)}</strong>
             </div>
           `;
         })
         .join("");
 
-      modalTotalValue = subtotal + isv;
-      const discountValue = Number(invoiceDiscountInput ? invoiceDiscountInput.value : 0) || 0;
-      const safeDiscount = Math.max(0, Math.min(discountValue, modalTotalValue));
-      modalTotalValue = Math.max(0, modalTotalValue - safeDiscount);
+      modalTotalValue = Math.max(0, subtotal - descuento) + isv;
       if (invoiceItems) {
         invoiceItems.innerHTML = itemsHtml;
       }
@@ -454,16 +458,13 @@
         invoiceIsv.textContent = formatCurrency(isv);
       }
       if (invoiceDiscount) {
-        invoiceDiscount.textContent = formatCurrency(safeDiscount);
+        invoiceDiscount.textContent = formatCurrency(descuento);
       }
       if (invoiceTotal) {
         invoiceTotal.textContent = formatCurrency(modalTotalValue);
       }
       if (invoicePaid) {
         invoicePaid.value = modalTotalValue.toFixed(2);
-      }
-      if (invoiceDiscountInput && !invoiceDiscountInput.value) {
-        invoiceDiscountInput.value = "0.00";
       }
       if (invoiceChange) {
         invoiceChange.textContent = formatCurrency(0);
@@ -532,15 +533,6 @@
     if (invoicePaid) {
       invoicePaid.addEventListener("input", updateChange);
     }
-    if (invoiceDiscountInput) {
-      invoiceDiscountInput.addEventListener("input", () => {
-        updateTotals();
-        if (invoiceModal && invoiceModal.classList.contains("open")) {
-          openInvoiceModal();
-        }
-      });
-    }
-
     if (confirmInvoice) {
       confirmInvoice.addEventListener("click", async () => {
         const rows = invoiceTable.querySelectorAll(".invoice-row");
@@ -552,7 +544,6 @@
         const clienteId = selectedOption && selectedOption.value ? Number(selectedOption.value) : null;
         const rtnValue = clientRtnInput ? clientRtnInput.value.trim() : "";
         const paid = Number(invoicePaid ? invoicePaid.value : 0);
-        const discountValue = Number(invoiceDiscountInput ? invoiceDiscountInput.value : 0) || 0;
         const tipo = modalInvoiceType;
         if (tipo === "contado" && paid < modalTotalValue) {
           alert("En contado, el pago debe ser igual o mayor al total.");
@@ -561,6 +552,7 @@
         const items = Array.from(rows).map((row) => ({
           producto_id: Number(row.dataset.id),
           cantidad: Number(row.querySelector(".qty-input").value || 0),
+          descuento: Number(row.querySelector(".discount-input").value || 0),
         }));
 
         try {
@@ -572,7 +564,6 @@
               cliente_id: clienteId,
               rtn: rtnValue,
               pago: paid,
-              descuento: discountValue,
               items,
             }),
           });

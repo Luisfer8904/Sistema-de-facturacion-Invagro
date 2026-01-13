@@ -107,6 +107,7 @@ class DetalleFacturaContado(db.Model):
     cantidad = db.Column(db.Integer, nullable=False)
     precio_unitario = db.Column(db.Numeric(10, 2), nullable=False)
     subtotal = db.Column(db.Numeric(10, 2), nullable=False)
+    descuento = db.Column(db.Numeric(10, 2), default=0)
     isv_aplica = db.Column(db.Boolean, default=False)
 
 
@@ -146,4 +147,5 @@ class DetalleFacturaCredito(db.Model):
     cantidad = db.Column(db.Integer, nullable=False)
     precio_unitario = db.Column(db.Numeric(10, 2), nullable=False)
     subtotal = db.Column(db.Numeric(10, 2), nullable=False)
+    descuento = db.Column(db.Numeric(10, 2), default=0)
     isv_aplica = db.Column(db.Boolean, default=False)

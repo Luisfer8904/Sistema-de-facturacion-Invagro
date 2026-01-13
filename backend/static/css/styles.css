@@ -896,6 +896,13 @@ body {
   border: 1px solid #dfe6e5;
 }
 
+.discount-input {
+  width: 90px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid #dfe6e5;
+}
+
 .tax-toggle {
   display: inline-flex;
   align-items: center;

@@ -180,6 +180,7 @@ def create_app():
                 gravado_total += Decimal(str(detalle["subtotal"]))
             else:
                 exento_total += Decimal(str(detalle["subtotal"]))
+            descuento_linea = Decimal(str(detalle.get("descuento", 0) or 0))
             data.append(
                 [
                     producto.codigo,
@@ -187,7 +188,7 @@ def create_app():
                     "UNIDAD",
                     str(detalle["cantidad"]),
                     f"L {detalle['precio']:.2f}",
-                    "L 0.00",
+                    f"L {descuento_linea:.2f}",
                     isv_text,
                     f"L {detalle['subtotal']:.2f}",
                 ]
@@ -215,7 +216,7 @@ def create_app():
             return table_instance
 
         isv_total = gravado_total * Decimal("0.15")
-        total_final = exento_total + gravado_total + isv_total
+        total_final = Decimal(str(invoice.total or 0))
         descuento_valor = Decimal(str(getattr(invoice, "descuento", 0) or 0))
         totals_data = [
             ["DESCUENTOS Y REBAJAS", f"L {descuento_valor:.2f}"],
@@ -224,7 +225,7 @@ def create_app():
             ["IMPORTE EXONERADO", "L 0.00"],
             ["IMPORTE GRAVADO 15%", f"L {gravado_total:.2f}"],
             ["ISV 15.00%", f"L {isv_total:.2f}"],
-            ["TOTAL A PAGAR", f"L {(total_final - descuento_valor):.2f}"],
+            ["TOTAL A PAGAR", f"L {total_final:.2f}"],
         ]
         totals_table = Table(totals_data, colWidths=[130, 85], hAlign="RIGHT")
         totals_table.setStyle(
@@ -705,7 +706,6 @@ def create_app():
         cliente_id = data.get("cliente_id") or None
         rtn = (data.get("rtn") or "").strip() or None
         pago_raw = data.get("pago", 0)
-        descuento_raw = data.get("descuento", 0)
         items = data.get("items") or []
 
         if tipo not in {"contado", "credito"}:
@@ -715,7 +715,6 @@ def create_app():
 
         try:
             pago = Decimal(str(pago_raw))
-            descuento = Decimal(str(descuento_raw))
         except Exception:
             return jsonify({"error": "Pago invalido."}), 400
 
@@ -725,12 +724,15 @@ def create_app():
             try:
                 producto_id = int(item.get("producto_id"))
                 cantidad = int(item.get("cantidad"))
+                descuento = Decimal(str(item.get("descuento", 0) or 0))
             except (TypeError, ValueError):
                 return jsonify({"error": "Producto o cantidad invalida."}), 400
             if cantidad <= 0:
                 return jsonify({"error": "Cantidad invalida."}), 400
+            if descuento < 0:
+                return jsonify({"error": "Descuento invalido."}), 400
             producto_ids.append(producto_id)
-            parsed_items.append((producto_id, cantidad))
+            parsed_items.append((producto_id, cantidad, descuento))
 
         productos = Producto.query.filter(Producto.id.in_(producto_ids)).all()
         productos_map = {producto.id: producto for producto in productos}
@@ -739,24 +741,23 @@ def create_app():
 
         subtotal = Decimal("0")
         isv = Decimal("0")
+        descuento_total = Decimal("0")
         detalles = []
-        for producto_id, cantidad in parsed_items:
+        for producto_id, cantidad, descuento in parsed_items:
             producto = productos_map[producto_id]
             precio = Decimal(str(producto.precio))
-            linea = precio * Decimal(cantidad)
-            subtotal += linea
+            linea_bruta = precio * Decimal(cantidad)
+            descuento_aplicado = min(descuento, linea_bruta)
+            linea_neta = max(Decimal("0"), linea_bruta - descuento_aplicado)
+            subtotal += linea_bruta
+            descuento_total += descuento_aplicado
             if producto.isv_aplica:
-                isv += linea * Decimal("0.15")
-            detalles.append((producto, cantidad, precio, linea))
+                isv += linea_neta * Decimal("0.15")
+            detalles.append((producto, cantidad, precio, linea_neta, descuento_aplicado))
 
-        total = subtotal + isv
+        total = max(Decimal("0"), subtotal - descuento_total) + isv
         if pago < 0:
             return jsonify({"error": "Pago invalido."}), 400
-        if descuento < 0:
-            return jsonify({"error": "Descuento invalido."}), 400
-        if descuento > total:
-            descuento = total
-        total = total - descuento
         if tipo == "contado" and pago < total:
             return jsonify({"error": "Pago insuficiente para contado."}), 400
 
@@ -775,7 +776,7 @@ def create_app():
                     fecha=datetime.utcnow(),
                     subtotal=subtotal,
                     isv=isv,
-                    descuento=descuento,
+                    descuento=descuento_total,
                     total=total,
                     pago=pago,
                     cambio=cambio,
@@ -783,7 +784,7 @@ def create_app():
                 )
                 db.session.add(factura)
                 db.session.flush()
-                for producto, cantidad, precio, linea in detalles:
+                for producto, cantidad, precio, linea, descuento_aplicado in detalles:
                     db.session.add(
                         DetalleFacturaContado(
                             factura_id=factura.id,
@@ -791,6 +792,7 @@ def create_app():
                             cantidad=cantidad,
                             precio_unitario=precio,
                             subtotal=linea,
+                            descuento=descuento_aplicado,
                             isv_aplica=producto.isv_aplica,
                         )
                     )
@@ -807,7 +809,7 @@ def create_app():
                     fecha=datetime.utcnow(),
                     subtotal=subtotal,
                     isv=isv,
-                    descuento=descuento,
+                    descuento=descuento_total,
                     total=total,
                     pago_inicial=pago,
                     saldo=saldo,
@@ -815,7 +817,7 @@ def create_app():
                 )
                 db.session.add(factura)
                 db.session.flush()
-                for producto, cantidad, precio, linea in detalles:
+                for producto, cantidad, precio, linea, descuento_aplicado in detalles:
                     db.session.add(
                         DetalleFacturaCredito(
                             factura_id=factura.id,
@@ -823,6 +825,7 @@ def create_app():
                             cantidad=cantidad,
                             precio_unitario=precio,
                             subtotal=linea,
+                            descuento=descuento_aplicado,
                             isv_aplica=producto.isv_aplica,
                         )
                     )
@@ -842,9 +845,10 @@ def create_app():
                     "cantidad": cantidad,
                     "precio": float(precio),
                     "subtotal": float(linea),
+                    "descuento": float(descuento_aplicado),
                     "isv_aplica": producto.isv_aplica,
                 }
-                for producto, cantidad, precio, linea in detalles
+                for producto, cantidad, precio, linea, descuento_aplicado in detalles
             ]
             pdf_filename = f"{numero_factura}.pdf"
             pdf_path = os.path.join(app.config["INVOICE_PDF_FOLDER"], pdf_filename)
