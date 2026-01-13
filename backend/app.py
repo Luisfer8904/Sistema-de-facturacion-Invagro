@@ -12,7 +12,14 @@ from werkzeug.utils import secure_filename
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import getSampleStyleSheet
-from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import (
+    Image,
+    Paragraph,
+    SimpleDocTemplate,
+    Spacer,
+    Table,
+    TableStyle,
+)
 
 from models import (
     AjustesNegocio,
@@ -95,31 +102,42 @@ def create_app():
             bottomMargin=36,
         )
         story = []
-        header_left = f"<b>{settings.nombre}</b><br/>RTN: {settings.rtn or '-'}<br/>TEL: {settings.telefono or '-'}<br/>{settings.email or ''}"
+        logo_path = os.path.join(app.static_folder, "assets", "logo.jpg")
+        logo_image = None
+        if os.path.exists(logo_path):
+            logo_image = Image(logo_path, width=80, height=80)
+
+        header_center = (
+            f"<b>{settings.nombre}</b><br/>"
+            f"{settings.direccion or ''}<br/>"
+            f"RTN: {settings.rtn or '-'} &nbsp;&nbsp; TEL: {settings.telefono or '-'}<br/>"
+            f"{settings.email or ''}"
+        )
         header_right = (
-            f"<b>FACTURA</b><br/>{invoice.numero_factura}<br/>FECHA: "
-            f"{invoice.fecha.strftime('%d/%m/%Y %I:%M %p')}"
+            f"<b>FACTURA</b><br/>{invoice.numero_factura}<br/>"
+            f"FECHA: {invoice.fecha.strftime('%d/%m/%Y %I:%M %p')}"
         )
         header_table = Table(
-            [[Paragraph(header_left, styles["Normal"]), Paragraph(header_right, styles["Normal"])]],
-            colWidths=[320, 200],
+            [[logo_image or "", Paragraph(header_center, styles["Normal"]), Paragraph(header_right, styles["Normal"])]],
+            colWidths=[90, 300, 130],
         )
         header_table.setStyle(
             TableStyle(
                 [
                     ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                    ("ALIGN", (1, 0), (1, 0), "RIGHT"),
+                    ("ALIGN", (2, 0), (2, 0), "RIGHT"),
+                    ("LINEBELOW", (0, 0), (-1, 0), 0.75, colors.black),
                 ]
             )
         )
         story.append(header_table)
-        story.append(Spacer(1, 12))
+        story.append(Spacer(1, 10))
 
         cliente_nombre = cliente.nombre if cliente else "N/A"
         cliente_telefono = cliente.telefono if cliente else "-"
         cliente_line = (
-            f"<b>CLIENTE:</b> {cliente_nombre} "
-            f"<b>RTN:</b> {invoice.rtn or '-'} "
+            f"<b>CLIENTE:</b> {cliente_nombre} &nbsp;&nbsp; "
+            f"<b>RTN:</b> {invoice.rtn or '-'} &nbsp;&nbsp; "
             f"<b>TEL:</b> {cliente_telefono}"
         )
         story.append(Paragraph(cliente_line, styles["Normal"]))
@@ -127,7 +145,13 @@ def create_app():
 
         tipo_texto = "CONTADO" if tipo == "contado" else "CREDITO"
         vendedor = usuario.nombre_completo if usuario and usuario.nombre_completo else "General"
-        meta_line = f"<b>CAJERO:</b> {vendedor} &nbsp;&nbsp; <b>TERMINOS:</b> {tipo_texto}"
+        estado = invoice.estado.upper() if invoice.estado else "-"
+        meta_line = (
+            f"<b>CAJERO:</b> {vendedor} &nbsp;&nbsp; "
+            f"<b>VENDEDOR:</b> GENERAL &nbsp;&nbsp; "
+            f"<b>TERMINOS:</b> {tipo_texto} &nbsp;&nbsp; "
+            f"<b>ESTADO:</b> {estado}"
+        )
         story.append(Paragraph(meta_line, styles["Normal"]))
         story.append(Spacer(1, 10))
 
@@ -135,9 +159,11 @@ def create_app():
             [
                 "CODIGO",
                 "DESCRIPCION",
+                "UNIDAD",
                 "CANTIDAD",
                 "PRECIO UNIT.",
-                "ISV",
+                "DESCTO",
+                "ISV %",
                 "TOTAL",
             ]
         ]
@@ -148,41 +174,46 @@ def create_app():
                 [
                     producto.codigo,
                     producto.nombre,
+                    "UNIDAD",
                     str(detalle["cantidad"]),
                     f"L {detalle['precio']:.2f}",
+                    "L 0.00",
                     isv_text,
                     f"L {detalle['subtotal']:.2f}",
                 ]
             )
-        table = Table(data, colWidths=[60, 200, 70, 80, 50, 70])
+        table = Table(data, colWidths=[55, 185, 60, 60, 70, 55, 45, 70])
         table.setStyle(
             TableStyle(
                 [
-                    ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
-                    ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+                    ("GRID", (0, 0), (-1, -1), 0.75, colors.black),
                     ("VALIGN", (0, 0), (-1, -1), "TOP"),
                     ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("ALIGN", (2, 1), (-1, -1), "RIGHT"),
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.whitesmoke),
                 ]
             )
         )
         story.append(table)
-        story.append(Spacer(1, 12))
+        story.append(Spacer(1, 10))
 
-        totals_table = Table(
-            [
-                ["SUBTOTAL", f"L {invoice.subtotal:.2f}"],
-                ["ISV", f"L {invoice.isv:.2f}"],
-                ["TOTAL A PAGAR", f"L {invoice.total:.2f}"],
-            ],
-            colWidths=[120, 120],
-            hAlign="RIGHT",
-        )
+        totals_data = [
+            ["DESCUENTOS Y REBAJAS", "L 0.00"],
+            ["SUBTOTAL", f"L {invoice.subtotal:.2f}"],
+            ["IMPORTE EXENTO", "L 0.00"],
+            ["IMPORTE EXONERADO", "L 0.00"],
+            ["IMPORTE GRAVADO 15%", f"L {invoice.subtotal:.2f}"],
+            ["ISV 15.00%", f"L {invoice.isv:.2f}"],
+            ["TOTAL A PAGAR", f"L {invoice.total:.2f}"],
+        ]
+        totals_table = Table(totals_data, colWidths=[140, 90], hAlign="RIGHT")
         totals_table.setStyle(
             TableStyle(
                 [
-                    ("BACKGROUND", (0, -1), (-1, -1), colors.lightgrey),
+                    ("GRID", (0, 0), (-1, -1), 0.75, colors.black),
                     ("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"),
                     ("ALIGN", (1, 0), (1, -1), "RIGHT"),
+                    ("BACKGROUND", (0, -1), (-1, -1), colors.whitesmoke),
                 ]
             )
         )
@@ -191,6 +222,13 @@ def create_app():
 
         if settings.mensaje:
             story.append(Paragraph(settings.mensaje, styles["Normal"]))
+        if settings.cai or settings.rango_autorizado or settings.fecha_limite_emision:
+            footer_text = (
+                f"CAI: {settings.cai or '-'}<br/>"
+                f"RANGO AUTORIZADO: {settings.rango_autorizado or '-'}<br/>"
+                f"FECHA LIMITE DE EMISION: {settings.fecha_limite_emision or '-'}"
+            )
+            story.append(Paragraph(footer_text, styles["Normal"]))
         doc.build(story)
 
     if not app.debug and not app.testing:
