@@ -469,7 +469,7 @@ def create_app():
                     db.session.rollback()
                     error = "No se pudo guardar el producto."
 
-        productos_list = Producto.query.order_by(Producto.id.desc()).all()
+        productos_list = Producto.query.filter_by(activo=True).order_by(Producto.id.desc()).all()
         categorias_list = Categoria.query.filter_by(activo=True).order_by(
             Categoria.nombre.asc()
         ).all()
@@ -660,7 +660,7 @@ def create_app():
 
         producto = Producto.query.get_or_404(producto_id)
         try:
-            db.session.delete(producto)
+            producto.activo = False
             db.session.commit()
         except SQLAlchemyError:
             db.session.rollback()
