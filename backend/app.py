@@ -519,7 +519,11 @@ def create_app():
         if not session.get("user"):
             return redirect(url_for("login"))
 
-        facturas_raw = FacturaCredito.query.order_by(FacturaCredito.fecha.desc()).all()
+        try:
+            facturas_raw = FacturaCredito.query.order_by(FacturaCredito.fecha.desc()).all()
+        except SQLAlchemyError:
+            db.session.rollback()
+            facturas_raw = []
         facturas = []
         for factura in facturas_raw:
             if factura.estado == "pagada":
@@ -557,7 +561,11 @@ def create_app():
         if not session.get("user"):
             return redirect(url_for("login"))
 
-        factura = FacturaCredito.query.get_or_404(factura_id)
+        try:
+            factura = FacturaCredito.query.get_or_404(factura_id)
+        except SQLAlchemyError:
+            db.session.rollback()
+            return redirect(url_for("facturas_credito"))
         if factura.estado == "pagada":
             return redirect(url_for("facturas_credito"))
 
@@ -574,8 +582,20 @@ def create_app():
         if not session.get("user"):
             return redirect(url_for("login"))
 
-        facturas_contado = FacturaContado.query.order_by(FacturaContado.fecha.desc()).all()
-        facturas_credito = FacturaCredito.query.order_by(FacturaCredito.fecha.desc()).all()
+        try:
+            facturas_contado = FacturaContado.query.order_by(
+                FacturaContado.fecha.desc()
+            ).all()
+        except SQLAlchemyError:
+            db.session.rollback()
+            facturas_contado = []
+        try:
+            facturas_credito = FacturaCredito.query.order_by(
+                FacturaCredito.fecha.desc()
+            ).all()
+        except SQLAlchemyError:
+            db.session.rollback()
+            facturas_credito = []
         facturas = []
         for factura in facturas_contado:
             fecha_label = factura.fecha.strftime("%d/%m/%Y") if factura.fecha else "-"
