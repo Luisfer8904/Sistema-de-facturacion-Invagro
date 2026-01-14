@@ -601,28 +601,41 @@ def create_app():
             clientes_map=clientes_map,
         )
 
-    @app.post("/facturas/<int:factura_id>/delete")
-    @app.post("/facturas/<string:tipo>/<int:factura_id>/delete")
+    @app.route("/facturas/<int:factura_id>/delete", methods=["POST", "GET"])
+    @app.route("/facturas/<string:tipo>/<int:factura_id>/delete", methods=["POST", "GET"])
     def eliminar_factura(factura_id, tipo=None):
         if not session.get("user"):
             return redirect(url_for("login"))
 
         tipo = (tipo or request.form.get("tipo", "")).strip().lower()
         try:
-            if tipo == "contado":
-                factura = FacturaContado.query.get_or_404(factura_id)
-                DetalleFacturaContado.query.filter_by(
-                    factura_id=factura_id
-                ).delete(synchronize_session=False)
-                db.session.delete(factura)
-            elif tipo == "credito":
-                factura = FacturaCredito.query.get_or_404(factura_id)
-                DetalleFacturaCredito.query.filter_by(
-                    factura_id=factura_id
-                ).delete(synchronize_session=False)
+            if tipo in {"contado", "credito"}:
+                if tipo == "contado":
+                    factura = FacturaContado.query.get_or_404(factura_id)
+                    DetalleFacturaContado.query.filter_by(
+                        factura_id=factura_id
+                    ).delete(synchronize_session=False)
+                else:
+                    factura = FacturaCredito.query.get_or_404(factura_id)
+                    DetalleFacturaCredito.query.filter_by(
+                        factura_id=factura_id
+                    ).delete(synchronize_session=False)
                 db.session.delete(factura)
             else:
-                return redirect(url_for("facturas_historial"))
+                factura = FacturaContado.query.get(factura_id)
+                if factura:
+                    DetalleFacturaContado.query.filter_by(
+                        factura_id=factura_id
+                    ).delete(synchronize_session=False)
+                    db.session.delete(factura)
+                else:
+                    factura = FacturaCredito.query.get(factura_id)
+                    if not factura:
+                        return redirect(url_for("facturas_historial"))
+                    DetalleFacturaCredito.query.filter_by(
+                        factura_id=factura_id
+                    ).delete(synchronize_session=False)
+                    db.session.delete(factura)
 
             db.session.commit()
         except SQLAlchemyError:
