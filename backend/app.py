@@ -559,6 +559,8 @@ def create_app():
         for factura in facturas_contado:
             facturas.append(
                 {
+                    "id": factura.id,
+                    "tipo": "contado",
                     "numero_factura": factura.numero_factura,
                     "cliente_id": factura.cliente_id,
                     "fecha": factura.fecha,
@@ -576,6 +578,8 @@ def create_app():
                 estado_label = "credito"
             facturas.append(
                 {
+                    "id": factura.id,
+                    "tipo": "credito",
                     "numero_factura": factura.numero_factura,
                     "cliente_id": factura.cliente_id,
                     "fecha": factura.fecha,
@@ -596,6 +600,32 @@ def create_app():
             facturas=facturas,
             clientes_map=clientes_map,
         )
+
+    @app.post("/facturas/<string:tipo>/<int:factura_id>/delete")
+    def eliminar_factura(tipo, factura_id):
+        if not session.get("user"):
+            return redirect(url_for("login"))
+
+        try:
+            if tipo == "contado":
+                factura = FacturaContado.query.get_or_404(factura_id)
+                DetalleFacturaContado.query.filter_by(
+                    factura_id=factura_id
+                ).delete(synchronize_session=False)
+                db.session.delete(factura)
+            elif tipo == "credito":
+                factura = FacturaCredito.query.get_or_404(factura_id)
+                DetalleFacturaCredito.query.filter_by(
+                    factura_id=factura_id
+                ).delete(synchronize_session=False)
+                db.session.delete(factura)
+            else:
+                return redirect(url_for("facturas_historial"))
+
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+        return redirect(url_for("facturas_historial"))
 
     @app.route("/clientes/<int:cliente_id>/edit", methods=["GET", "POST"])
     def editar_cliente(cliente_id):

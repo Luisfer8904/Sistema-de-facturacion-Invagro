@@ -59,6 +59,9 @@
                   {% else %}
                     -
                   {% endif %}
+                  <form method="post" action="/facturas/{{ factura.tipo }}/{{ factura.id }}/delete" onsubmit="return confirm('¿Eliminar esta factura?');">
+                    <button class="danger-button" type="submit">Eliminar</button>
+                  </form>
                 </span>
               </div>
             {% endfor %}
