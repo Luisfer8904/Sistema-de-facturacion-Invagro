@@ -601,11 +601,13 @@ def create_app():
             clientes_map=clientes_map,
         )
 
+    @app.post("/facturas/<int:factura_id>/delete")
     @app.post("/facturas/<string:tipo>/<int:factura_id>/delete")
-    def eliminar_factura(tipo, factura_id):
+    def eliminar_factura(factura_id, tipo=None):
         if not session.get("user"):
             return redirect(url_for("login"))
 
+        tipo = (tipo or request.form.get("tipo", "")).strip().lower()
         try:
             if tipo == "contado":
                 factura = FacturaContado.query.get_or_404(factura_id)
