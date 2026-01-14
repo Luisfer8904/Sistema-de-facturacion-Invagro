@@ -27,9 +27,7 @@ from models import (
     Categoria,
     Cliente,
     DetalleFacturaContado,
-    DetalleFacturaCredito,
     FacturaContado,
-    FacturaCredito,
     Producto,
     User,
     db,
@@ -520,20 +518,14 @@ def create_app():
             return redirect(url_for("login"))
 
         try:
-            facturas_raw = FacturaCredito.query.order_by(FacturaCredito.fecha.desc()).all()
+            facturas_raw = FacturaContado.query.filter_by(estado="credito").order_by(
+                FacturaContado.fecha.desc()
+            ).all()
         except SQLAlchemyError:
             db.session.rollback()
             facturas_raw = []
         facturas = []
         for factura in facturas_raw:
-            if factura.estado == "pagada":
-                estado_label = "pagada"
-            elif factura.estado == "anulada":
-                estado_label = "anulada"
-            else:
-                estado_label = "credito"
-            if estado_label != "credito":
-                continue
             fecha_label = factura.fecha.strftime("%d/%m/%Y") if factura.fecha else "-"
             facturas.append(
                 {
@@ -543,7 +535,7 @@ def create_app():
                     "fecha": factura.fecha,
                     "fecha_label": fecha_label,
                     "total": factura.total,
-                    "estado_label": estado_label,
+                    "estado_label": "credito",
                     "pdf_filename": factura.pdf_filename,
                 }
             )
@@ -562,16 +554,17 @@ def create_app():
             return redirect(url_for("login"))
 
         try:
-            factura = FacturaCredito.query.get_or_404(factura_id)
+            factura = FacturaContado.query.get_or_404(factura_id)
         except SQLAlchemyError:
             db.session.rollback()
             return redirect(url_for("facturas_credito"))
-        if factura.estado == "pagada":
+        if factura.estado != "credito":
             return redirect(url_for("facturas_credito"))
 
         try:
             factura.estado = "pagada"
-            factura.saldo = Decimal("0")
+            factura.pago = factura.total
+            factura.cambio = Decimal("0")
             db.session.commit()
         except SQLAlchemyError:
             db.session.rollback()
@@ -589,41 +582,21 @@ def create_app():
         except SQLAlchemyError:
             db.session.rollback()
             facturas_contado = []
-        try:
-            facturas_credito = FacturaCredito.query.order_by(
-                FacturaCredito.fecha.desc()
-            ).all()
-        except SQLAlchemyError:
-            db.session.rollback()
-            facturas_credito = []
         facturas = []
         for factura in facturas_contado:
             fecha_label = factura.fecha.strftime("%d/%m/%Y") if factura.fecha else "-"
-            facturas.append(
-                {
-                    "id": factura.id,
-                    "tipo": "contado",
-                    "numero_factura": factura.numero_factura,
-                    "cliente_id": factura.cliente_id,
-                    "fecha": factura.fecha,
-                    "fecha_label": fecha_label,
-                    "total": factura.total,
-                    "estado_label": "contado",
-                    "pdf_filename": factura.pdf_filename,
-                }
-            )
-        for factura in facturas_credito:
-            if factura.estado == "pagada":
+            if factura.estado == "credito":
+                estado_label = "credito"
+            elif factura.estado == "pagada":
                 estado_label = "pagada"
             elif factura.estado == "anulada":
                 estado_label = "anulada"
             else:
-                estado_label = "credito"
-            fecha_label = factura.fecha.strftime("%d/%m/%Y") if factura.fecha else "-"
+                estado_label = "contado"
             facturas.append(
                 {
                     "id": factura.id,
-                    "tipo": "credito",
+                    "tipo": "credito" if estado_label == "credito" else "contado",
                     "numero_factura": factura.numero_factura,
                     "cliente_id": factura.cliente_id,
                     "fecha": factura.fecha,
@@ -669,18 +642,6 @@ def create_app():
                     db.session.rollback()
                 return redirect(url_for("facturas_historial"))
 
-            factura = FacturaCredito.query.filter_by(numero_factura=ref).first()
-            if factura:
-                try:
-                    DetalleFacturaCredito.query.filter_by(
-                        factura_id=factura.id
-                    ).delete(synchronize_session=False)
-                    db.session.delete(factura)
-                    db.session.commit()
-                except SQLAlchemyError:
-                    db.session.rollback()
-                return redirect(url_for("facturas_historial"))
-
         parts = [part for part in ref.split("/") if part]
         if len(parts) == 2 and parts[0] in {"contado", "credito"} and parts[1].isdigit():
             tipo = parts[0]
@@ -694,32 +655,19 @@ def create_app():
 
         try:
             if tipo in {"contado", "credito"} and factura_id is not None:
-                if tipo == "contado":
-                    factura = FacturaContado.query.get_or_404(factura_id)
-                    DetalleFacturaContado.query.filter_by(
-                        factura_id=factura_id
-                    ).delete(synchronize_session=False)
-                else:
-                    factura = FacturaCredito.query.get_or_404(factura_id)
-                    DetalleFacturaCredito.query.filter_by(
-                        factura_id=factura_id
-                    ).delete(synchronize_session=False)
+                factura = FacturaContado.query.get_or_404(factura_id)
+                DetalleFacturaContado.query.filter_by(
+                    factura_id=factura_id
+                ).delete(synchronize_session=False)
                 db.session.delete(factura)
             elif factura_id is not None:
                 factura = FacturaContado.query.get(factura_id)
-                if factura:
-                    DetalleFacturaContado.query.filter_by(
-                        factura_id=factura_id
-                    ).delete(synchronize_session=False)
-                    db.session.delete(factura)
-                else:
-                    factura = FacturaCredito.query.get(factura_id)
-                    if not factura:
-                        return redirect(url_for("facturas_historial"))
-                    DetalleFacturaCredito.query.filter_by(
-                        factura_id=factura_id
-                    ).delete(synchronize_session=False)
-                    db.session.delete(factura)
+                if not factura:
+                    return redirect(url_for("facturas_historial"))
+                DetalleFacturaContado.query.filter_by(
+                    factura_id=factura_id
+                ).delete(synchronize_session=False)
+                db.session.delete(factura)
             else:
                 factura = None
                 if numero_ref:
@@ -732,15 +680,7 @@ def create_app():
                         ).delete(synchronize_session=False)
                         db.session.delete(factura)
                     else:
-                        factura = FacturaCredito.query.filter_by(
-                            numero_factura=numero_ref
-                        ).first()
-                        if not factura:
-                            return redirect(url_for("facturas_historial"))
-                        DetalleFacturaCredito.query.filter_by(
-                            factura_id=factura.id
-                        ).delete(synchronize_session=False)
-                        db.session.delete(factura)
+                        return redirect(url_for("facturas_historial"))
                 else:
                     return redirect(url_for("facturas_historial"))
 
@@ -986,7 +926,7 @@ def create_app():
                     total=total,
                     pago=pago,
                     cambio=cambio,
-                    estado="pagada",
+                    estado="contado",
                 )
                 db.session.add(factura)
                 db.session.flush()
@@ -1003,11 +943,7 @@ def create_app():
                         )
                     )
             else:
-                saldo = total - pago
-                if saldo < 0:
-                    saldo = Decimal("0")
-                estado = "pagada" if saldo == 0 else "pendiente"
-                factura = FacturaCredito(
+                factura = FacturaContado(
                     numero_factura=numero_factura,
                     cliente_id=cliente_id,
                     usuario_id=usuario_id,
@@ -1017,15 +953,15 @@ def create_app():
                     isv=isv,
                     descuento=descuento_total,
                     total=total,
-                    pago_inicial=pago,
-                    saldo=saldo,
-                    estado=estado,
+                    pago=pago,
+                    cambio=Decimal("0"),
+                    estado="credito",
                 )
                 db.session.add(factura)
                 db.session.flush()
                 for producto, cantidad, precio, linea, descuento_unit in detalles:
                     db.session.add(
-                        DetalleFacturaCredito(
+                        DetalleFacturaContado(
                             factura_id=factura.id,
                             producto_id=producto.id,
                             cantidad=cantidad,

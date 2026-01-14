@@ -106,7 +106,7 @@ CREATE TABLE IF NOT EXISTS `inva-facturas_contado` (
     total DECIMAL(10,2),
     pago DECIMAL(10,2),
     cambio DECIMAL(10,2),
-    estado ENUM('pagada', 'anulada') DEFAULT 'pagada',
+    estado ENUM('contado', 'credito', 'pagada', 'anulada') DEFAULT 'contado',
     pdf_filename VARCHAR(255),
     FOREIGN KEY (cliente_id) REFERENCES `inva-clientes`(id) ON DELETE SET NULL,
     FOREIGN KEY (usuario_id) REFERENCES `inva-usuarios`(id) ON DELETE SET NULL,

@@ -89,7 +89,9 @@ class FacturaContado(db.Model):
     total = db.Column(db.Numeric(10, 2))
     pago = db.Column(db.Numeric(10, 2))
     cambio = db.Column(db.Numeric(10, 2))
-    estado = db.Column(db.Enum("pagada", "anulada"), default="pagada")
+    estado = db.Column(
+        db.Enum("contado", "credito", "pagada", "anulada"), default="contado"
+    )
     pdf_filename = db.Column(db.String(255))
 
 
