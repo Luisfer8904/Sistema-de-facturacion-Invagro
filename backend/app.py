@@ -519,7 +519,9 @@ def create_app():
         if not session.get("user"):
             return redirect(url_for("login"))
 
-        facturas = FacturaCredito.query.order_by(FacturaCredito.fecha.desc()).all()
+        facturas = FacturaCredito.query.filter_by(estado="pendiente").order_by(
+            FacturaCredito.fecha.desc()
+        ).all()
         clientes = Cliente.query.all()
         clientes_map = {cliente.id: cliente.nombre for cliente in clientes}
         return render_template(
@@ -529,12 +531,63 @@ def create_app():
             clientes_map=clientes_map,
         )
 
+    @app.post("/facturas/credito/<int:factura_id>/cobrar")
+    def cobrar_factura_credito(factura_id):
+        if not session.get("user"):
+            return redirect(url_for("login"))
+
+        factura = FacturaCredito.query.get_or_404(factura_id)
+        if factura.estado == "pagada":
+            return redirect(url_for("facturas_credito"))
+
+        try:
+            factura.estado = "pagada"
+            factura.saldo = Decimal("0")
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+        return redirect(url_for("facturas_credito"))
+
     @app.get("/facturas/historial")
     def facturas_historial():
         if not session.get("user"):
             return redirect(url_for("login"))
 
-        facturas = FacturaContado.query.order_by(FacturaContado.fecha.desc()).all()
+        facturas_contado = FacturaContado.query.order_by(FacturaContado.fecha.desc()).all()
+        facturas_credito = FacturaCredito.query.order_by(FacturaCredito.fecha.desc()).all()
+        facturas = []
+        for factura in facturas_contado:
+            facturas.append(
+                {
+                    "numero_factura": factura.numero_factura,
+                    "cliente_id": factura.cliente_id,
+                    "fecha": factura.fecha,
+                    "total": factura.total,
+                    "estado_label": "contado",
+                    "pdf_filename": factura.pdf_filename,
+                }
+            )
+        for factura in facturas_credito:
+            if factura.estado == "pagada":
+                estado_label = "pagada"
+            elif factura.estado == "anulada":
+                estado_label = "anulada"
+            else:
+                estado_label = "credito"
+            facturas.append(
+                {
+                    "numero_factura": factura.numero_factura,
+                    "cliente_id": factura.cliente_id,
+                    "fecha": factura.fecha,
+                    "total": factura.total,
+                    "estado_label": estado_label,
+                    "pdf_filename": factura.pdf_filename,
+                }
+            )
+        facturas.sort(
+            key=lambda item: item["fecha"] or datetime.min,
+            reverse=True,
+        )
         clientes = Cliente.query.all()
         clientes_map = {cliente.id: cliente.nombre for cliente in clientes}
         return render_template(
