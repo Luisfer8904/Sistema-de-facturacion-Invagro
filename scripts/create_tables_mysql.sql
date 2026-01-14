@@ -53,6 +53,8 @@ CREATE TABLE IF NOT EXISTS `inva-ajustes_negocio` (
     direccion VARCHAR(255),
     cai VARCHAR(60),
     rango_autorizado VARCHAR(120),
+    rango_autorizado_inicio VARCHAR(120),
+    rango_autorizado_fin VARCHAR(120),
     fecha_limite_emision VARCHAR(30),
     mensaje VARCHAR(255)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

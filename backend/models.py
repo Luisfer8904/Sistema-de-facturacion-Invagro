@@ -69,6 +69,8 @@ class AjustesNegocio(db.Model):
     direccion = db.Column(db.String(255))
     cai = db.Column(db.String(60))
     rango_autorizado = db.Column(db.String(120))
+    rango_autorizado_inicio = db.Column(db.String(120))
+    rango_autorizado_fin = db.Column(db.String(120))
     fecha_limite_emision = db.Column(db.String(30))
     mensaje = db.Column(db.String(255))
 

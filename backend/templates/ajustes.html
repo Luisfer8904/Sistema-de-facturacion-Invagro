@@ -62,11 +62,19 @@
               <input type="text" name="cai" value="{{ settings.cai or '' }}" />
             </label>
             <label>
-              <span>Rango autorizado</span>
+              <span>Rango autorizado inicial</span>
               <input
                 type="text"
-                name="rango_autorizado"
-                value="{{ settings.rango_autorizado or '' }}"
+                name="rango_autorizado_inicio"
+                value="{{ settings.rango_autorizado_inicio or settings.rango_autorizado or '' }}"
+              />
+            </label>
+            <label>
+              <span>Rango autorizado final</span>
+              <input
+                type="text"
+                name="rango_autorizado_fin"
+                value="{{ settings.rango_autorizado_fin or '' }}"
               />
             </label>
             <label>

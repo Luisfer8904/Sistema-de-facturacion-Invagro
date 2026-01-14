@@ -69,32 +69,25 @@ def create_app():
         file_storage.save(file_path)
         return unique_name
 
-    def parse_rango_autorizado(rango_texto):
+    def parse_rango_autorizado_inicio(rango_texto):
         if not rango_texto:
             return None
         matches = list(re.finditer(r"\d+", rango_texto))
-        if len(matches) < 2:
+        if not matches:
             return None
-        start_match = matches[-2]
-        end_match = matches[-1]
+        start_match = matches[-1]
         prefix = rango_texto[: start_match.start()]
         start_raw = start_match.group(0)
-        end_raw = end_match.group(0)
         try:
             start_num = int(start_raw)
-            end_num = int(end_raw)
         except ValueError:
             return None
-        return {
-            "prefix": prefix,
-            "start_num": start_num,
-            "end_num": end_num,
-            "width": len(start_raw),
-        }
+        return {"prefix": prefix, "start_num": start_num, "width": len(start_raw)}
 
     def generate_invoice_number():
         settings = get_business_settings()
-        rango_info = parse_rango_autorizado(settings.rango_autorizado or "")
+        rango_inicio = settings.rango_autorizado_inicio or settings.rango_autorizado or ""
+        rango_info = parse_rango_autorizado_inicio(rango_inicio)
         if not rango_info:
             return f"F001-{datetime.utcnow():%Y%m%d%H%M%S}"
 
@@ -105,9 +98,6 @@ def create_app():
                 suffix = last_invoice.numero_factura[len(rango_info["prefix"]):]
                 if suffix.isdigit():
                     next_num = int(suffix) + 1
-
-        if next_num > rango_info["end_num"]:
-            raise ValueError("Se alcanzo el limite del rango autorizado.")
 
         return f"{rango_info['prefix']}{next_num:0{rango_info['width']}d}"
 
@@ -128,6 +118,8 @@ def create_app():
             direccion="",
             cai="",
             rango_autorizado="",
+            rango_autorizado_inicio="",
+            rango_autorizado_fin="",
             fecha_limite_emision="",
             mensaje="",
         )
@@ -349,10 +341,17 @@ def create_app():
         footer_blocks = []
         if settings.mensaje:
             footer_blocks.append(Paragraph(settings.mensaje, styles["Normal"]))
-        if settings.cai or settings.rango_autorizado or settings.fecha_limite_emision:
+        rango_texto = ""
+        if settings.rango_autorizado_inicio or settings.rango_autorizado_fin:
+            inicio = settings.rango_autorizado_inicio or "-"
+            fin = settings.rango_autorizado_fin or "-"
+            rango_texto = f"{inicio} - {fin}"
+        elif settings.rango_autorizado:
+            rango_texto = settings.rango_autorizado
+        if settings.cai or rango_texto or settings.fecha_limite_emision:
             footer_text = (
                 f"CAI: {settings.cai or '-'}<br/>"
-                f"RANGO AUTORIZADO: {settings.rango_autorizado or '-'}<br/>"
+                f"RANGO AUTORIZADO: {rango_texto or '-'}<br/>"
                 f"FECHA LIMITE DE EMISION: {settings.fecha_limite_emision or '-'}"
             )
             footer_blocks.append(Paragraph(footer_text, styles["Normal"]))
@@ -550,6 +549,12 @@ def create_app():
             settings.direccion = request.form.get("direccion", "").strip()
             settings.cai = request.form.get("cai", "").strip()
             settings.rango_autorizado = request.form.get("rango_autorizado", "").strip()
+            settings.rango_autorizado_inicio = request.form.get(
+                "rango_autorizado_inicio", ""
+            ).strip()
+            settings.rango_autorizado_fin = request.form.get(
+                "rango_autorizado_fin", ""
+            ).strip()
             settings.fecha_limite_emision = request.form.get("fecha_limite_emision", "").strip()
             settings.mensaje = request.form.get("mensaje", "").strip()
             db.session.commit()
