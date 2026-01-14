@@ -51,7 +51,7 @@
                 <span>{{ factura.fecha.strftime('%d/%m/%Y') if factura.fecha else '-' }}</span>
                 <span>L {{ "%.2f"|format(factura.total or 0) }}</span>
                 <span>{{ factura.estado_label|upper }}</span>
-                <span>
+                <div class="table-actions">
                   {% if factura.pdf_filename %}
                     <a class="secondary-button" href="{{ url_for('static', filename='invoices/' ~ factura.pdf_filename) }}" target="_blank">
                       Ver PDF
@@ -63,7 +63,7 @@
                     <input type="hidden" name="tipo" value="{{ factura.tipo }}" />
                     <button class="danger-button" type="submit">Eliminar</button>
                   </form>
-                </span>
+                </div>
               </div>
             {% endfor %}
           {% else %}

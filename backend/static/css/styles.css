@@ -747,6 +747,13 @@ body {
   color: #4a5568;
 }
 
+.table-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
 .category-list {
   margin-top: 16px;
   display: grid;
