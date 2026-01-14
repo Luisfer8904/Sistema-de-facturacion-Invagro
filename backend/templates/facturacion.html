@@ -590,8 +590,11 @@
           }
           if (invoiceWhatsappLink && result.pdf_url) {
             const pdfUrl = new URL(result.pdf_url, window.location.origin).toString();
+            const clientName = clientSelect ? clientSelect.options[clientSelect.selectedIndex]?.textContent.trim() : "";
+            const greeting = clientName ? `Hola ${clientName},` : "Hola,";
+            const tipoText = tipo === "credito" ? "credito" : "contado";
             const message = encodeURIComponent(
-              `Factura ${result.numero_factura} - Total L ${modalTotalValue.toFixed(2)} - PDF: ${pdfUrl}`
+              `${greeting}\nSe genero una factura ${tipoText} por L ${modalTotalValue.toFixed(2)}.\nNo. ${result.numero_factura}\nPDF: ${pdfUrl}`
             );
             invoiceWhatsappLink.href = `https://wa.me/?text=${message}`;
             invoiceWhatsappLink.style.display = "inline-flex";
