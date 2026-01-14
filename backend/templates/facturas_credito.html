@@ -48,7 +48,7 @@
               <div class="table-row table-six">
                 <span>{{ factura.numero_factura }}</span>
                 <span>{{ clientes_map.get(factura.cliente_id, 'N/A') }}</span>
-                <span>{{ factura.fecha.strftime('%d/%m/%Y') if factura.fecha else '-' }}</span>
+                <span>{{ factura.fecha_label }}</span>
                 <span>L {{ "%.2f"|format(factura.total or 0) }}</span>
                 <span>CREDITO</span>
                 <div class="table-actions">

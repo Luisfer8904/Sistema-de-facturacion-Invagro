@@ -519,9 +519,30 @@ def create_app():
         if not session.get("user"):
             return redirect(url_for("login"))
 
-        facturas = FacturaCredito.query.filter_by(estado="pendiente").order_by(
-            FacturaCredito.fecha.desc()
-        ).all()
+        facturas_raw = FacturaCredito.query.order_by(FacturaCredito.fecha.desc()).all()
+        facturas = []
+        for factura in facturas_raw:
+            if factura.estado == "pagada":
+                estado_label = "pagada"
+            elif factura.estado == "anulada":
+                estado_label = "anulada"
+            else:
+                estado_label = "credito"
+            if estado_label != "credito":
+                continue
+            fecha_label = factura.fecha.strftime("%d/%m/%Y") if factura.fecha else "-"
+            facturas.append(
+                {
+                    "id": factura.id,
+                    "numero_factura": factura.numero_factura,
+                    "cliente_id": factura.cliente_id,
+                    "fecha": factura.fecha,
+                    "fecha_label": fecha_label,
+                    "total": factura.total,
+                    "estado_label": estado_label,
+                    "pdf_filename": factura.pdf_filename,
+                }
+            )
         clientes = Cliente.query.all()
         clientes_map = {cliente.id: cliente.nombre for cliente in clientes}
         return render_template(
@@ -557,6 +578,7 @@ def create_app():
         facturas_credito = FacturaCredito.query.order_by(FacturaCredito.fecha.desc()).all()
         facturas = []
         for factura in facturas_contado:
+            fecha_label = factura.fecha.strftime("%d/%m/%Y") if factura.fecha else "-"
             facturas.append(
                 {
                     "id": factura.id,
@@ -564,6 +586,7 @@ def create_app():
                     "numero_factura": factura.numero_factura,
                     "cliente_id": factura.cliente_id,
                     "fecha": factura.fecha,
+                    "fecha_label": fecha_label,
                     "total": factura.total,
                     "estado_label": "contado",
                     "pdf_filename": factura.pdf_filename,
@@ -576,6 +599,7 @@ def create_app():
                 estado_label = "anulada"
             else:
                 estado_label = "credito"
+            fecha_label = factura.fecha.strftime("%d/%m/%Y") if factura.fecha else "-"
             facturas.append(
                 {
                     "id": factura.id,
@@ -583,13 +607,14 @@ def create_app():
                     "numero_factura": factura.numero_factura,
                     "cliente_id": factura.cliente_id,
                     "fecha": factura.fecha,
+                    "fecha_label": fecha_label,
                     "total": factura.total,
                     "estado_label": estado_label,
                     "pdf_filename": factura.pdf_filename,
                 }
             )
         facturas.sort(
-            key=lambda item: item["fecha"] or datetime.min,
+            key=lambda item: item.get("fecha") or datetime.min,
             reverse=True,
         )
         clientes = Cliente.query.all()
