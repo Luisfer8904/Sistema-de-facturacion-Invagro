@@ -93,7 +93,7 @@
                 </div>
                 <div class="product-actions">
                   <a class="secondary-button" href="/productos/{{ producto.id }}/edit">Editar</a>
-                  <form method="post" action="/productos/{{ producto.id }}/delete">
+                  <form method="post" action="/productos/{{ producto.id }}/delete" onsubmit="return confirm('¿Eliminar este producto?');">
                     <button class="danger-button" type="submit">Eliminar</button>
                   </form>
                 </div>
@@ -193,7 +193,7 @@
                   {% for categoria in categorias %}
                     <li>
                       <span>{{ categoria.nombre }}</span>
-                      <form method="post" action="/categorias/{{ categoria.id }}/delete">
+                      <form method="post" action="/categorias/{{ categoria.id }}/delete" onsubmit="return confirm('¿Eliminar esta categoría?');">
                         <button class="danger-button" type="submit">Eliminar</button>
                       </form>
                     </li>
