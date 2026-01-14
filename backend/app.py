@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 from datetime import datetime
 from decimal import Decimal
 from uuid import uuid4
@@ -68,8 +69,47 @@ def create_app():
         file_storage.save(file_path)
         return unique_name
 
+    def parse_rango_autorizado(rango_texto):
+        if not rango_texto:
+            return None
+        matches = list(re.finditer(r"\d+", rango_texto))
+        if len(matches) < 2:
+            return None
+        start_match = matches[-2]
+        end_match = matches[-1]
+        prefix = rango_texto[: start_match.start()]
+        start_raw = start_match.group(0)
+        end_raw = end_match.group(0)
+        try:
+            start_num = int(start_raw)
+            end_num = int(end_raw)
+        except ValueError:
+            return None
+        return {
+            "prefix": prefix,
+            "start_num": start_num,
+            "end_num": end_num,
+            "width": len(start_raw),
+        }
+
     def generate_invoice_number():
-        return f"F001-{datetime.utcnow():%Y%m%d%H%M%S}"
+        settings = get_business_settings()
+        rango_info = parse_rango_autorizado(settings.rango_autorizado or "")
+        if not rango_info:
+            return f"F001-{datetime.utcnow():%Y%m%d%H%M%S}"
+
+        last_invoice = FacturaContado.query.order_by(FacturaContado.id.desc()).first()
+        next_num = rango_info["start_num"]
+        if last_invoice and last_invoice.numero_factura:
+            if last_invoice.numero_factura.startswith(rango_info["prefix"]):
+                suffix = last_invoice.numero_factura[len(rango_info["prefix"]):]
+                if suffix.isdigit():
+                    next_num = int(suffix) + 1
+
+        if next_num > rango_info["end_num"]:
+            raise ValueError("Se alcanzo el limite del rango autorizado.")
+
+        return f"{rango_info['prefix']}{next_num:0{rango_info['width']}d}"
 
     def get_business_settings():
         settings = AjustesNegocio.query.first()
