@@ -111,6 +111,11 @@ def create_app():
 
         return f"{rango_info['prefix']}{next_num:0{rango_info['width']}d}"
 
+    def build_invoice_pdf_filename(numero_factura):
+        safe_base = re.sub(r"[\\/\\s]+", "-", numero_factura).strip("-")
+        safe_name = secure_filename(safe_base) or "factura"
+        return f"{safe_name}.pdf"
+
     def get_business_settings():
         settings = AjustesNegocio.query.first()
         if settings:
@@ -1032,7 +1037,7 @@ def create_app():
                 }
                 for producto, cantidad, precio, linea, descuento_unit in detalles
             ]
-            pdf_filename = f"{numero_factura}.pdf"
+            pdf_filename = build_invoice_pdf_filename(numero_factura)
             pdf_path = os.path.join(app.config["INVOICE_PDF_FOLDER"], pdf_filename)
             create_invoice_pdf(pdf_path, settings, factura, detalles_pdf, tipo, cliente, usuario)
             factura.pdf_filename = pdf_filename
