@@ -35,22 +35,24 @@
 
       <main class="content-area">
         <section class="module-table">
-          <div class="table-header table-six">
+          <div class="table-header table-seven">
             <span>Factura</span>
             <span>Cliente</span>
             <span>Fecha</span>
             <span>Total</span>
-            <span>Estado</span>
-            <span>PDF</span>
+            <span>Abonado</span>
+            <span>Saldo</span>
+            <span>Acciones</span>
           </div>
           {% if facturas %}
             {% for factura in facturas %}
-              <div class="table-row table-six">
+              <div class="table-row table-seven">
                 <span>{{ factura.numero_factura }}</span>
                 <span>{{ clientes_map.get(factura.cliente_id, 'N/A') }}</span>
                 <span>{{ factura.fecha_label }}</span>
                 <span>L {{ "%.2f"|format(factura.total or 0) }}</span>
-                <span>CREDITO</span>
+                <span>L {{ "%.2f"|format(factura.abonado or 0) }}</span>
+                <span>L {{ "%.2f"|format(factura.saldo or 0) }}</span>
                 <div class="table-actions">
                   {% if factura.pdf_filename %}
                     <a class="secondary-button" href="{{ url_for('static', filename='invoices/' ~ factura.pdf_filename) }}" target="_blank">
@@ -59,6 +61,10 @@
                   {% else %}
                     -
                   {% endif %}
+                  <form method="post" action="/facturas/credito/{{ factura.id }}/abonos">
+                    <input class="amount-input" type="number" name="monto" min="0.01" step="0.01" placeholder="Abono" required />
+                    <button class="secondary-button" type="submit">Registrar</button>
+                  </form>
                   <form method="post" action="/facturas/credito/{{ factura.id }}/cobrar" onsubmit="return confirm('¿Cobrar esta factura?');">
                     <button class="primary-button" type="submit">Cobrar factura</button>
                   </form>
@@ -66,8 +72,9 @@
               </div>
             {% endfor %}
           {% else %}
-            <div class="table-row table-six">
+            <div class="table-row table-seven">
               <span>Sin registros</span>
+              <span>-</span>
               <span>-</span>
               <span>-</span>
               <span>-</span>

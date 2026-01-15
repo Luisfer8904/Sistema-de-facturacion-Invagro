@@ -115,6 +115,19 @@ class DetalleFacturaContado(db.Model):
     isv_aplica = db.Column(db.Boolean, default=False)
 
 
+class AbonoFactura(db.Model):
+    __tablename__ = "inva-abonos_facturas"
+    __table_args__ = {"extend_existing": True}
+
+    id = db.Column(db.Integer, primary_key=True)
+    factura_id = db.Column(
+        db.Integer, db.ForeignKey("inva-facturas_contado.id"), nullable=False
+    )
+    usuario_id = db.Column(db.Integer, db.ForeignKey("inva-usuarios.id"))
+    monto = db.Column(db.Numeric(10, 2), nullable=False)
+    fecha = db.Column(db.DateTime)
+
+
 class FacturaCredito(db.Model):
     __tablename__ = "inva-facturas_credito"
     __table_args__ = {"extend_existing": True}

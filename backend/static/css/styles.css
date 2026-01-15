@@ -888,6 +888,10 @@ body {
   grid-template-columns: 2fr 0.7fr 0.9fr 0.8fr 0.9fr 0.6fr;
 }
 
+.table-seven {
+  grid-template-columns: 1.6fr 0.8fr 0.8fr 0.8fr 0.8fr 0.8fr 1.4fr;
+}
+
 .table-five {
   grid-template-columns: 2fr 0.7fr 0.9fr 1fr 0.6fr;
 }
@@ -905,6 +909,13 @@ body {
 
 .discount-input {
   width: 90px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid #dfe6e5;
+}
+
+.amount-input {
+  width: 110px;
   padding: 6px 8px;
   border-radius: 8px;
   border: 1px solid #dfe6e5;

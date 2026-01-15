@@ -25,6 +25,7 @@ from reportlab.platypus import (
 )
 
 from models import (
+    AbonoFactura,
     AjustesNegocio,
     Categoria,
     Cliente,
@@ -627,6 +628,8 @@ def create_app():
         facturas = []
         for factura in facturas_raw:
             fecha_label = factura.fecha.strftime("%d/%m/%Y") if factura.fecha else "-"
+            abonado = factura.pago or Decimal("0")
+            saldo = (factura.total or Decimal("0")) - abonado
             facturas.append(
                 {
                     "id": factura.id,
@@ -635,6 +638,8 @@ def create_app():
                     "fecha": factura.fecha,
                     "fecha_label": fecha_label,
                     "total": factura.total,
+                    "abonado": abonado,
+                    "saldo": saldo,
                     "estado_label": "credito",
                     "pdf_filename": factura.pdf_filename,
                 }
@@ -662,9 +667,64 @@ def create_app():
             return redirect(url_for("facturas_credito"))
 
         try:
+            usuario = User.query.filter_by(username=session["user"]).first()
+            usuario_id = usuario.id if usuario else None
+            saldo = (factura.total or Decimal("0")) - (factura.pago or Decimal("0"))
+            if saldo > 0:
+                db.session.add(
+                    AbonoFactura(
+                        factura_id=factura.id,
+                        usuario_id=usuario_id,
+                        monto=saldo,
+                        fecha=datetime.utcnow(),
+                    )
+                )
             factura.estado = "pagada"
             factura.pago = factura.total
             factura.cambio = Decimal("0")
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+        return redirect(url_for("facturas_credito"))
+
+    @app.post("/facturas/credito/<int:factura_id>/abonos")
+    def registrar_abono_factura(factura_id):
+        if not session.get("user"):
+            return redirect(url_for("login"))
+
+        try:
+            monto_raw = request.form.get("monto", "0").strip()
+            monto = Decimal(monto_raw)
+        except Exception:
+            return redirect(url_for("facturas_credito"))
+        if monto <= 0:
+            return redirect(url_for("facturas_credito"))
+
+        factura = FacturaContado.query.get_or_404(factura_id)
+        if factura.estado != "credito":
+            return redirect(url_for("facturas_credito"))
+
+        pago_actual = factura.pago or Decimal("0")
+        saldo = (factura.total or Decimal("0")) - pago_actual
+        if monto > saldo:
+            return redirect(url_for("facturas_credito"))
+
+        try:
+            usuario = User.query.filter_by(username=session["user"]).first()
+            usuario_id = usuario.id if usuario else None
+            db.session.add(
+                AbonoFactura(
+                    factura_id=factura.id,
+                    usuario_id=usuario_id,
+                    monto=monto,
+                    fecha=datetime.utcnow(),
+                )
+            )
+            factura.pago = pago_actual + monto
+            nuevo_saldo = saldo - monto
+            if nuevo_saldo <= 0:
+                factura.estado = "pagada"
+                factura.cambio = Decimal("0")
             db.session.commit()
         except SQLAlchemyError:
             db.session.rollback()

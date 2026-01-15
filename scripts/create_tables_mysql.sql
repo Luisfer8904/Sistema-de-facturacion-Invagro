@@ -168,6 +168,19 @@ CREATE TABLE IF NOT EXISTS `inva-detalle_facturas_contado` (
     INDEX idx_producto_id_contado (producto_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Tabla de Abonos de Facturas
+CREATE TABLE IF NOT EXISTS `inva-abonos_facturas` (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    factura_id INT NOT NULL,
+    usuario_id INT,
+    monto DECIMAL(10,2) NOT NULL,
+    fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (factura_id) REFERENCES `inva-facturas_contado`(id) ON DELETE CASCADE,
+    FOREIGN KEY (usuario_id) REFERENCES `inva-usuarios`(id) ON DELETE SET NULL,
+    INDEX idx_abono_factura_id (factura_id),
+    INDEX idx_abono_fecha (fecha)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Tabla de Detalle Facturas Credito
 CREATE TABLE IF NOT EXISTS `inva-detalle_facturas_credito` (
     id INT AUTO_INCREMENT PRIMARY KEY,
