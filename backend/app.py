@@ -1,11 +1,12 @@
 import logging
 import os
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
 from uuid import uuid4
 
 import click
+from sqlalchemy import func
 from flask import Flask, jsonify, redirect, render_template, request, session, url_for
 from sqlalchemy.exc import SQLAlchemyError
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -405,7 +406,56 @@ def create_app():
         if not session.get("user"):
             return redirect(url_for("login"))
 
-        return render_template("dashboard.html", user=session["user"])
+        now = datetime.utcnow()
+        cutoff = now - timedelta(days=30)
+
+        try:
+            clientes_count = Cliente.query.count()
+            productos_count = Producto.query.filter_by(activo=True).count()
+            facturas_credito_count = FacturaContado.query.filter_by(estado="credito").count()
+            credito_total = (
+                db.session.query(func.coalesce(func.sum(FacturaContado.total), 0))
+                .filter(FacturaContado.estado == "credito")
+                .scalar()
+                or 0
+            )
+            credito_menor_30 = (
+                db.session.query(func.coalesce(func.sum(FacturaContado.total), 0))
+                .filter(
+                    FacturaContado.estado == "credito",
+                    FacturaContado.fecha >= cutoff,
+                )
+                .scalar()
+                or 0
+            )
+            credito_mayor_30 = (
+                db.session.query(func.coalesce(func.sum(FacturaContado.total), 0))
+                .filter(
+                    FacturaContado.estado == "credito",
+                    FacturaContado.fecha < cutoff,
+                )
+                .scalar()
+                or 0
+            )
+        except SQLAlchemyError:
+            db.session.rollback()
+            clientes_count = 0
+            productos_count = 0
+            facturas_credito_count = 0
+            credito_total = 0
+            credito_menor_30 = 0
+            credito_mayor_30 = 0
+
+        return render_template(
+            "dashboard.html",
+            user=session["user"],
+            clientes_count=clientes_count,
+            productos_count=productos_count,
+            facturas_credito_count=facturas_credito_count,
+            credito_total=credito_total,
+            credito_menor_30=credito_menor_30,
+            credito_mayor_30=credito_mayor_30,
+        )
 
     @app.get("/logout")
     def logout():

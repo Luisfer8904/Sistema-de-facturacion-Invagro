@@ -64,16 +64,28 @@
 
         <section class="stats-grid">
           <div class="stat-card">
-            <div class="stat-label">Facturas</div>
-            <div class="stat-value">0</div>
+            <div class="stat-label">Credito pendiente</div>
+            <div class="stat-value">{{ facturas_credito_count or 0 }}</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Total credito</div>
+            <div class="stat-value">L {{ "%.2f"|format(credito_total or 0) }}</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Credito &lt; 30 dias</div>
+            <div class="stat-value">L {{ "%.2f"|format(credito_menor_30 or 0) }}</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Credito &gt;= 30 dias</div>
+            <div class="stat-value">L {{ "%.2f"|format(credito_mayor_30 or 0) }}</div>
           </div>
           <div class="stat-card">
             <div class="stat-label">Clientes</div>
-            <div class="stat-value">0</div>
+            <div class="stat-value">{{ clientes_count or 0 }}</div>
           </div>
           <div class="stat-card">
             <div class="stat-label">Productos</div>
-            <div class="stat-value">0</div>
+            <div class="stat-value">{{ productos_count or 0 }}</div>
           </div>
         </section>
       </main>
