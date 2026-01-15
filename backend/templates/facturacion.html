@@ -472,14 +472,16 @@
         invoiceTotal.textContent = formatCurrency(modalTotalValue);
       }
       if (invoicePaid) {
-        invoicePaid.value = modalTotalValue.toFixed(2);
+        invoicePaid.value = modalInvoiceType === "credito" ? "0.00" : modalTotalValue.toFixed(2);
       }
       if (invoiceChange) {
         invoiceChange.textContent = formatCurrency(0);
       }
       if (invoiceBalanceRow && invoiceBalance) {
         invoiceBalanceRow.style.display = modalInvoiceType === "credito" ? "flex" : "none";
-        invoiceBalance.textContent = formatCurrency(0);
+        invoiceBalance.textContent = formatCurrency(
+          modalInvoiceType === "credito" ? modalTotalValue : 0
+        );
       }
 
       if (invoiceModal) {
