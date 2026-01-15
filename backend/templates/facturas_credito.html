@@ -34,6 +34,16 @@
       </div>
 
       <main class="content-area">
+        <section class="pos-search">
+          <input
+            type="text"
+            placeholder="Buscar por cliente o factura"
+            id="credit-invoice-search"
+          />
+          <button class="primary-button" type="button" id="clear-credit-search">
+            Limpiar
+          </button>
+        </section>
         <section class="module-table">
           <div class="table-header table-seven">
             <span>Factura</span>
@@ -46,7 +56,11 @@
           </div>
           {% if facturas %}
             {% for factura in facturas %}
-              <div class="table-row table-seven">
+              <div
+                class="table-row table-seven"
+                data-name="{{ clientes_map.get(factura.cliente_id, 'N/A') }}"
+                data-invoice="{{ factura.numero_factura }}"
+              >
                 <span>{{ factura.numero_factura }}</span>
                 <span>{{ clientes_map.get(factura.cliente_id, 'N/A') }}</span>
                 <span>{{ factura.fecha_label }}</span>
@@ -86,4 +100,31 @@
       </main>
     </div>
   </div>
+  <script>
+    const creditSearch = document.getElementById("credit-invoice-search");
+    const clearCreditSearch = document.getElementById("clear-credit-search");
+    const creditRows = Array.from(document.querySelectorAll(".table-row.table-seven"));
+
+    const applyCreditFilter = () => {
+      const query = creditSearch ? creditSearch.value.trim().toLowerCase() : "";
+      creditRows.forEach((row) => {
+        const name = (row.dataset.name || "").toLowerCase();
+        const invoice = (row.dataset.invoice || "").toLowerCase();
+        const matches = !query || name.includes(query) || invoice.includes(query);
+        row.style.display = matches ? "grid" : "none";
+      });
+    };
+
+    if (creditSearch) {
+      creditSearch.addEventListener("input", applyCreditFilter);
+    }
+    if (clearCreditSearch) {
+      clearCreditSearch.addEventListener("click", () => {
+        if (creditSearch) {
+          creditSearch.value = "";
+        }
+        applyCreditFilter();
+      });
+    }
+  </script>
 {% endblock %}
