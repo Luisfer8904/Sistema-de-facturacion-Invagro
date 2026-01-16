@@ -42,55 +42,19 @@
           <button class="primary-button">Exportar</button>
         </section>
 
-        <section class="module-grid">
-          <div class="module-card">
-            <h3>Ventas mensuales</h3>
-            <p>Comparativos por periodos y tendencias.</p>
-          </div>
-          <div class="module-card">
-            <h3>Clientes activos</h3>
-            <p>Segmentacion por zona y frecuencia.</p>
-          </div>
-          <div class="module-card">
-            <h3>Productos top</h3>
-            <p>Ranking de productos mas vendidos.</p>
-          </div>
-        </section>
-
-        <section class="module-table">
-          <div class="table-header">
-            <span>Reporte</span>
-            <span>Periodo</span>
-            <span>Estado</span>
-          </div>
-          <div class="table-row">
-            <span>Estado de cuenta por cliente</span>
-            <span>Mes actual</span>
-            <span class="table-actions">
-              <button
-                class="icon-action"
-                type="button"
-                data-account-open
-                data-client="Distribuidora San Miguel"
-                data-rtn="0801-1987-20458"
-                data-phone="50400000000"
-                data-total="245890.5"
-                data-overdue="4"
-              >
-                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                  <path
-                    d="M4 5.5h16c.83 0 1.5.67 1.5 1.5v10c0 .83-.67 1.5-1.5 1.5H4c-.83 0-1.5-.67-1.5-1.5V7c0-.83.67-1.5 1.5-1.5zm0 2.5v.45l7.2 4.32c.5.3 1.1.3 1.6 0L20 8.45V8H4zm16 9.5V10.1l-6.6 3.95c-.9.55-2 .55-2.9 0L4 10.1v7.4h16z"
-                  />
-                </svg>
-                Enviar estado
-              </button>
-            </span>
-          </div>
-          <div class="table-row">
-            <span>Sin registros</span>
-            <span>-</span>
-            <span>-</span>
-          </div>
+        <section class="report-tools">
+          <button class="tool-card" type="button" data-account-open>
+            <div class="tool-icon tool-green">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path
+                  d="M4 5.5h16c.83 0 1.5.67 1.5 1.5v10c0 .83-.67 1.5-1.5 1.5H4c-.83 0-1.5-.67-1.5-1.5V7c0-.83.67-1.5 1.5-1.5zm0 2.5v.45l7.2 4.32c.5.3 1.1.3 1.6 0L20 8.45V8H4zm16 9.5V10.1l-6.6 3.95c-.9.55-2 .55-2.9 0L4 10.1v7.4h16z"
+                />
+              </svg>
+            </div>
+            <h3>Estados de cuenta</h3>
+            <p>Selecciona un cliente, revisa facturas pendientes y genera el PDF.</p>
+            <span class="tool-action">Abrir →</span>
+          </button>
         </section>
       </main>
     </div>
@@ -109,47 +73,53 @@
         <div class="account-form">
           <label>
             <span>Cliente</span>
-            <input type="text" id="account-client" placeholder="Nombre del cliente" />
+            <select id="account-client-select">
+              <option value="">Selecciona un cliente</option>
+              {% for cliente in clientes %}
+                <option value="{{ cliente.id }}">{{ cliente.nombre }}</option>
+              {% endfor %}
+            </select>
           </label>
           <label>
             <span>RTN</span>
-            <input type="text" id="account-rtn" placeholder="RTN" />
+            <input type="text" id="account-rtn" placeholder="RTN" readonly />
           </label>
           <label>
             <span>Telefono WhatsApp</span>
             <input type="tel" id="account-phone" placeholder="Ej. 50499999999" />
           </label>
-          <label>
-            <span>Total adeudado (L)</span>
-            <input type="number" min="0" step="0.01" id="account-total" />
-          </label>
-          <label>
-            <span>Facturas vencidas</span>
-            <input type="number" min="0" step="1" id="account-overdue" />
-          </label>
+        </div>
+        <div class="account-invoice-table">
+          <div class="account-invoice-header">
+            <span>Factura</span>
+            <span>Fecha</span>
+            <span>Total</span>
+            <span>Saldo</span>
+          </div>
+          <div class="account-invoice-body" id="account-invoice-body">
+            <div class="account-invoice-row is-empty">
+              Selecciona un cliente para ver facturas pendientes.
+            </div>
+          </div>
         </div>
         <div class="account-summary">
           <div>
-            <span>Total adeudado</span>
+            <span>Total pendiente</span>
             <strong id="account-total-label">L 0.00</strong>
           </div>
           <div>
-            <span>Facturas vencidas</span>
-            <strong id="account-overdue-label">0</strong>
-          </div>
-          <div>
-            <span>Fecha de corte</span>
-            <strong id="account-date-label">-</strong>
+            <span>Facturas pendientes</span>
+            <strong id="account-count-label">0</strong>
           </div>
         </div>
         <p class="account-note">
-          Genera el PDF con el logo de Invagro y luego envialo por WhatsApp.
+          Genera el PDF y luego envialo por WhatsApp con el enlace.
         </p>
       </div>
       <div class="form-actions">
         <button class="secondary-button" type="button" data-account-close>Cancelar</button>
         <button class="primary-button" type="button" id="account-print">Generar PDF</button>
-        <button class="secondary-button" type="button" id="account-whatsapp">Enviar WhatsApp</button>
+        <button class="secondary-button" type="button" id="account-whatsapp">Enviar PDF</button>
       </div>
     </div>
   </div>
@@ -171,15 +141,28 @@
         <span>RTN</span>
         <strong id="pdf-rtn">-</strong>
       </div>
+      <div>
+        <span>Telefono</span>
+        <strong id="pdf-phone">-</strong>
+      </div>
+    </div>
+    <div class="account-pdf-table">
+      <div class="account-pdf-row account-pdf-header-row">
+        <span>Factura</span>
+        <span>Fecha</span>
+        <span>Total</span>
+        <span>Saldo</span>
+      </div>
+      <div class="account-pdf-body" id="account-pdf-body"></div>
     </div>
     <div class="account-pdf-summary">
       <div>
-        <span>Total adeudado</span>
+        <span>Total pendiente</span>
         <strong id="pdf-total">L 0.00</strong>
       </div>
       <div>
-        <span>Facturas vencidas</span>
-        <strong id="pdf-overdue">0</strong>
+        <span>Facturas pendientes</span>
+        <strong id="pdf-count">0</strong>
       </div>
     </div>
     <p class="account-pdf-note">
@@ -191,34 +174,44 @@
     const accountModal = document.getElementById("account-modal");
     const accountOpenButtons = document.querySelectorAll("[data-account-open]");
     const accountCloseButtons = document.querySelectorAll("[data-account-close]");
-    const accountClientInput = document.getElementById("account-client");
+    const accountClientSelect = document.getElementById("account-client-select");
     const accountRtnInput = document.getElementById("account-rtn");
     const accountPhoneInput = document.getElementById("account-phone");
-    const accountTotalInput = document.getElementById("account-total");
-    const accountOverdueInput = document.getElementById("account-overdue");
     const accountClientLabel = document.getElementById("account-client-label");
     const accountTotalLabel = document.getElementById("account-total-label");
-    const accountOverdueLabel = document.getElementById("account-overdue-label");
-    const accountDateLabel = document.getElementById("account-date-label");
+    const accountCountLabel = document.getElementById("account-count-label");
+    const accountInvoiceBody = document.getElementById("account-invoice-body");
     const accountPrintButton = document.getElementById("account-print");
     const accountWhatsappButton = document.getElementById("account-whatsapp");
     const pdfClient = document.getElementById("pdf-client");
     const pdfRtn = document.getElementById("pdf-rtn");
+    const pdfPhone = document.getElementById("pdf-phone");
     const pdfTotal = document.getElementById("pdf-total");
-    const pdfOverdue = document.getElementById("pdf-overdue");
+    const pdfCount = document.getElementById("pdf-count");
     const pdfDate = document.getElementById("pdf-date");
+    const accountPdfBody = document.getElementById("account-pdf-body");
+    const clientes = {{ clientes | tojson }};
+    const facturasCredito = {{ facturas_credito | tojson }};
+    let currentPdfUrl = "";
 
     const currencyFormatter = new Intl.NumberFormat("es-HN", {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     });
 
-    const updateAccountPreview = () => {
-      const client = accountClientInput.value.trim() || "-";
-      const rtn = accountRtnInput.value.trim() || "-";
-      const totalValue = parseFloat(accountTotalInput.value || "0");
-      const overdueValue = parseInt(accountOverdueInput.value || "0", 10);
-      const formattedTotal = `L ${currencyFormatter.format(totalValue)}`;
+    const formatCurrency = (value) => `L ${currencyFormatter.format(value || 0)}`;
+
+    const renderEmptyInvoices = (message) => {
+      accountInvoiceBody.innerHTML = "";
+      accountPdfBody.innerHTML = "";
+      const row = document.createElement("div");
+      row.className = "account-invoice-row is-empty";
+      row.textContent = message;
+      accountInvoiceBody.appendChild(row);
+    };
+
+    const updatePdfMeta = (client, totalSaldo, invoiceCount) => {
+      const formattedTotal = formatCurrency(totalSaldo);
       const today = new Date();
       const formattedDate = today.toLocaleDateString("es-HN", {
         day: "2-digit",
@@ -226,54 +219,132 @@
         year: "numeric",
       });
 
-      accountClientLabel.textContent = `Cliente: ${client}`;
-      accountTotalLabel.textContent = formattedTotal;
-      accountOverdueLabel.textContent = `${overdueValue}`;
-      accountDateLabel.textContent = formattedDate;
-
-      pdfClient.textContent = client;
-      pdfRtn.textContent = rtn;
+      pdfClient.textContent = client?.nombre || "-";
+      pdfRtn.textContent = client?.rtn || "-";
+      pdfPhone.textContent = client?.telefono || "-";
       pdfTotal.textContent = formattedTotal;
-      pdfOverdue.textContent = `${overdueValue}`;
+      pdfCount.textContent = `${invoiceCount}`;
       pdfDate.textContent = `Fecha: ${formattedDate}`;
     };
 
-    const openAccountModal = (button) => {
-      accountClientInput.value = button.dataset.client || "";
-      accountRtnInput.value = button.dataset.rtn || "";
-      accountPhoneInput.value = button.dataset.phone || "";
-      accountTotalInput.value = button.dataset.total || "";
-      accountOverdueInput.value = button.dataset.overdue || "";
-      updateAccountPreview();
+    const renderInvoicesForClient = (clientId) => {
+      const client = clientes.find((item) => String(item.id) === String(clientId));
+      accountRtnInput.value = client?.rtn || "";
+      accountPhoneInput.value = client?.telefono || "";
+      accountClientLabel.textContent = `Cliente: ${client?.nombre || "-"}`;
+      currentPdfUrl = "";
+
+      if (!clientId) {
+        accountTotalLabel.textContent = formatCurrency(0);
+        accountCountLabel.textContent = "0";
+        updatePdfMeta(null, 0, 0);
+        renderEmptyInvoices("Selecciona un cliente para ver facturas pendientes.");
+        return;
+      }
+
+      const invoices = facturasCredito.filter(
+        (factura) => String(factura.cliente_id) === String(clientId)
+      );
+      let totalSaldo = 0;
+      accountInvoiceBody.innerHTML = "";
+      accountPdfBody.innerHTML = "";
+
+      if (!invoices.length) {
+        accountTotalLabel.textContent = formatCurrency(0);
+        accountCountLabel.textContent = "0";
+        updatePdfMeta(client, 0, 0);
+        renderEmptyInvoices("No hay facturas pendientes para este cliente.");
+        return;
+      }
+
+      invoices.forEach((factura) => {
+        totalSaldo += factura.saldo || 0;
+        const row = document.createElement("div");
+        row.className = "account-invoice-row";
+        row.innerHTML = `
+          <span>${factura.numero_factura}</span>
+          <span>${factura.fecha}</span>
+          <span>${formatCurrency(factura.total)}</span>
+          <span>${formatCurrency(factura.saldo)}</span>
+        `;
+        accountInvoiceBody.appendChild(row);
+
+        const pdfRow = document.createElement("div");
+        pdfRow.className = "account-pdf-row";
+        pdfRow.innerHTML = `
+          <span>${factura.numero_factura}</span>
+          <span>${factura.fecha}</span>
+          <span>${formatCurrency(factura.total)}</span>
+          <span>${formatCurrency(factura.saldo)}</span>
+        `;
+        accountPdfBody.appendChild(pdfRow);
+      });
+
+      accountTotalLabel.textContent = formatCurrency(totalSaldo);
+      accountCountLabel.textContent = `${invoices.length}`;
+      updatePdfMeta(client, totalSaldo, invoices.length);
+    };
+
+    const openAccountModal = () => {
+      accountClientSelect.value = "";
+      renderInvoicesForClient("");
       accountModal.classList.add("open");
     };
 
     accountOpenButtons.forEach((button) => {
-      button.addEventListener("click", () => openAccountModal(button));
+      button.addEventListener("click", () => openAccountModal());
     });
 
     accountCloseButtons.forEach((button) => {
       button.addEventListener("click", () => accountModal.classList.remove("open"));
     });
 
-    [accountClientInput, accountRtnInput, accountTotalInput, accountOverdueInput].forEach((input) => {
-      input.addEventListener("input", updateAccountPreview);
+    accountClientSelect.addEventListener("change", (event) => {
+      renderInvoicesForClient(event.target.value);
     });
 
-    accountPrintButton.addEventListener("click", () => {
-      updateAccountPreview();
-      window.print();
+    accountPhoneInput.addEventListener("input", () => {
+      pdfPhone.textContent = accountPhoneInput.value.trim() || "-";
+    });
+
+    accountPrintButton.addEventListener("click", async () => {
+      const clientId = accountClientSelect.value;
+      if (!clientId) {
+        alert("Selecciona un cliente para generar el PDF.");
+        return;
+      }
+      try {
+        const response = await fetch("/reportes/estado-cuenta/pdf", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ cliente_id: clientId }),
+        });
+        if (!response.ok) {
+          throw new Error("No se pudo generar el PDF.");
+        }
+        const result = await response.json();
+        currentPdfUrl = result.pdf_url || "";
+        if (currentPdfUrl) {
+          window.open(currentPdfUrl, "_blank");
+        }
+      } catch (error) {
+        alert("No se pudo generar el PDF.");
+      }
     });
 
     accountWhatsappButton.addEventListener("click", () => {
-      updateAccountPreview();
       const phone = accountPhoneInput.value.replace(/\\D/g, "");
       if (!phone) {
         alert("Ingresa un telefono de WhatsApp para continuar.");
         return;
       }
+      if (!currentPdfUrl) {
+        alert("Primero genera el PDF para poder enviarlo.");
+        return;
+      }
+      const client = accountClientSelect.options[accountClientSelect.selectedIndex]?.text || "";
       const message = encodeURIComponent(
-        `Hola ${accountClientInput.value || ""}. Te comparto el estado de cuenta con saldo pendiente de ${accountTotalLabel.textContent}.`
+        `Hola ${client}. Te envio el estado de cuenta. PDF: ${currentPdfUrl}`
       );
       window.open(`https://wa.me/${phone}?text=${message}`, "_blank");
     });

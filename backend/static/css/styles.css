@@ -722,6 +722,56 @@ body {
   margin-bottom: 24px;
 }
 
+.report-tools {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 18px;
+  margin-bottom: 24px;
+}
+
+.tool-card {
+  text-align: left;
+  border: none;
+  border-radius: 18px;
+  padding: 20px;
+  background: #ffffff;
+  box-shadow: 0 10px 26px rgba(12, 32, 28, 0.1);
+  cursor: pointer;
+  display: grid;
+  gap: 12px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.tool-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 30px rgba(12, 32, 28, 0.14);
+}
+
+.tool-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+}
+
+.tool-icon svg {
+  width: 24px;
+  height: 24px;
+  fill: currentColor;
+}
+
+.tool-green {
+  background: linear-gradient(135deg, #2c7a3f, #4caf50);
+}
+
+.tool-action {
+  font-weight: 700;
+  color: #2c7a3f;
+}
+
 .module-table {
   background: #ffffff;
   border-radius: 14px;
@@ -1099,10 +1149,53 @@ body {
   color: #2c3e50;
 }
 
-.account-form input {
+.account-form input,
+.account-form select {
   padding: 10px 12px;
   border-radius: 10px;
   border: 2px solid #e0e0e0;
+}
+
+.account-form select {
+  background: #ffffff;
+}
+
+.account-invoice-table {
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid #eef2f1;
+}
+
+.account-invoice-header,
+.account-invoice-row {
+  display: grid;
+  grid-template-columns: 1.2fr 0.9fr 1fr 1fr;
+  padding: 12px 14px;
+  gap: 10px;
+  align-items: center;
+}
+
+.account-invoice-header {
+  background: #f5f6fa;
+  font-weight: 700;
+  color: #2c3e50;
+}
+
+.account-invoice-row {
+  border-top: 1px solid #eef2f1;
+  color: #4a5568;
+  font-weight: 600;
+}
+
+.account-invoice-row span:last-child,
+.account-invoice-row span:nth-child(3) {
+  text-align: right;
+}
+
+.account-invoice-row.is-empty {
+  display: block;
+  text-align: center;
+  color: #7f8c8d;
 }
 
 .account-summary {
@@ -1162,6 +1255,32 @@ body {
   display: flex;
   justify-content: space-between;
   font-weight: 600;
+}
+
+.account-pdf-table {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+
+.account-pdf-row {
+  display: grid;
+  grid-template-columns: 1.2fr 0.9fr 1fr 1fr;
+  padding: 10px 12px;
+  gap: 10px;
+  align-items: center;
+}
+
+.account-pdf-header-row {
+  background: #f5f6fa;
+  font-weight: 700;
+  color: #2c3e50;
+}
+
+.account-pdf-row span:nth-child(3),
+.account-pdf-row span:nth-child(4) {
+  text-align: right;
 }
 
 .account-pdf-summary {

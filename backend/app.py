@@ -579,7 +579,202 @@ def create_app():
         if not session.get("user"):
             return redirect(url_for("login"))
 
-        return render_template("reportes.html", user=session["user"])
+        try:
+            clientes_data = [
+                {
+                    "id": cliente.id,
+                    "nombre": cliente.nombre,
+                    "rtn": cliente.ruc_dni or "",
+                    "telefono": cliente.telefono or "",
+                }
+                for cliente in Cliente.query.order_by(Cliente.nombre.asc()).all()
+            ]
+            facturas_raw = (
+                FacturaContado.query.filter_by(estado="credito")
+                .order_by(FacturaContado.fecha.desc())
+                .all()
+            )
+            facturas_credito = []
+            for factura in facturas_raw:
+                total = Decimal(str(factura.total or 0))
+                abonado = Decimal(str(factura.pago or 0))
+                saldo = total - abonado
+                if saldo <= 0:
+                    continue
+                facturas_credito.append(
+                    {
+                        "id": factura.id,
+                        "numero_factura": factura.numero_factura,
+                        "cliente_id": factura.cliente_id,
+                        "fecha": factura.fecha.strftime("%d/%m/%Y")
+                        if factura.fecha
+                        else "-",
+                        "total": float(total),
+                        "abonado": float(abonado),
+                        "saldo": float(saldo),
+                    }
+                )
+        except SQLAlchemyError:
+            db.session.rollback()
+            clientes_data = []
+            facturas_credito = []
+
+        return render_template(
+            "reportes.html",
+            user=session["user"],
+            clientes=clientes_data,
+            facturas_credito=facturas_credito,
+        )
+
+    def create_account_statement_pdf(file_path, settings, cliente, facturas, total_saldo):
+        styles = getSampleStyleSheet()
+        doc = SimpleDocTemplate(
+            file_path,
+            pagesize=letter,
+            leftMargin=22,
+            rightMargin=22,
+            topMargin=22,
+            bottomMargin=22,
+        )
+        story = []
+        logo_path = os.path.join(app.static_folder, "assets", "logo.jpg")
+        logo_image = None
+        if os.path.exists(logo_path):
+            logo_image = Image(logo_path, width=60, height=60)
+
+        header_center = (
+            f"<b>{settings.nombre}</b><br/>"
+            f"{settings.direccion or ''}<br/>"
+            f"RTN: {settings.rtn or '-'} &nbsp;&nbsp; TEL: {settings.telefono or '-'}<br/>"
+            f"{settings.email or ''}"
+        )
+        header_right = f"<b>ESTADO DE CUENTA</b><br/>FECHA: {datetime.utcnow():%d/%m/%Y}"
+        header_table = Table(
+            [
+                [
+                    logo_image or "",
+                    Paragraph(header_center, styles["Normal"]),
+                    Paragraph(header_right, styles["Normal"]),
+                ]
+            ],
+            colWidths=[90, 300, 130],
+        )
+        header_table.setStyle(
+            TableStyle(
+                [
+                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                    ("ALIGN", (2, 0), (2, 0), "RIGHT"),
+                    ("LINEBELOW", (0, 0), (-1, 0), 0.75, colors.black),
+                ]
+            )
+        )
+        story.append(header_table)
+        story.append(Spacer(1, 10))
+
+        cliente_line = (
+            f"<b>CLIENTE:</b> {cliente.nombre} &nbsp;&nbsp; "
+            f"<b>RTN:</b> {cliente.ruc_dni or '-'} &nbsp;&nbsp; "
+            f"<b>TEL:</b> {cliente.telefono or '-'}"
+        )
+        story.append(Paragraph(cliente_line, styles["Normal"]))
+        story.append(Spacer(1, 8))
+
+        table_data = [["FACTURA", "FECHA", "TOTAL", "ABONADO", "SALDO"]]
+        for factura in facturas:
+            table_data.append(
+                [
+                    factura["numero_factura"],
+                    factura["fecha"],
+                    f"L {factura['total']:.2f}",
+                    f"L {factura['abonado']:.2f}",
+                    f"L {factura['saldo']:.2f}",
+                ]
+            )
+        table = Table(table_data, colWidths=[120, 90, 90, 90, 90])
+        table.setStyle(
+            TableStyle(
+                [
+                    ("BOX", (0, 0), (-1, -1), 0.75, colors.black),
+                    ("LINEBELOW", (0, 0), (-1, 0), 0.6, colors.black),
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.whitesmoke),
+                    ("ALIGN", (2, 1), (-1, -1), "RIGHT"),
+                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("FONTSIZE", (0, 0), (-1, 0), 9),
+                    ("FONTSIZE", (0, 1), (-1, -1), 9),
+                ]
+            )
+        )
+        story.append(table)
+        story.append(Spacer(1, 10))
+
+        total_table = Table(
+            [["TOTAL PENDIENTE", f"L {total_saldo:.2f}"]],
+            colWidths=[150, 120],
+        )
+        total_table.setStyle(
+            TableStyle(
+                [
+                    ("ALIGN", (0, 0), (-1, -1), "RIGHT"),
+                    ("FONTNAME", (0, 0), (-1, -1), "Helvetica-Bold"),
+                    ("FONTSIZE", (0, 0), (-1, -1), 10),
+                ]
+            )
+        )
+        story.append(total_table)
+        doc.build(story)
+
+    @app.post("/reportes/estado-cuenta/pdf")
+    def reportes_estado_cuenta_pdf():
+        if not session.get("user"):
+            return jsonify({"error": "No autorizado"}), 401
+
+        data = request.get_json(silent=True) or {}
+        cliente_id = data.get("cliente_id")
+        if not cliente_id:
+            return jsonify({"error": "Cliente requerido"}), 400
+        try:
+            cliente_id = int(cliente_id)
+        except (TypeError, ValueError):
+            return jsonify({"error": "Cliente invalido"}), 400
+
+        cliente = Cliente.query.get(cliente_id)
+        if not cliente:
+            return jsonify({"error": "Cliente no encontrado"}), 404
+
+        facturas_raw = (
+            FacturaContado.query.filter_by(estado="credito", cliente_id=cliente_id)
+            .order_by(FacturaContado.fecha.asc())
+            .all()
+        )
+        facturas_credito = []
+        total_saldo = Decimal("0")
+        for factura in facturas_raw:
+            total = Decimal(str(factura.total or 0))
+            abonado = Decimal(str(factura.pago or 0))
+            saldo = total - abonado
+            if saldo <= 0:
+                continue
+            total_saldo += saldo
+            facturas_credito.append(
+                {
+                    "numero_factura": factura.numero_factura,
+                    "fecha": factura.fecha.strftime("%d/%m/%Y")
+                    if factura.fecha
+                    else "-",
+                    "total": float(total),
+                    "abonado": float(abonado),
+                    "saldo": float(saldo),
+                }
+            )
+        settings = get_business_settings()
+        safe_base = f"estado-cuenta-{cliente_id}-{datetime.utcnow():%Y%m%d%H%M%S}"
+        filename = build_invoice_pdf_filename(safe_base)
+        file_path = os.path.join(app.config["INVOICE_PDF_FOLDER"], filename)
+        create_account_statement_pdf(
+            file_path, settings, cliente, facturas_credito, total_saldo
+        )
+        pdf_url = url_for("static", filename=f"invoices/{filename}")
+        return jsonify({"pdf_url": pdf_url})
 
     @app.route("/ajustes", methods=["GET", "POST"])
     def ajustes():
