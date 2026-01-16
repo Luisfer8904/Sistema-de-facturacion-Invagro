@@ -64,6 +64,29 @@
             <span>Estado</span>
           </div>
           <div class="table-row">
+            <span>Estado de cuenta por cliente</span>
+            <span>Mes actual</span>
+            <span class="table-actions">
+              <button
+                class="icon-action"
+                type="button"
+                data-account-open
+                data-client="Distribuidora San Miguel"
+                data-rtn="0801-1987-20458"
+                data-phone="50400000000"
+                data-total="245890.5"
+                data-overdue="4"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path
+                    d="M4 5.5h16c.83 0 1.5.67 1.5 1.5v10c0 .83-.67 1.5-1.5 1.5H4c-.83 0-1.5-.67-1.5-1.5V7c0-.83.67-1.5 1.5-1.5zm0 2.5v.45l7.2 4.32c.5.3 1.1.3 1.6 0L20 8.45V8H4zm16 9.5V10.1l-6.6 3.95c-.9.55-2 .55-2.9 0L4 10.1v7.4h16z"
+                  />
+                </svg>
+                Enviar estado
+              </button>
+            </span>
+          </div>
+          <div class="table-row">
             <span>Sin registros</span>
             <span>-</span>
             <span>-</span>
@@ -72,4 +95,187 @@
       </main>
     </div>
   </div>
+
+  <div class="modal" id="account-modal">
+    <div class="modal-card account-modal-card">
+      <div class="modal-header">
+        <div>
+          <h3>Estado de cuenta</h3>
+          <span id="account-client-label">Cliente: -</span>
+        </div>
+        <button class="modal-close" type="button" data-account-close>×</button>
+      </div>
+      <div class="account-modal-body">
+        <div class="account-form">
+          <label>
+            <span>Cliente</span>
+            <input type="text" id="account-client" placeholder="Nombre del cliente" />
+          </label>
+          <label>
+            <span>RTN</span>
+            <input type="text" id="account-rtn" placeholder="RTN" />
+          </label>
+          <label>
+            <span>Telefono WhatsApp</span>
+            <input type="tel" id="account-phone" placeholder="Ej. 50499999999" />
+          </label>
+          <label>
+            <span>Total adeudado (L)</span>
+            <input type="number" min="0" step="0.01" id="account-total" />
+          </label>
+          <label>
+            <span>Facturas vencidas</span>
+            <input type="number" min="0" step="1" id="account-overdue" />
+          </label>
+        </div>
+        <div class="account-summary">
+          <div>
+            <span>Total adeudado</span>
+            <strong id="account-total-label">L 0.00</strong>
+          </div>
+          <div>
+            <span>Facturas vencidas</span>
+            <strong id="account-overdue-label">0</strong>
+          </div>
+          <div>
+            <span>Fecha de corte</span>
+            <strong id="account-date-label">-</strong>
+          </div>
+        </div>
+        <p class="account-note">
+          Genera el PDF con el logo de Invagro y luego envialo por WhatsApp.
+        </p>
+      </div>
+      <div class="form-actions">
+        <button class="secondary-button" type="button" data-account-close>Cancelar</button>
+        <button class="primary-button" type="button" id="account-print">Generar PDF</button>
+        <button class="secondary-button" type="button" id="account-whatsapp">Enviar WhatsApp</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="account-pdf" class="account-pdf">
+    <div class="account-pdf-header">
+      <img src="/static/assets/logo.jpg" alt="Logo Invagro" />
+      <div>
+        <h2>Estado de cuenta</h2>
+        <span id="pdf-date">Fecha: -</span>
+      </div>
+    </div>
+    <div class="account-pdf-meta">
+      <div>
+        <span>Cliente</span>
+        <strong id="pdf-client">-</strong>
+      </div>
+      <div>
+        <span>RTN</span>
+        <strong id="pdf-rtn">-</strong>
+      </div>
+    </div>
+    <div class="account-pdf-summary">
+      <div>
+        <span>Total adeudado</span>
+        <strong id="pdf-total">L 0.00</strong>
+      </div>
+      <div>
+        <span>Facturas vencidas</span>
+        <strong id="pdf-overdue">0</strong>
+      </div>
+    </div>
+    <p class="account-pdf-note">
+      Este resumen corresponde a los saldos pendientes del cliente.
+    </p>
+  </div>
+
+  <script>
+    const accountModal = document.getElementById("account-modal");
+    const accountOpenButtons = document.querySelectorAll("[data-account-open]");
+    const accountCloseButtons = document.querySelectorAll("[data-account-close]");
+    const accountClientInput = document.getElementById("account-client");
+    const accountRtnInput = document.getElementById("account-rtn");
+    const accountPhoneInput = document.getElementById("account-phone");
+    const accountTotalInput = document.getElementById("account-total");
+    const accountOverdueInput = document.getElementById("account-overdue");
+    const accountClientLabel = document.getElementById("account-client-label");
+    const accountTotalLabel = document.getElementById("account-total-label");
+    const accountOverdueLabel = document.getElementById("account-overdue-label");
+    const accountDateLabel = document.getElementById("account-date-label");
+    const accountPrintButton = document.getElementById("account-print");
+    const accountWhatsappButton = document.getElementById("account-whatsapp");
+    const pdfClient = document.getElementById("pdf-client");
+    const pdfRtn = document.getElementById("pdf-rtn");
+    const pdfTotal = document.getElementById("pdf-total");
+    const pdfOverdue = document.getElementById("pdf-overdue");
+    const pdfDate = document.getElementById("pdf-date");
+
+    const currencyFormatter = new Intl.NumberFormat("es-HN", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+
+    const updateAccountPreview = () => {
+      const client = accountClientInput.value.trim() || "-";
+      const rtn = accountRtnInput.value.trim() || "-";
+      const totalValue = parseFloat(accountTotalInput.value || "0");
+      const overdueValue = parseInt(accountOverdueInput.value || "0", 10);
+      const formattedTotal = `L ${currencyFormatter.format(totalValue)}`;
+      const today = new Date();
+      const formattedDate = today.toLocaleDateString("es-HN", {
+        day: "2-digit",
+        month: "long",
+        year: "numeric",
+      });
+
+      accountClientLabel.textContent = `Cliente: ${client}`;
+      accountTotalLabel.textContent = formattedTotal;
+      accountOverdueLabel.textContent = `${overdueValue}`;
+      accountDateLabel.textContent = formattedDate;
+
+      pdfClient.textContent = client;
+      pdfRtn.textContent = rtn;
+      pdfTotal.textContent = formattedTotal;
+      pdfOverdue.textContent = `${overdueValue}`;
+      pdfDate.textContent = `Fecha: ${formattedDate}`;
+    };
+
+    const openAccountModal = (button) => {
+      accountClientInput.value = button.dataset.client || "";
+      accountRtnInput.value = button.dataset.rtn || "";
+      accountPhoneInput.value = button.dataset.phone || "";
+      accountTotalInput.value = button.dataset.total || "";
+      accountOverdueInput.value = button.dataset.overdue || "";
+      updateAccountPreview();
+      accountModal.classList.add("open");
+    };
+
+    accountOpenButtons.forEach((button) => {
+      button.addEventListener("click", () => openAccountModal(button));
+    });
+
+    accountCloseButtons.forEach((button) => {
+      button.addEventListener("click", () => accountModal.classList.remove("open"));
+    });
+
+    [accountClientInput, accountRtnInput, accountTotalInput, accountOverdueInput].forEach((input) => {
+      input.addEventListener("input", updateAccountPreview);
+    });
+
+    accountPrintButton.addEventListener("click", () => {
+      updateAccountPreview();
+      window.print();
+    });
+
+    accountWhatsappButton.addEventListener("click", () => {
+      updateAccountPreview();
+      const phone = accountPhoneInput.value.replace(/\\D/g, "");
+      if (!phone) {
+        alert("Ingresa un telefono de WhatsApp para continuar.");
+        return;
+      }
+      const message = encodeURIComponent(
+        `Hola ${accountClientInput.value || ""}. Te comparto el estado de cuenta con saldo pendiente de ${accountTotalLabel.textContent}.`
+      );
+      window.open(`https://wa.me/${phone}?text=${message}`, "_blank");
+    });
+  </script>
 {% endblock %}

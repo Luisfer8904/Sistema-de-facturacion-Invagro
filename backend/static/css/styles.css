@@ -747,6 +747,25 @@ body {
   color: #4a5568;
 }
 
+.icon-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: none;
+  background: #e9f3ec;
+  color: #2c7a3f;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.icon-action svg {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+}
+
 .table-actions {
   display: flex;
   gap: 8px;
@@ -1056,6 +1075,131 @@ body {
   border-radius: 16px;
   padding: 20px;
   box-shadow: 0 20px 40px rgba(15, 23, 42, 0.2);
+}
+
+.account-modal-card {
+  width: min(760px, 100%);
+}
+
+.account-modal-body {
+  display: grid;
+  gap: 16px;
+}
+
+.account-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.account-form label {
+  display: grid;
+  gap: 6px;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.account-form input {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 2px solid #e0e0e0;
+}
+
+.account-summary {
+  display: grid;
+  gap: 10px;
+  background: #f5f6fa;
+  padding: 12px;
+  border-radius: 12px;
+}
+
+.account-summary div {
+  display: flex;
+  justify-content: space-between;
+  font-weight: 700;
+}
+
+.account-note {
+  margin: 0;
+  color: #7f8c8d;
+  font-weight: 600;
+}
+
+.account-pdf {
+  display: none;
+  padding: 32px;
+  background: #ffffff;
+  color: #1c2b2a;
+}
+
+.account-pdf-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.account-pdf-header img {
+  width: 72px;
+  height: 72px;
+  object-fit: contain;
+  border-radius: 12px;
+  background: #f5f6fa;
+  padding: 6px;
+}
+
+.account-pdf-header h2 {
+  margin: 0 0 6px;
+}
+
+.account-pdf-meta {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.account-pdf-meta div {
+  display: flex;
+  justify-content: space-between;
+  font-weight: 600;
+}
+
+.account-pdf-summary {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 12px;
+  background: #f5f6fa;
+  margin-bottom: 16px;
+}
+
+.account-pdf-summary div {
+  display: flex;
+  justify-content: space-between;
+  font-weight: 700;
+}
+
+.account-pdf-note {
+  margin: 0;
+  color: #4a5568;
+  font-weight: 600;
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  #account-pdf,
+  #account-pdf * {
+    visibility: visible;
+  }
+
+  #account-pdf {
+    position: absolute;
+    inset: 0;
+    display: block;
+  }
 }
 
 .invoice-modal-body {
