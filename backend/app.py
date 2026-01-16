@@ -1,6 +1,7 @@
 import logging
 import os
 import re
+import time
 from datetime import datetime, timedelta
 from decimal import Decimal
 from uuid import uuid4
@@ -107,6 +108,18 @@ def create_app():
         safe_base = re.sub(r"[\\/\\s]+", "-", numero_factura).strip("-")
         safe_name = secure_filename(safe_base) or "factura"
         return f"{safe_name}.pdf"
+
+    def cleanup_old_pdfs(folder_path, max_age_seconds=86400):
+        cutoff = time.time() - max_age_seconds
+        try:
+            for name in os.listdir(folder_path):
+                if not name.lower().endswith(".pdf"):
+                    continue
+                file_path = os.path.join(folder_path, name)
+                if os.path.isfile(file_path) and os.path.getmtime(file_path) < cutoff:
+                    os.remove(file_path)
+        except OSError:
+            app.logger.warning("No se pudo limpiar PDFs antiguos.")
 
     def get_business_settings():
         settings = AjustesNegocio.query.first()
@@ -770,6 +783,7 @@ def create_app():
         safe_base = f"estado-cuenta-{cliente_id}-{datetime.utcnow():%Y%m%d%H%M%S}"
         filename = build_invoice_pdf_filename(safe_base)
         file_path = os.path.join(app.config["INVOICE_PDF_FOLDER"], filename)
+        cleanup_old_pdfs(app.config["INVOICE_PDF_FOLDER"])
         create_account_statement_pdf(
             file_path, settings, cliente, facturas_credito, total_saldo
         )
