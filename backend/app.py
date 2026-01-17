@@ -751,6 +751,103 @@ def create_app():
         total_compras = sum(item["total"] for item in items)
         return jsonify({"facturas": items, "total": total_compras})
 
+    def query_productos_por_cliente(cliente_id, start_date, end_exclusive):
+        rows = (
+            db.session.query(
+                Producto.codigo,
+                Producto.nombre,
+                func.sum(DetalleFacturaContado.cantidad).label("cantidad"),
+                func.sum(DetalleFacturaContado.subtotal).label("total"),
+            )
+            .join(
+                DetalleFacturaContado,
+                DetalleFacturaContado.producto_id == Producto.id,
+            )
+            .join(
+                FacturaContado,
+                FacturaContado.id == DetalleFacturaContado.factura_id,
+            )
+            .filter(FacturaContado.estado != "anulada")
+            .filter(FacturaContado.cliente_id == cliente_id)
+            .filter(FacturaContado.fecha >= start_date)
+            .filter(FacturaContado.fecha < end_exclusive)
+            .group_by(Producto.codigo, Producto.nombre)
+            .order_by(func.sum(DetalleFacturaContado.cantidad).desc())
+            .all()
+        )
+        return [
+            {
+                "codigo": row.codigo,
+                "nombre": row.nombre,
+                "cantidad": int(row.cantidad or 0),
+                "total": float(row.total or 0),
+            }
+            for row in rows
+        ]
+
+    @app.post("/reportes/productos-cliente")
+    def reportes_productos_cliente():
+        if not session.get("user"):
+            return jsonify({"error": "No autorizado"}), 401
+
+        data = request.get_json(silent=True) or {}
+        cliente_id = data.get("cliente_id")
+        if not cliente_id:
+            return jsonify({"error": "Cliente requerido"}), 400
+        try:
+            cliente_id = int(cliente_id)
+        except (TypeError, ValueError):
+            return jsonify({"error": "Cliente invalido"}), 400
+
+        start_raw = (data.get("start_date") or "").strip()
+        end_raw = (data.get("end_date") or "").strip()
+        try:
+            start_date, end_exclusive = parse_report_date_range(start_raw, end_raw)
+        except ValueError:
+            return jsonify({"error": "Rango de fechas invalido."}), 400
+
+        productos = query_productos_por_cliente(cliente_id, start_date, end_exclusive)
+        total_compras = sum(item["total"] for item in productos)
+        return jsonify({"productos": productos, "total": total_compras})
+
+    @app.post("/reportes/productos-cliente/pdf")
+    def reportes_productos_cliente_pdf():
+        if not session.get("user"):
+            return jsonify({"error": "No autorizado"}), 401
+
+        data = request.get_json(silent=True) or {}
+        cliente_id = data.get("cliente_id")
+        if not cliente_id:
+            return jsonify({"error": "Cliente requerido"}), 400
+        try:
+            cliente_id = int(cliente_id)
+        except (TypeError, ValueError):
+            return jsonify({"error": "Cliente invalido"}), 400
+
+        start_raw = (data.get("start_date") or "").strip()
+        end_raw = (data.get("end_date") or "").strip()
+        try:
+            start_date, end_exclusive = parse_report_date_range(start_raw, end_raw)
+        except ValueError:
+            return jsonify({"error": "Rango de fechas invalido."}), 400
+
+        cliente = Cliente.query.get(cliente_id)
+        if not cliente:
+            return jsonify({"error": "Cliente no encontrado"}), 404
+
+        productos = query_productos_por_cliente(cliente_id, start_date, end_exclusive)
+        total_compras = sum(item["total"] for item in productos)
+        settings = get_business_settings()
+        safe_base = f"productos-cliente-{cliente_id}-{datetime.utcnow():%Y%m%d%H%M%S}"
+        filename = build_invoice_pdf_filename(safe_base)
+        file_path = os.path.join(app.config["INVOICE_PDF_FOLDER"], filename)
+        cleanup_old_pdfs(app.config["INVOICE_PDF_FOLDER"], prefix="productos-cliente-")
+        create_products_by_client_pdf(
+            file_path, settings, cliente, productos, total_compras, start_date, end_exclusive
+        )
+        pdf_url = url_for("static", filename=f"invoices/{filename}", _external=True)
+        return jsonify({"pdf_url": pdf_url})
+
     def create_account_statement_pdf(file_path, settings, cliente, facturas, total_saldo):
         styles = getSampleStyleSheet()
         doc = SimpleDocTemplate(
@@ -834,6 +931,107 @@ def create_app():
 
         total_table = Table(
             [["TOTAL PENDIENTE", f"L {total_saldo:.2f}"]],
+            colWidths=[150, 120],
+        )
+        total_table.setStyle(
+            TableStyle(
+                [
+                    ("ALIGN", (0, 0), (-1, -1), "RIGHT"),
+                    ("FONTNAME", (0, 0), (-1, -1), "Helvetica-Bold"),
+                    ("FONTSIZE", (0, 0), (-1, -1), 10),
+                ]
+            )
+        )
+        story.append(total_table)
+        doc.build(story)
+
+    def create_products_by_client_pdf(
+        file_path, settings, cliente, productos, total_compras, start_date, end_exclusive
+    ):
+        styles = getSampleStyleSheet()
+        doc = SimpleDocTemplate(
+            file_path,
+            pagesize=letter,
+            leftMargin=22,
+            rightMargin=22,
+            topMargin=22,
+            bottomMargin=22,
+        )
+        story = []
+        logo_path = os.path.join(app.static_folder, "assets", "logo.jpg")
+        logo_image = None
+        if os.path.exists(logo_path):
+            logo_image = Image(logo_path, width=60, height=60)
+
+        header_center = (
+            f"<b>{settings.nombre}</b><br/>"
+            f"{settings.direccion or ''}<br/>"
+            f"RTN: {settings.rtn or '-'} &nbsp;&nbsp; TEL: {settings.telefono or '-'}<br/>"
+            f"{settings.email or ''}"
+        )
+        rango_texto = (
+            f"{start_date:%d/%m/%Y} - {(end_exclusive - timedelta(days=1)):%d/%m/%Y}"
+        )
+        header_right = f"<b>PRODUCTOS POR CLIENTE</b><br/>RANGO: {rango_texto}"
+        header_table = Table(
+            [
+                [
+                    logo_image or "",
+                    Paragraph(header_center, styles["Normal"]),
+                    Paragraph(header_right, styles["Normal"]),
+                ]
+            ],
+            colWidths=[90, 300, 130],
+        )
+        header_table.setStyle(
+            TableStyle(
+                [
+                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                    ("ALIGN", (2, 0), (2, 0), "RIGHT"),
+                    ("LINEBELOW", (0, 0), (-1, 0), 0.75, colors.black),
+                ]
+            )
+        )
+        story.append(header_table)
+        story.append(Spacer(1, 10))
+
+        cliente_line = (
+            f"<b>CLIENTE:</b> {cliente.nombre} &nbsp;&nbsp; "
+            f"<b>RTN:</b> {cliente.ruc_dni or '-'} &nbsp;&nbsp; "
+            f"<b>TEL:</b> {cliente.telefono or '-'}"
+        )
+        story.append(Paragraph(cliente_line, styles["Normal"]))
+        story.append(Spacer(1, 8))
+
+        table_data = [["CODIGO", "PRODUCTO", "UNIDADES", "TOTAL"]]
+        for producto in productos:
+            table_data.append(
+                [
+                    producto["codigo"],
+                    producto["nombre"],
+                    str(producto["cantidad"]),
+                    f"L {producto['total']:.2f}",
+                ]
+            )
+        table = Table(table_data, colWidths=[90, 230, 90, 90])
+        table.setStyle(
+            TableStyle(
+                [
+                    ("BOX", (0, 0), (-1, -1), 0.75, colors.black),
+                    ("LINEBELOW", (0, 0), (-1, 0), 0.6, colors.black),
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.whitesmoke),
+                    ("ALIGN", (2, 1), (-1, -1), "RIGHT"),
+                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("FONTSIZE", (0, 0), (-1, 0), 9),
+                    ("FONTSIZE", (0, 1), (-1, -1), 9),
+                ]
+            )
+        )
+        story.append(table)
+        story.append(Spacer(1, 10))
+
+        total_table = Table(
+            [["TOTAL COMPRADO", f"L {total_compras:.2f}"]],
             colWidths=[150, 120],
         )
         total_table.setStyle(

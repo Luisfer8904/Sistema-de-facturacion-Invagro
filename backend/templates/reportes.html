@@ -77,6 +77,18 @@
             <p>Consulta historial y totales por cliente en un rango.</p>
             <span class="tool-action">Abrir →</span>
           </button>
+          <button class="tool-card" type="button" data-product-open>
+            <div class="tool-icon tool-purple">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path
+                  d="M4 7l8-4 8 4v10l-8 4-8-4V7zm8 2.2L6.5 7 12 4.8 17.5 7 12 9.2zm-6 1.5v5.6l5 2.5v-5.6l-5-2.5zm7 7.9 5-2.5v-5.6l-5 2.5v5.6z"
+                />
+              </svg>
+            </div>
+            <h3>Productos por cliente</h3>
+            <p>Lista de productos comprados por cliente y total.</p>
+            <span class="tool-action">Abrir →</span>
+          </button>
         </section>
       </main>
     </div>
@@ -252,6 +264,69 @@
     </div>
   </div>
 
+  <div class="modal" id="product-modal">
+    <div class="modal-card report-modal-card">
+      <div class="modal-header">
+        <div>
+          <h3>Productos comprados</h3>
+          <span id="product-range-label">Cliente: -</span>
+        </div>
+        <button class="modal-close" type="button" data-product-close>×</button>
+      </div>
+      <div class="report-modal-body">
+        <div class="report-form report-form-wide">
+          <label>
+            <span>Cliente</span>
+            <select id="product-client-select">
+              <option value="">Selecciona un cliente</option>
+              {% for cliente in clientes %}
+                <option value="{{ cliente.id }}">{{ cliente.nombre }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label>
+            <span>Desde</span>
+            <input type="date" id="product-start" />
+          </label>
+          <label>
+            <span>Hasta</span>
+            <input type="date" id="product-end" />
+          </label>
+          <label>
+            <span>Telefono WhatsApp</span>
+            <input type="tel" id="product-phone" placeholder="Ej. 50499999999" />
+          </label>
+          <button class="primary-button" type="button" id="product-search">Buscar</button>
+        </div>
+        <div class="report-table">
+          <div class="report-table-header">
+            <span>Producto</span>
+            <span>Unidades</span>
+            <span>Total</span>
+          </div>
+          <div class="report-table-body" id="product-table-body">
+            <div class="report-table-row is-empty">Selecciona un cliente para iniciar.</div>
+          </div>
+        </div>
+        <div class="report-summary">
+          <div>
+            <span>Total comprado</span>
+            <strong id="product-total-label">L 0.00</strong>
+          </div>
+          <div>
+            <span>Productos listados</span>
+            <strong id="product-count-label">0</strong>
+          </div>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button class="secondary-button" type="button" data-product-close>Cerrar</button>
+        <button class="primary-button" type="button" id="product-pdf">Generar PDF</button>
+        <button class="secondary-button" type="button" id="product-whatsapp">Enviar PDF</button>
+      </div>
+    </div>
+  </div>
+
   <div id="account-pdf" class="account-pdf">
     <div class="account-pdf-header">
       <img src="/static/assets/logo.jpg" alt="Logo Invagro" />
@@ -342,6 +417,21 @@
     const clientTotalLabel = document.getElementById("client-total-label");
     const clientCountLabel = document.getElementById("client-count-label");
     const clientRangeLabel = document.getElementById("client-range-label");
+    const productModal = document.getElementById("product-modal");
+    const productOpenButtons = document.querySelectorAll("[data-product-open]");
+    const productCloseButtons = document.querySelectorAll("[data-product-close]");
+    const productClientSelect = document.getElementById("product-client-select");
+    const productStartInput = document.getElementById("product-start");
+    const productEndInput = document.getElementById("product-end");
+    const productPhoneInput = document.getElementById("product-phone");
+    const productSearchButton = document.getElementById("product-search");
+    const productPdfButton = document.getElementById("product-pdf");
+    const productWhatsappButton = document.getElementById("product-whatsapp");
+    const productTableBody = document.getElementById("product-table-body");
+    const productTotalLabel = document.getElementById("product-total-label");
+    const productCountLabel = document.getElementById("product-count-label");
+    const productRangeLabel = document.getElementById("product-range-label");
+    let currentProductPdfUrl = "";
 
     const currencyFormatter = new Intl.NumberFormat("es-HN", {
       minimumFractionDigits: 2,
@@ -524,6 +614,14 @@
       clientTableBody.appendChild(row);
     };
 
+    const renderProductEmpty = (message) => {
+      productTableBody.innerHTML = "";
+      const row = document.createElement("div");
+      row.className = "report-table-row is-empty";
+      row.textContent = message;
+      productTableBody.appendChild(row);
+    };
+
     const openTopModal = () => {
       const today = new Date();
       const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -681,6 +779,156 @@
         } catch (error) {
           renderClientEmpty("No se pudo cargar el reporte.");
         }
+      });
+    }
+
+    const openProductModal = () => {
+      const today = new Date();
+      const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+      productStartInput.value = toDateInputValue(startOfMonth);
+      productEndInput.value = toDateInputValue(today);
+      productClientSelect.value = "";
+      productRangeLabel.textContent = "Cliente: -";
+      productPhoneInput.value = "";
+      currentProductPdfUrl = "";
+      renderProductEmpty("Selecciona un cliente para iniciar.");
+      productTotalLabel.textContent = formatCurrency(0);
+      productCountLabel.textContent = "0";
+      productModal.classList.add("open");
+    };
+
+    productOpenButtons.forEach((button) => {
+      button.addEventListener("click", openProductModal);
+    });
+    productCloseButtons.forEach((button) => {
+      button.addEventListener("click", () => productModal.classList.remove("open"));
+    });
+    if (productModal) {
+      productModal.addEventListener("click", (event) => {
+        if (event.target === productModal) {
+          productModal.classList.remove("open");
+        }
+      });
+    }
+    if (productClientSelect) {
+      productClientSelect.addEventListener("change", () => {
+        const selectedText =
+          productClientSelect.options[productClientSelect.selectedIndex]?.textContent || "-";
+        productRangeLabel.textContent = `Cliente: ${selectedText}`;
+        const selectedClient = clientes.find(
+          (item) => String(item.id) === String(productClientSelect.value)
+        );
+        productPhoneInput.value = selectedClient?.telefono || "";
+      });
+    }
+    if (productSearchButton) {
+      productSearchButton.addEventListener("click", async () => {
+        const clienteId = productClientSelect.value;
+        if (!clienteId) {
+          renderProductEmpty("Selecciona un cliente para iniciar.");
+          return;
+        }
+        const startValue = productStartInput.value;
+        const endValue = productEndInput.value;
+        if (!startValue || !endValue) {
+          renderProductEmpty("Selecciona un rango de fechas.");
+          return;
+        }
+        const selectedText =
+          productClientSelect.options[productClientSelect.selectedIndex]?.textContent || "-";
+        productRangeLabel.textContent = `Cliente: ${selectedText}`;
+        currentProductPdfUrl = "";
+        try {
+          const response = await fetch("/reportes/productos-cliente", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              cliente_id: clienteId,
+              start_date: startValue,
+              end_date: endValue,
+            }),
+          });
+          const result = await response.json();
+          if (!response.ok) {
+            throw new Error(result.error || "No se pudo cargar.");
+          }
+          const productos = result.productos || [];
+          productTableBody.innerHTML = "";
+          if (!productos.length) {
+            renderProductEmpty("No hay compras en el rango seleccionado.");
+            productTotalLabel.textContent = formatCurrency(0);
+            productCountLabel.textContent = "0";
+            return;
+          }
+          productos.forEach((producto) => {
+            const row = document.createElement("div");
+            row.className = "report-table-row";
+            row.innerHTML = `
+              <span>${producto.nombre}</span>
+              <span>${producto.cantidad}</span>
+              <span>${formatCurrency(producto.total)}</span>
+            `;
+            productTableBody.appendChild(row);
+          });
+          productTotalLabel.textContent = formatCurrency(result.total || 0);
+          productCountLabel.textContent = `${productos.length}`;
+        } catch (error) {
+          renderProductEmpty("No se pudo cargar el reporte.");
+        }
+      });
+    }
+    if (productPdfButton) {
+      productPdfButton.addEventListener("click", async () => {
+        const clienteId = productClientSelect.value;
+        if (!clienteId) {
+          alert("Selecciona un cliente para generar el PDF.");
+          return;
+        }
+        const startValue = productStartInput.value;
+        const endValue = productEndInput.value;
+        if (!startValue || !endValue) {
+          alert("Selecciona un rango de fechas.");
+          return;
+        }
+        try {
+          const response = await fetch("/reportes/productos-cliente/pdf", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              cliente_id: clienteId,
+              start_date: startValue,
+              end_date: endValue,
+            }),
+          });
+          const result = await response.json();
+          if (!response.ok) {
+            throw new Error(result.error || "No se pudo generar el PDF.");
+          }
+          currentProductPdfUrl = result.pdf_url || "";
+          if (currentProductPdfUrl) {
+            window.open(currentProductPdfUrl, "_blank");
+          }
+        } catch (error) {
+          alert("No se pudo generar el PDF.");
+        }
+      });
+    }
+    if (productWhatsappButton) {
+      productWhatsappButton.addEventListener("click", () => {
+        const phone = productPhoneInput.value.replace(/\\D/g, "");
+        if (!phone) {
+          alert("Ingresa un telefono de WhatsApp para continuar.");
+          return;
+        }
+        if (!currentProductPdfUrl) {
+          alert("Primero genera el PDF para poder enviarlo.");
+          return;
+        }
+        const client = productClientSelect.options[productClientSelect.selectedIndex]?.text || "";
+        const message = encodeURIComponent(
+          `Hola ${client}. Te envio el reporte de productos comprados. PDF: ${currentProductPdfUrl}`
+        );
+        window.open(`https://wa.me/${phone}?text=${message}`, "_blank");
       });
     }
   </script>

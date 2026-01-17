@@ -775,6 +775,10 @@ body {
   background: linear-gradient(135deg, #d97706, #f59e0b);
 }
 
+.tool-purple {
+  background: linear-gradient(135deg, #6d28d9, #8b5cf6);
+}
+
 .tool-action {
   font-weight: 700;
   color: #2c7a3f;
@@ -1178,6 +1182,12 @@ body {
   border-radius: 12px;
   overflow: hidden;
   border: 1px solid #eef2f1;
+}
+
+.report-table-body {
+  max-height: 260px;
+  overflow-y: auto;
+  padding-right: 6px;
 }
 
 .report-table-header,
