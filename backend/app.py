@@ -104,16 +104,22 @@ def create_app():
 
         return f"{rango_info['prefix']}{next_num:0{rango_info['width']}d}"
 
-    def build_invoice_pdf_filename(numero_factura):
+    def build_invoice_pdf_filename(numero_factura, token=None):
         safe_base = re.sub(r"[\\/\\s]+", "-", numero_factura).strip("-")
         safe_name = secure_filename(safe_base) or "factura"
+        if token:
+            safe_token = re.sub(r"[^a-zA-Z0-9_-]+", "", token)
+            if safe_token:
+                safe_name = f"{safe_name}-{safe_token}"
         return f"{safe_name}.pdf"
 
-    def cleanup_old_pdfs(folder_path, max_age_seconds=86400):
+    def cleanup_old_pdfs(folder_path, max_age_seconds=86400, prefix=None):
         cutoff = time.time() - max_age_seconds
         try:
             for name in os.listdir(folder_path):
                 if not name.lower().endswith(".pdf"):
+                    continue
+                if prefix and not name.startswith(prefix):
                     continue
                 file_path = os.path.join(folder_path, name)
                 if os.path.isfile(file_path) and os.path.getmtime(file_path) < cutoff:
@@ -783,7 +789,7 @@ def create_app():
         safe_base = f"estado-cuenta-{cliente_id}-{datetime.utcnow():%Y%m%d%H%M%S}"
         filename = build_invoice_pdf_filename(safe_base)
         file_path = os.path.join(app.config["INVOICE_PDF_FOLDER"], filename)
-        cleanup_old_pdfs(app.config["INVOICE_PDF_FOLDER"])
+        cleanup_old_pdfs(app.config["INVOICE_PDF_FOLDER"], prefix="estado-cuenta-")
         create_account_statement_pdf(
             file_path, settings, cliente, facturas_credito, total_saldo
         )
@@ -1361,7 +1367,8 @@ def create_app():
                 }
                 for producto, cantidad, precio, linea, descuento_unit in detalles
             ]
-            pdf_filename = build_invoice_pdf_filename(numero_factura)
+            random_token = uuid4().hex[:6]
+            pdf_filename = build_invoice_pdf_filename(numero_factura, token=random_token)
             pdf_path = os.path.join(app.config["INVOICE_PDF_FOLDER"], pdf_filename)
             create_invoice_pdf(pdf_path, settings, factura, detalles_pdf, tipo, cliente, usuario)
             factura.pdf_filename = pdf_filename
