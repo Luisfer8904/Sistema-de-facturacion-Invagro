@@ -202,6 +202,8 @@
       </div>
       <div class="form-actions">
         <button class="secondary-button" type="button" data-top-close>Cerrar</button>
+        <button class="primary-button" type="button" id="top-pdf">Generar PDF</button>
+        <button class="secondary-button" type="button" id="top-whatsapp">Enviar PDF</button>
       </div>
     </div>
   </div>
@@ -215,10 +217,10 @@
         </div>
         <button class="modal-close" type="button" data-client-close>×</button>
       </div>
-      <div class="report-modal-body">
-        <div class="report-form report-form-wide">
-          <label>
-            <span>Cliente</span>
+        <div class="report-modal-body">
+          <div class="report-form report-form-wide">
+            <label>
+              <span>Cliente</span>
             <select id="client-select">
               <option value="">Selecciona un cliente</option>
               {% for cliente in clientes %}
@@ -226,16 +228,20 @@
               {% endfor %}
             </select>
           </label>
-          <label>
-            <span>Desde</span>
-            <input type="date" id="client-start" />
-          </label>
-          <label>
-            <span>Hasta</span>
-            <input type="date" id="client-end" />
-          </label>
-          <button class="primary-button" type="button" id="client-search">Buscar</button>
-        </div>
+            <label>
+              <span>Desde</span>
+              <input type="date" id="client-start" />
+            </label>
+            <label>
+              <span>Hasta</span>
+              <input type="date" id="client-end" />
+            </label>
+            <label>
+              <span>Telefono WhatsApp</span>
+              <input type="tel" id="client-phone" placeholder="Ej. 50499999999" />
+            </label>
+            <button class="primary-button" type="button" id="client-search">Buscar</button>
+          </div>
         <div class="report-table report-table-wide">
           <div class="report-table-header report-table-header-wide">
             <span>Factura</span>
@@ -260,6 +266,8 @@
       </div>
       <div class="form-actions">
         <button class="secondary-button" type="button" data-client-close>Cerrar</button>
+        <button class="primary-button" type="button" id="client-pdf">Generar PDF</button>
+        <button class="secondary-button" type="button" id="client-whatsapp">Enviar PDF</button>
       </div>
     </div>
   </div>
@@ -406,13 +414,18 @@
     const topTotalLabel = document.getElementById("top-total-label");
     const topCountLabel = document.getElementById("top-count-label");
     const topRangeLabel = document.getElementById("top-range-label");
+    const topPdfButton = document.getElementById("top-pdf");
+    const topWhatsappButton = document.getElementById("top-whatsapp");
     const clientModal = document.getElementById("client-modal");
     const clientOpenButtons = document.querySelectorAll("[data-client-open]");
     const clientCloseButtons = document.querySelectorAll("[data-client-close]");
     const clientSelect = document.getElementById("client-select");
     const clientStartInput = document.getElementById("client-start");
     const clientEndInput = document.getElementById("client-end");
+    const clientPhoneInput = document.getElementById("client-phone");
     const clientSearchButton = document.getElementById("client-search");
+    const clientPdfButton = document.getElementById("client-pdf");
+    const clientWhatsappButton = document.getElementById("client-whatsapp");
     const clientTableBody = document.getElementById("client-table-body");
     const clientTotalLabel = document.getElementById("client-total-label");
     const clientCountLabel = document.getElementById("client-count-label");
@@ -432,6 +445,8 @@
     const productCountLabel = document.getElementById("product-count-label");
     const productRangeLabel = document.getElementById("product-range-label");
     let currentProductPdfUrl = "";
+    let currentTopPdfUrl = "";
+    let currentClientPdfUrl = "";
 
     const currencyFormatter = new Intl.NumberFormat("es-HN", {
       minimumFractionDigits: 2,
@@ -628,6 +643,7 @@
       topStartInput.value = toDateInputValue(startOfMonth);
       topEndInput.value = toDateInputValue(today);
       topRangeLabel.textContent = `Rango: ${formatRangeLabel(topStartInput.value, topEndInput.value)}`;
+      currentTopPdfUrl = "";
       renderTopEmpty("Selecciona un rango de fechas.");
       topTotalLabel.textContent = formatCurrency(0);
       topCountLabel.textContent = "0";
@@ -656,6 +672,7 @@
           return;
         }
         topRangeLabel.textContent = `Rango: ${formatRangeLabel(startValue, endValue)}`;
+        currentTopPdfUrl = "";
         try {
           const response = await fetch("/reportes/productos-top", {
             method: "POST",
@@ -691,6 +708,45 @@
         }
       });
     }
+    if (topPdfButton) {
+      topPdfButton.addEventListener("click", async () => {
+        const startValue = topStartInput.value;
+        const endValue = topEndInput.value;
+        if (!startValue || !endValue) {
+          alert("Selecciona un rango de fechas.");
+          return;
+        }
+        try {
+          const response = await fetch("/reportes/productos-top/pdf", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ start_date: startValue, end_date: endValue }),
+          });
+          const result = await response.json();
+          if (!response.ok) {
+            throw new Error(result.error || "No se pudo generar el PDF.");
+          }
+          currentTopPdfUrl = result.pdf_url || "";
+          if (currentTopPdfUrl) {
+            window.open(currentTopPdfUrl, "_blank");
+          }
+        } catch (error) {
+          alert("No se pudo generar el PDF.");
+        }
+      });
+    }
+    if (topWhatsappButton) {
+      topWhatsappButton.addEventListener("click", () => {
+        if (!currentTopPdfUrl) {
+          alert("Primero genera el PDF para poder enviarlo.");
+          return;
+        }
+        const message = encodeURIComponent(
+          `Hola, te envio el reporte de top productos. PDF: ${currentTopPdfUrl}`
+        );
+        window.open(`https://wa.me/?text=${message}`, "_blank");
+      });
+    }
 
     const openClientModal = () => {
       const today = new Date();
@@ -698,7 +754,9 @@
       clientStartInput.value = toDateInputValue(startOfMonth);
       clientEndInput.value = toDateInputValue(today);
       clientSelect.value = "";
+      clientPhoneInput.value = "";
       clientRangeLabel.textContent = "Cliente: -";
+      currentClientPdfUrl = "";
       renderClientEmpty("Selecciona un cliente para iniciar.");
       clientTotalLabel.textContent = formatCurrency(0);
       clientCountLabel.textContent = "0";
@@ -723,6 +781,10 @@
         const selectedText =
           clientSelect.options[clientSelect.selectedIndex]?.textContent || "-";
         clientRangeLabel.textContent = `Cliente: ${selectedText}`;
+        const selectedClient = clientes.find(
+          (item) => String(item.id) === String(clientSelect.value)
+        );
+        clientPhoneInput.value = selectedClient?.telefono || "";
       });
     }
     if (clientSearchButton) {
@@ -741,6 +803,7 @@
         const selectedText =
           clientSelect.options[clientSelect.selectedIndex]?.textContent || "-";
         clientRangeLabel.textContent = `Cliente: ${selectedText}`;
+        currentClientPdfUrl = "";
         try {
           const response = await fetch("/reportes/compras-cliente", {
             method: "POST",
@@ -779,6 +842,60 @@
         } catch (error) {
           renderClientEmpty("No se pudo cargar el reporte.");
         }
+      });
+    }
+    if (clientPdfButton) {
+      clientPdfButton.addEventListener("click", async () => {
+        const clienteId = clientSelect.value;
+        if (!clienteId) {
+          alert("Selecciona un cliente para generar el PDF.");
+          return;
+        }
+        const startValue = clientStartInput.value;
+        const endValue = clientEndInput.value;
+        if (!startValue || !endValue) {
+          alert("Selecciona un rango de fechas.");
+          return;
+        }
+        try {
+          const response = await fetch("/reportes/compras-cliente/pdf", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              cliente_id: clienteId,
+              start_date: startValue,
+              end_date: endValue,
+            }),
+          });
+          const result = await response.json();
+          if (!response.ok) {
+            throw new Error(result.error || "No se pudo generar el PDF.");
+          }
+          currentClientPdfUrl = result.pdf_url || "";
+          if (currentClientPdfUrl) {
+            window.open(currentClientPdfUrl, "_blank");
+          }
+        } catch (error) {
+          alert("No se pudo generar el PDF.");
+        }
+      });
+    }
+    if (clientWhatsappButton) {
+      clientWhatsappButton.addEventListener("click", () => {
+        const phone = clientPhoneInput.value.replace(/\\D/g, "");
+        if (!phone) {
+          alert("Ingresa un telefono de WhatsApp para continuar.");
+          return;
+        }
+        if (!currentClientPdfUrl) {
+          alert("Primero genera el PDF para poder enviarlo.");
+          return;
+        }
+        const client = clientSelect.options[clientSelect.selectedIndex]?.text || "";
+        const message = encodeURIComponent(
+          `Hola ${client}. Te envio el reporte de compras. PDF: ${currentClientPdfUrl}`
+        );
+        window.open(`https://wa.me/${phone}?text=${message}`, "_blank");
       });
     }
 
