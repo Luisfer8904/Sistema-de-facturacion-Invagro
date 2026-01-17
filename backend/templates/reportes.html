@@ -55,6 +55,28 @@
             <p>Selecciona un cliente, revisa facturas pendientes y genera el PDF.</p>
             <span class="tool-action">Abrir →</span>
           </button>
+          <button class="tool-card" type="button" data-top-open>
+            <div class="tool-icon tool-blue">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M5 3h2v18H5V3zm6 6h2v12h-2V9zm6-4h2v16h-2V5z" />
+              </svg>
+            </div>
+            <h3>Top productos</h3>
+            <p>Filtra por fechas y revisa los productos mas vendidos.</p>
+            <span class="tool-action">Abrir →</span>
+          </button>
+          <button class="tool-card" type="button" data-client-open>
+            <div class="tool-icon tool-amber">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path
+                  d="M7.5 12.5c-2 0-3.5-1.6-3.5-3.6S5.5 5.3 7.5 5.3s3.5 1.6 3.5 3.6-1.5 3.6-3.5 3.6zm9 0c-2 0-3.5-1.6-3.5-3.6S14.5 5.3 16.5 5.3 20 6.9 20 8.9s-1.5 3.6-3.5 3.6zM4 18.7c0-2.3 2.7-4.2 6-4.2s6 1.9 6 4.2V20H4v-1.3z"
+                />
+              </svg>
+            </div>
+            <h3>Compras por cliente</h3>
+            <p>Consulta historial y totales por cliente en un rango.</p>
+            <span class="tool-action">Abrir →</span>
+          </button>
         </section>
       </main>
     </div>
@@ -120,6 +142,112 @@
         <button class="secondary-button" type="button" data-account-close>Cancelar</button>
         <button class="primary-button" type="button" id="account-print">Generar PDF</button>
         <button class="secondary-button" type="button" id="account-whatsapp">Enviar PDF</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="top-modal">
+    <div class="modal-card report-modal-card">
+      <div class="modal-header">
+        <div>
+          <h3>Top productos vendidos</h3>
+          <span id="top-range-label">Rango: -</span>
+        </div>
+        <button class="modal-close" type="button" data-top-close>×</button>
+      </div>
+      <div class="report-modal-body">
+        <div class="report-form">
+          <label>
+            <span>Desde</span>
+            <input type="date" id="top-start" />
+          </label>
+          <label>
+            <span>Hasta</span>
+            <input type="date" id="top-end" />
+          </label>
+          <button class="primary-button" type="button" id="top-search">Buscar</button>
+        </div>
+        <div class="report-table">
+          <div class="report-table-header">
+            <span>Producto</span>
+            <span>Unidades</span>
+            <span>Total</span>
+          </div>
+          <div class="report-table-body" id="top-table-body">
+            <div class="report-table-row is-empty">Selecciona un rango de fechas.</div>
+          </div>
+        </div>
+        <div class="report-summary">
+          <div>
+            <span>Total vendido</span>
+            <strong id="top-total-label">L 0.00</strong>
+          </div>
+          <div>
+            <span>Productos listados</span>
+            <strong id="top-count-label">0</strong>
+          </div>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button class="secondary-button" type="button" data-top-close>Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="client-modal">
+    <div class="modal-card report-modal-card">
+      <div class="modal-header">
+        <div>
+          <h3>Compras por cliente</h3>
+          <span id="client-range-label">Cliente: -</span>
+        </div>
+        <button class="modal-close" type="button" data-client-close>×</button>
+      </div>
+      <div class="report-modal-body">
+        <div class="report-form report-form-wide">
+          <label>
+            <span>Cliente</span>
+            <select id="client-select">
+              <option value="">Selecciona un cliente</option>
+              {% for cliente in clientes %}
+                <option value="{{ cliente.id }}">{{ cliente.nombre }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label>
+            <span>Desde</span>
+            <input type="date" id="client-start" />
+          </label>
+          <label>
+            <span>Hasta</span>
+            <input type="date" id="client-end" />
+          </label>
+          <button class="primary-button" type="button" id="client-search">Buscar</button>
+        </div>
+        <div class="report-table report-table-wide">
+          <div class="report-table-header report-table-header-wide">
+            <span>Factura</span>
+            <span>Fecha</span>
+            <span>Estado</span>
+            <span>Total</span>
+          </div>
+          <div class="report-table-body" id="client-table-body">
+            <div class="report-table-row is-empty">Selecciona un cliente para iniciar.</div>
+          </div>
+        </div>
+        <div class="report-summary">
+          <div>
+            <span>Total comprado</span>
+            <strong id="client-total-label">L 0.00</strong>
+          </div>
+          <div>
+            <span>Facturas listadas</span>
+            <strong id="client-count-label">0</strong>
+          </div>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button class="secondary-button" type="button" data-client-close>Cerrar</button>
       </div>
     </div>
   </div>
@@ -193,6 +321,27 @@
     const clientes = {{ clientes | tojson }};
     const facturasCredito = {{ facturas_credito | tojson }};
     let currentPdfUrl = "";
+    const topModal = document.getElementById("top-modal");
+    const topOpenButtons = document.querySelectorAll("[data-top-open]");
+    const topCloseButtons = document.querySelectorAll("[data-top-close]");
+    const topStartInput = document.getElementById("top-start");
+    const topEndInput = document.getElementById("top-end");
+    const topSearchButton = document.getElementById("top-search");
+    const topTableBody = document.getElementById("top-table-body");
+    const topTotalLabel = document.getElementById("top-total-label");
+    const topCountLabel = document.getElementById("top-count-label");
+    const topRangeLabel = document.getElementById("top-range-label");
+    const clientModal = document.getElementById("client-modal");
+    const clientOpenButtons = document.querySelectorAll("[data-client-open]");
+    const clientCloseButtons = document.querySelectorAll("[data-client-close]");
+    const clientSelect = document.getElementById("client-select");
+    const clientStartInput = document.getElementById("client-start");
+    const clientEndInput = document.getElementById("client-end");
+    const clientSearchButton = document.getElementById("client-search");
+    const clientTableBody = document.getElementById("client-table-body");
+    const clientTotalLabel = document.getElementById("client-total-label");
+    const clientCountLabel = document.getElementById("client-count-label");
+    const clientRangeLabel = document.getElementById("client-range-label");
 
     const currencyFormatter = new Intl.NumberFormat("es-HN", {
       minimumFractionDigits: 2,
@@ -200,6 +349,16 @@
     });
 
     const formatCurrency = (value) => `L ${currencyFormatter.format(value || 0)}`;
+    const toDateInputValue = (date) => {
+      const offset = date.getTimezoneOffset() * 60000;
+      return new Date(date.getTime() - offset).toISOString().slice(0, 10);
+    };
+    const formatRangeLabel = (startValue, endValue) => {
+      if (!startValue || !endValue) {
+        return "-";
+      }
+      return `${startValue} a ${endValue}`;
+    };
 
     const renderEmptyInvoices = (message) => {
       accountInvoiceBody.innerHTML = "";
@@ -348,5 +507,181 @@
       );
       window.open(`https://wa.me/${phone}?text=${message}`, "_blank");
     });
+
+    const renderTopEmpty = (message) => {
+      topTableBody.innerHTML = "";
+      const row = document.createElement("div");
+      row.className = "report-table-row is-empty";
+      row.textContent = message;
+      topTableBody.appendChild(row);
+    };
+
+    const renderClientEmpty = (message) => {
+      clientTableBody.innerHTML = "";
+      const row = document.createElement("div");
+      row.className = "report-table-row is-empty";
+      row.textContent = message;
+      clientTableBody.appendChild(row);
+    };
+
+    const openTopModal = () => {
+      const today = new Date();
+      const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+      topStartInput.value = toDateInputValue(startOfMonth);
+      topEndInput.value = toDateInputValue(today);
+      topRangeLabel.textContent = `Rango: ${formatRangeLabel(topStartInput.value, topEndInput.value)}`;
+      renderTopEmpty("Selecciona un rango de fechas.");
+      topTotalLabel.textContent = formatCurrency(0);
+      topCountLabel.textContent = "0";
+      topModal.classList.add("open");
+    };
+
+    topOpenButtons.forEach((button) => {
+      button.addEventListener("click", openTopModal);
+    });
+    topCloseButtons.forEach((button) => {
+      button.addEventListener("click", () => topModal.classList.remove("open"));
+    });
+    if (topModal) {
+      topModal.addEventListener("click", (event) => {
+        if (event.target === topModal) {
+          topModal.classList.remove("open");
+        }
+      });
+    }
+    if (topSearchButton) {
+      topSearchButton.addEventListener("click", async () => {
+        const startValue = topStartInput.value;
+        const endValue = topEndInput.value;
+        if (!startValue || !endValue) {
+          renderTopEmpty("Selecciona un rango de fechas.");
+          return;
+        }
+        topRangeLabel.textContent = `Rango: ${formatRangeLabel(startValue, endValue)}`;
+        try {
+          const response = await fetch("/reportes/productos-top", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ start_date: startValue, end_date: endValue }),
+          });
+          const result = await response.json();
+          if (!response.ok) {
+            throw new Error(result.error || "No se pudo cargar.");
+          }
+          const productos = result.productos || [];
+          topTableBody.innerHTML = "";
+          if (!productos.length) {
+            renderTopEmpty("No hay ventas en el rango seleccionado.");
+            topTotalLabel.textContent = formatCurrency(0);
+            topCountLabel.textContent = "0";
+            return;
+          }
+          productos.forEach((producto) => {
+            const row = document.createElement("div");
+            row.className = "report-table-row";
+            row.innerHTML = `
+              <span>${producto.nombre}</span>
+              <span>${producto.cantidad}</span>
+              <span>${formatCurrency(producto.total)}</span>
+            `;
+            topTableBody.appendChild(row);
+          });
+          topTotalLabel.textContent = formatCurrency(result.total || 0);
+          topCountLabel.textContent = `${productos.length}`;
+        } catch (error) {
+          renderTopEmpty("No se pudo cargar el reporte.");
+        }
+      });
+    }
+
+    const openClientModal = () => {
+      const today = new Date();
+      const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+      clientStartInput.value = toDateInputValue(startOfMonth);
+      clientEndInput.value = toDateInputValue(today);
+      clientSelect.value = "";
+      clientRangeLabel.textContent = "Cliente: -";
+      renderClientEmpty("Selecciona un cliente para iniciar.");
+      clientTotalLabel.textContent = formatCurrency(0);
+      clientCountLabel.textContent = "0";
+      clientModal.classList.add("open");
+    };
+
+    clientOpenButtons.forEach((button) => {
+      button.addEventListener("click", openClientModal);
+    });
+    clientCloseButtons.forEach((button) => {
+      button.addEventListener("click", () => clientModal.classList.remove("open"));
+    });
+    if (clientModal) {
+      clientModal.addEventListener("click", (event) => {
+        if (event.target === clientModal) {
+          clientModal.classList.remove("open");
+        }
+      });
+    }
+    if (clientSelect) {
+      clientSelect.addEventListener("change", () => {
+        const selectedText =
+          clientSelect.options[clientSelect.selectedIndex]?.textContent || "-";
+        clientRangeLabel.textContent = `Cliente: ${selectedText}`;
+      });
+    }
+    if (clientSearchButton) {
+      clientSearchButton.addEventListener("click", async () => {
+        const clienteId = clientSelect.value;
+        if (!clienteId) {
+          renderClientEmpty("Selecciona un cliente para iniciar.");
+          return;
+        }
+        const startValue = clientStartInput.value;
+        const endValue = clientEndInput.value;
+        if (!startValue || !endValue) {
+          renderClientEmpty("Selecciona un rango de fechas.");
+          return;
+        }
+        const selectedText =
+          clientSelect.options[clientSelect.selectedIndex]?.textContent || "-";
+        clientRangeLabel.textContent = `Cliente: ${selectedText}`;
+        try {
+          const response = await fetch("/reportes/compras-cliente", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              cliente_id: clienteId,
+              start_date: startValue,
+              end_date: endValue,
+            }),
+          });
+          const result = await response.json();
+          if (!response.ok) {
+            throw new Error(result.error || "No se pudo cargar.");
+          }
+          const facturas = result.facturas || [];
+          clientTableBody.innerHTML = "";
+          if (!facturas.length) {
+            renderClientEmpty("No hay compras en el rango seleccionado.");
+            clientTotalLabel.textContent = formatCurrency(0);
+            clientCountLabel.textContent = "0";
+            return;
+          }
+          facturas.forEach((factura) => {
+            const row = document.createElement("div");
+            row.className = "report-table-row report-table-row-wide";
+            row.innerHTML = `
+              <span>${factura.numero_factura}</span>
+              <span>${factura.fecha}</span>
+              <span>${factura.estado}</span>
+              <span>${formatCurrency(factura.total)}</span>
+            `;
+            clientTableBody.appendChild(row);
+          });
+          clientTotalLabel.textContent = formatCurrency(result.total || 0);
+          clientCountLabel.textContent = `${facturas.length}`;
+        } catch (error) {
+          renderClientEmpty("No se pudo cargar el reporte.");
+        }
+      });
+    }
   </script>
 {% endblock %}

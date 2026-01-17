@@ -645,6 +645,112 @@ def create_app():
             facturas_credito=facturas_credito,
         )
 
+    def parse_report_date_range(start_raw, end_raw):
+        today = datetime.utcnow()
+        if start_raw:
+            start_date = datetime.strptime(start_raw, "%Y-%m-%d")
+        else:
+            start_date = datetime(today.year, today.month, 1)
+        if end_raw:
+            end_date = datetime.strptime(end_raw, "%Y-%m-%d")
+        else:
+            end_date = today
+        if end_date < start_date:
+            raise ValueError("Rango de fechas invalido.")
+        end_exclusive = end_date + timedelta(days=1)
+        return start_date, end_exclusive
+
+    @app.post("/reportes/productos-top")
+    def reportes_productos_top():
+        if not session.get("user"):
+            return jsonify({"error": "No autorizado"}), 401
+
+        data = request.get_json(silent=True) or {}
+        start_raw = (data.get("start_date") or "").strip()
+        end_raw = (data.get("end_date") or "").strip()
+        try:
+            start_date, end_exclusive = parse_report_date_range(start_raw, end_raw)
+        except ValueError:
+            return jsonify({"error": "Rango de fechas invalido."}), 400
+
+        rows = (
+            db.session.query(
+                Producto.codigo,
+                Producto.nombre,
+                func.sum(DetalleFacturaContado.cantidad).label("cantidad"),
+                func.sum(DetalleFacturaContado.subtotal).label("total"),
+            )
+            .join(
+                DetalleFacturaContado,
+                DetalleFacturaContado.producto_id == Producto.id,
+            )
+            .join(
+                FacturaContado,
+                FacturaContado.id == DetalleFacturaContado.factura_id,
+            )
+            .filter(FacturaContado.estado != "anulada")
+            .filter(FacturaContado.fecha >= start_date)
+            .filter(FacturaContado.fecha < end_exclusive)
+            .group_by(Producto.codigo, Producto.nombre)
+            .order_by(func.sum(DetalleFacturaContado.cantidad).desc())
+            .limit(50)
+            .all()
+        )
+
+        productos = [
+            {
+                "codigo": row.codigo,
+                "nombre": row.nombre,
+                "cantidad": int(row.cantidad or 0),
+                "total": float(row.total or 0),
+            }
+            for row in rows
+        ]
+        total_vendido = sum(item["total"] for item in productos)
+        return jsonify({"productos": productos, "total": total_vendido})
+
+    @app.post("/reportes/compras-cliente")
+    def reportes_compras_cliente():
+        if not session.get("user"):
+            return jsonify({"error": "No autorizado"}), 401
+
+        data = request.get_json(silent=True) or {}
+        cliente_id = data.get("cliente_id")
+        if not cliente_id:
+            return jsonify({"error": "Cliente requerido"}), 400
+        try:
+            cliente_id = int(cliente_id)
+        except (TypeError, ValueError):
+            return jsonify({"error": "Cliente invalido"}), 400
+
+        start_raw = (data.get("start_date") or "").strip()
+        end_raw = (data.get("end_date") or "").strip()
+        try:
+            start_date, end_exclusive = parse_report_date_range(start_raw, end_raw)
+        except ValueError:
+            return jsonify({"error": "Rango de fechas invalido."}), 400
+
+        facturas = (
+            FacturaContado.query.filter_by(cliente_id=cliente_id)
+            .filter(FacturaContado.estado != "anulada")
+            .filter(FacturaContado.fecha >= start_date)
+            .filter(FacturaContado.fecha < end_exclusive)
+            .order_by(FacturaContado.fecha.desc())
+            .all()
+        )
+
+        items = [
+            {
+                "numero_factura": factura.numero_factura,
+                "fecha": factura.fecha.strftime("%d/%m/%Y") if factura.fecha else "-",
+                "total": float(factura.total or 0),
+                "estado": factura.estado or "-",
+            }
+            for factura in facturas
+        ]
+        total_compras = sum(item["total"] for item in items)
+        return jsonify({"facturas": items, "total": total_compras})
+
     def create_account_statement_pdf(file_path, settings, cliente, facturas, total_saldo):
         styles = getSampleStyleSheet()
         doc = SimpleDocTemplate(

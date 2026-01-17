@@ -750,7 +750,7 @@ body {
 .tool-icon {
   width: 48px;
   height: 48px;
-  border-radius: 14px;
+  border-radius: 8px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -765,6 +765,14 @@ body {
 
 .tool-green {
   background: linear-gradient(135deg, #2c7a3f, #4caf50);
+}
+
+.tool-blue {
+  background: linear-gradient(135deg, #1f6fe5, #4aa3ff);
+}
+
+.tool-amber {
+  background: linear-gradient(135deg, #d97706, #f59e0b);
 }
 
 .tool-action {
@@ -1129,6 +1137,111 @@ body {
 
 .account-modal-card {
   width: min(760px, 100%);
+}
+
+.report-modal-card {
+  width: min(760px, 100%);
+}
+
+.report-modal-body {
+  display: grid;
+  gap: 16px;
+}
+
+.report-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+  align-items: end;
+}
+
+.report-form-wide {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.report-form label {
+  display: grid;
+  gap: 6px;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.report-form input,
+.report-form select {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 2px solid #e0e0e0;
+  background: #ffffff;
+}
+
+.report-table {
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid #eef2f1;
+}
+
+.report-table-header,
+.report-table-row {
+  display: grid;
+  grid-template-columns: 1.4fr 0.8fr 1fr;
+  padding: 12px 14px;
+  gap: 10px;
+  align-items: center;
+}
+
+.report-table-header {
+  background: #f5f6fa;
+  font-weight: 700;
+  color: #2c3e50;
+}
+
+.report-table-row {
+  border-top: 1px solid #eef2f1;
+  color: #4a5568;
+  font-weight: 600;
+}
+
+.report-table-row span:last-child,
+.report-table-row span:nth-child(2) {
+  text-align: right;
+}
+
+.report-table-row.is-empty {
+  display: block;
+  text-align: center;
+  color: #7f8c8d;
+}
+
+.report-table-wide .report-table-header,
+.report-table-row-wide {
+  grid-template-columns: 1.1fr 0.9fr 0.9fr 1fr;
+}
+
+.report-table-header-wide span:last-child,
+.report-table-row-wide span:last-child {
+  text-align: right;
+}
+
+.report-table-header-wide span:nth-child(2),
+.report-table-header-wide span:nth-child(3),
+.report-table-row-wide span:nth-child(2),
+.report-table-row-wide span:nth-child(3) {
+  text-align: left;
+}
+
+.report-summary {
+  display: grid;
+  gap: 10px;
+  background: #f5f6fa;
+  padding: 12px;
+  border-radius: 12px;
+}
+
+.report-summary div {
+  display: flex;
+  justify-content: space-between;
+  font-weight: 700;
+  color: #2c3e50;
 }
 
 .account-modal-body {
