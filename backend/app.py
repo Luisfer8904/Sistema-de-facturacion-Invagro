@@ -1226,6 +1226,7 @@ def create_app():
         cliente_id = data.get("cliente_id") or None
         rtn = (data.get("rtn") or "").strip() or None
         pago_raw = data.get("pago", 0)
+        fecha_raw = (data.get("fecha") or "").strip()
         items = data.get("items") or []
 
         if tipo not in {"contado", "credito"}:
@@ -1237,6 +1238,13 @@ def create_app():
             pago = Decimal(str(pago_raw))
         except Exception:
             return jsonify({"error": "Pago invalido."}), 400
+        if fecha_raw:
+            try:
+                fecha_factura = datetime.strptime(fecha_raw, "%Y-%m-%d")
+            except ValueError:
+                return jsonify({"error": "Fecha invalida."}), 400
+        else:
+            fecha_factura = datetime.utcnow()
 
         producto_ids = []
         parsed_items = []
@@ -1294,7 +1302,7 @@ def create_app():
                     cliente_id=cliente_id,
                     usuario_id=usuario_id,
                     rtn=rtn,
-                    fecha=datetime.utcnow(),
+                    fecha=fecha_factura,
                     subtotal=subtotal,
                     isv=isv,
                     descuento=descuento_total,
@@ -1323,7 +1331,7 @@ def create_app():
                     cliente_id=cliente_id,
                     usuario_id=usuario_id,
                     rtn=rtn,
-                    fecha=datetime.utcnow(),
+                    fecha=fecha_factura,
                     subtotal=subtotal,
                     isv=isv,
                     descuento=descuento_total,
