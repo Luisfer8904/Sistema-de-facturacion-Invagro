@@ -74,6 +74,11 @@
                     </a>
                   {% endif %}
                   {% if pedido.estado != "facturado" %}
+                    <form method="post" action="/pedidos/{{ pedido.id }}/delete" onsubmit="return confirm('¿Eliminar este pedido?');">
+                      <button class="danger-button" type="submit">Eliminar</button>
+                    </form>
+                  {% endif %}
+                  {% if pedido.estado != "facturado" %}
                     <form method="post" action="/pedidos/{{ pedido.id }}/anular" onsubmit="return confirm('¿Anular este pedido?');">
                       <button class="danger-button" type="submit">Anular</button>
                     </form>

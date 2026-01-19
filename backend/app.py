@@ -739,6 +739,21 @@ def create_app():
             db.session.rollback()
         return redirect(url_for("pedidos"))
 
+    @app.post("/pedidos/<int:pedido_id>/delete")
+    def eliminar_pedido(pedido_id):
+        if not session.get("user"):
+            return redirect(url_for("login"))
+
+        pedido = Pedido.query.get_or_404(pedido_id)
+        if pedido.estado == "facturado":
+            return redirect(url_for("pedidos"))
+        try:
+            db.session.delete(pedido)
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+        return redirect(url_for("pedidos"))
+
     @app.route("/productos", methods=["GET", "POST"])
     def productos():
         if not session.get("user"):
