@@ -2058,6 +2058,7 @@ def create_app():
         pago_raw = data.get("pago", 0)
         fecha_raw = (data.get("fecha") or "").strip()
         items = data.get("items") or []
+        pedido_id = data.get("pedido_id")
 
         if tipo not in {"contado", "credito"}:
             return jsonify({"error": "Tipo de factura invalido."}), 400
