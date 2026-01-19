@@ -1078,6 +1078,28 @@ body {
   background: #ffffff;
 }
 
+.pos-pedidos {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  margin: 12px 0 16px;
+  flex-wrap: wrap;
+}
+
+.pos-pedidos label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.pos-pedidos select {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 2px solid #e0e0e0;
+  background: #ffffff;
+}
+
 .pos-table {
   background: #f9fbfa;
   border-radius: 12px;

@@ -11,6 +11,7 @@
       <nav class="sidebar-nav">
         <a class="nav-item" href="/dashboard">Dashboard</a>
         <a class="nav-item active" href="/facturacion">Facturacion</a>
+        <a class="nav-item" href="/pedidos">Pedidos</a>
         <a class="nav-item" href="/facturas/credito">Facturas credito</a>
         <a class="nav-item" href="/facturas/historial">Historial facturas</a>
         <a class="nav-item" href="/clientes">Clientes</a>
@@ -116,6 +117,26 @@
             </div>
           </div>
 
+          <div class="pos-pedidos">
+            <div>
+              <label>Pedidos listos</label>
+              <select id="pedido-select">
+                <option value="">Selecciona un pedido</option>
+                {% for pedido in pedidos_listos %}
+                  <option
+                    value="{{ pedido.id }}"
+                    data-cliente="{{ pedido.cliente_id or '' }}"
+                    data-rtn="{{ pedido.rtn or '' }}"
+                    data-numero="{{ pedido.numero_pedido }}"
+                  >
+                    {{ pedido.numero_pedido }} - {{ clientes_map.get(pedido.cliente_id, 'N/A') }}
+                  </option>
+                {% endfor %}
+              </select>
+            </div>
+            <button class="secondary-button" type="button" id="load-order">Cargar pedido</button>
+          </div>
+
           <div class="pos-table" id="invoice-table">
             <div class="table-header table-six">
               <span>Descripcion</span>
@@ -155,7 +176,7 @@
           </div>
 
           <div class="pos-actions">
-            <button class="secondary-button" type="button">Guardar borrador</button>
+            <button class="secondary-button" type="button" id="save-order">Guardar pedido</button>
             <button class="primary-button" type="button" id="emit-invoice">Emitir factura</button>
           </div>
         </section>
@@ -251,6 +272,9 @@
     const tabs = document.querySelectorAll(".pos-tabs .tab");
     const clientSelect = document.getElementById("cliente-select");
     const clientRtnInput = document.getElementById("cliente-rtn");
+    const pedidoSelect = document.getElementById("pedido-select");
+    const loadOrderButton = document.getElementById("load-order");
+    const saveOrderButton = document.getElementById("save-order");
     const emitButton = document.getElementById("emit-invoice");
     const invoiceModal = document.getElementById("invoice-modal");
     const invoiceCloseButtons = invoiceModal
@@ -274,8 +298,11 @@
     const confirmInvoice = document.getElementById("confirm-invoice");
     const invoicePdfLink = document.getElementById("invoice-pdf-link");
     const invoiceWhatsappLink = document.getElementById("invoice-whatsapp-link");
+    const productMap = new Map(productCards.map((card) => [card.dataset.id, card]));
     let modalTotalValue = 0;
     let modalInvoiceType = "contado";
+    let currentPedidoId = null;
+    let isLoadingPedido = false;
 
     const formatCurrency = (value) => `L ${value.toFixed(2)}`;
     const toDateInputValue = (date) => {
@@ -326,12 +353,32 @@
       }
     };
 
-    const addRow = (card) => {
+    const clearPedidoContext = () => {
+      if (currentPedidoId) {
+        currentPedidoId = null;
+      }
+      if (pedidoSelect && !isLoadingPedido) {
+        pedidoSelect.value = "";
+      }
+    };
+
+    const clearInvoiceRows = () => {
+      invoiceTable.querySelectorAll(".invoice-row").forEach((row) => row.remove());
+      ensureEmptyState();
+      updateTotals();
+    };
+
+    const addRow = (card, options = {}) => {
+      const { quantity = 1, discount = 0, replace = false } = options;
       const id = card.dataset.id;
       const existing = invoiceTable.querySelector(`.invoice-row[data-id="${id}"]`);
       if (existing) {
         const qtyInput = existing.querySelector(".qty-input");
-        qtyInput.value = Number(qtyInput.value || 0) + 1;
+        const nextQty = replace ? quantity : Number(qtyInput.value || 0) + 1;
+        qtyInput.value = nextQty;
+        if (replace) {
+          existing.querySelector(".discount-input").value = discount;
+        }
         updateTotals();
         return;
       }
@@ -343,22 +390,32 @@
       row.dataset.isv = card.dataset.isv;
       row.innerHTML = `
         <span>${card.dataset.name}</span>
-        <input class="qty-input" type="number" min="1" value="1" />
+        <input class="qty-input" type="number" min="1" value="${quantity}" />
         <span>${formatCurrency(Number(card.dataset.price))}</span>
-        <input class="discount-input" type="number" min="0" step="0.01" value="0" />
+        <input class="discount-input" type="number" min="0" step="0.01" value="${discount}" />
         <span class="line-total">${formatCurrency(Number(card.dataset.price))}</span>
         <button class="remove-button" type="button">×</button>
       `;
 
       invoiceTable.appendChild(row);
-      row.querySelector(".qty-input").addEventListener("input", updateTotals);
-      row.querySelector(".discount-input").addEventListener("input", updateTotals);
+      row.querySelector(".qty-input").addEventListener("input", () => {
+        clearPedidoContext();
+        updateTotals();
+      });
+      row.querySelector(".discount-input").addEventListener("input", () => {
+        clearPedidoContext();
+        updateTotals();
+      });
       row.querySelector(".remove-button").addEventListener("click", () => {
         row.remove();
+        clearPedidoContext();
         ensureEmptyState();
         updateTotals();
       });
 
+      if (!isLoadingPedido) {
+        clearPedidoContext();
+      }
       ensureEmptyState();
       updateTotals();
     };
@@ -399,6 +456,65 @@
       clientSelect.addEventListener("change", () => {
         const option = clientSelect.options[clientSelect.selectedIndex];
         clientRtnInput.value = option ? option.dataset.rtn || "" : "";
+      });
+    }
+
+    const applyPedidoData = (pedidoData) => {
+      if (!pedidoData || !pedidoData.items) {
+        return;
+      }
+      isLoadingPedido = true;
+      clearInvoiceRows();
+      pedidoData.items.forEach((item) => {
+        const card = productMap.get(String(item.producto_id));
+        if (!card) {
+          return;
+        }
+        addRow(card, {
+          quantity: Number(item.cantidad || 0),
+          discount: Number(item.descuento || 0),
+          replace: true,
+        });
+      });
+      isLoadingPedido = false;
+      currentPedidoId = pedidoData.pedido_id;
+      if (pedidoSelect) {
+        pedidoSelect.value = String(pedidoData.pedido_id || "");
+      }
+      if (clientSelect) {
+        const option = clientSelect.querySelector(
+          `option[value="${pedidoData.cliente_id || ""}"]`
+        );
+        if (option) {
+          clientSelect.value = String(pedidoData.cliente_id);
+          if (clientRtnInput) {
+            clientRtnInput.value = option.dataset.rtn || pedidoData.rtn || "";
+          }
+        } else if (clientRtnInput) {
+          clientRtnInput.value = pedidoData.rtn || "";
+        }
+      }
+      updateTotals();
+    };
+
+    if (loadOrderButton && pedidoSelect) {
+      loadOrderButton.addEventListener("click", async () => {
+        const pedidoId = pedidoSelect.value;
+        if (!pedidoId) {
+          alert("Selecciona un pedido.");
+          return;
+        }
+        try {
+          const response = await fetch(`/pedidos/${pedidoId}/data`);
+          const result = await response.json();
+          if (!response.ok) {
+            alert(result.error || "No se pudo cargar el pedido.");
+            return;
+          }
+          applyPedidoData(result);
+        } catch (error) {
+          alert("No se pudo cargar el pedido.");
+        }
       });
     }
 
@@ -591,6 +707,7 @@
               pago: paid,
               fecha,
               items,
+              pedido_id: currentPedidoId,
             }),
           });
           const result = await response.json();
@@ -622,6 +739,69 @@
           alert("No se pudo guardar la factura.");
         }
       });
+    }
+
+    if (saveOrderButton) {
+      saveOrderButton.addEventListener("click", async () => {
+        const rows = invoiceTable.querySelectorAll(".invoice-row");
+        if (!rows.length) {
+          alert("Agrega productos antes de guardar el pedido.");
+          return;
+        }
+        const selectedOption = clientSelect ? clientSelect.options[clientSelect.selectedIndex] : null;
+        const clienteId = selectedOption && selectedOption.value ? Number(selectedOption.value) : null;
+        const rtnValue = clientRtnInput ? clientRtnInput.value.trim() : "";
+        const items = Array.from(rows).map((row) => ({
+          producto_id: Number(row.dataset.id),
+          cantidad: Number(row.querySelector(".qty-input").value || 0),
+          descuento: Number(row.querySelector(".discount-input").value || 0),
+        }));
+
+        try {
+          const response = await fetch("/pedidos", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              cliente_id: clienteId,
+              rtn: rtnValue,
+              items,
+            }),
+          });
+          const result = await response.json();
+          if (!response.ok) {
+            alert(result.error || "No se pudo guardar el pedido.");
+            return;
+          }
+          alert(`Pedido guardado: ${result.numero_pedido}`);
+          clearInvoiceRows();
+          if (clientSelect) {
+            clientSelect.value = "";
+          }
+          if (clientRtnInput) {
+            clientRtnInput.value = "";
+          }
+          clearPedidoContext();
+        } catch (error) {
+          alert("No se pudo guardar el pedido.");
+        }
+      });
+    }
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const initialPedidoId = urlParams.get("pedido_id");
+    if (initialPedidoId) {
+      fetch(`/pedidos/${initialPedidoId}/data`)
+        .then((response) => response.json().then((data) => ({ ok: response.ok, data })))
+        .then(({ ok, data }) => {
+          if (!ok) {
+            alert(data.error || "No se pudo cargar el pedido.");
+            return;
+          }
+          applyPedidoData(data);
+        })
+        .catch(() => {
+          alert("No se pudo cargar el pedido.");
+        });
     }
   </script>
 {% endblock %}

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Historial facturas | Invagro{% endblock %}
+{% block title %}Pedidos | Invagro{% endblock %}
 {% block body_class %}page dashboard-page{% endblock %}
 {% block content %}
   <div class="dashboard-container">
@@ -11,9 +11,9 @@
       <nav class="sidebar-nav">
         <a class="nav-item" href="/dashboard">Dashboard</a>
         <a class="nav-item" href="/facturacion">Facturacion</a>
-        <a class="nav-item" href="/pedidos">Pedidos</a>
+        <a class="nav-item active" href="/pedidos">Pedidos</a>
         <a class="nav-item" href="/facturas/credito">Facturas credito</a>
-        <a class="nav-item active" href="/facturas/historial">Historial facturas</a>
+        <a class="nav-item" href="/facturas/historial">Historial facturas</a>
         <a class="nav-item" href="/clientes">Clientes</a>
         <a class="nav-item" href="/productos">Productos</a>
         <a class="nav-item" href="/reportes">Reportes</a>
@@ -27,7 +27,7 @@
     <div class="main-content">
       <div class="topbar">
         <div class="topbar-left">
-          <h2>Historial de facturas</h2>
+          <h2>Pedidos</h2>
         </div>
         <div class="topbar-right">
           <span class="user-pill">Sesion: {{ user }}</span>
@@ -35,35 +35,49 @@
       </div>
 
       <main class="content-area">
+        <section class="module-header">
+          <div>
+            <h1>Pedidos registrados</h1>
+            <p>Guarda pedidos y conviertelos en factura cuando esten listos.</p>
+          </div>
+          <div class="header-actions">
+            <a class="primary-button" href="/facturacion">Nuevo pedido</a>
+          </div>
+        </section>
+
         <section class="module-table">
           <div class="table-header table-six">
-            <span>Factura</span>
+            <span>Pedido</span>
             <span>Cliente</span>
             <span>Fecha</span>
             <span>Total</span>
             <span>Estado</span>
-            <span>PDF</span>
+            <span>Acciones</span>
           </div>
-          {% if facturas %}
-            {% for factura in facturas %}
+          {% if pedidos %}
+            {% for pedido in pedidos %}
               <div class="table-row table-six">
-                <span>{{ factura.numero_factura }}</span>
-                <span>{{ clientes_map.get(factura.cliente_id, 'N/A') }}</span>
-                <span>{{ factura.fecha_label }}</span>
-                <span>L {{ "%.2f"|format(factura.total or 0) }}</span>
-                <span>{{ factura.estado_label|upper }}</span>
+                <span>{{ pedido.numero_pedido }}</span>
+                <span>{{ clientes_map.get(pedido.cliente_id, 'N/A') }}</span>
+                <span>{{ pedido.fecha_label }}</span>
+                <span>L {{ "%.2f"|format(pedido.total or 0) }}</span>
+                <span>{{ pedido.estado_label }}</span>
                 <div class="table-actions">
-                  {% if factura.pdf_filename %}
-                    <a class="secondary-button" href="{{ url_for('static', filename='invoices/' ~ factura.pdf_filename) }}" target="_blank">
-                      Ver PDF
-                    </a>
-                  {% else %}
-                    -
+                  {% if pedido.estado == "pendiente" %}
+                    <form method="post" action="/pedidos/{{ pedido.id }}/listo">
+                      <button class="secondary-button" type="submit">Marcar listo</button>
+                    </form>
                   {% endif %}
-                  <form method="post" action="/facturas/{{ factura.id }}/delete" onsubmit="return confirm('¿Eliminar esta factura?');">
-                    <input type="hidden" name="tipo" value="{{ factura.tipo }}" />
-                    <button class="danger-button" type="submit">Eliminar</button>
-                  </form>
+                  {% if pedido.estado == "listo" %}
+                    <a class="secondary-button" href="/facturacion?pedido_id={{ pedido.id }}">
+                      Cargar factura
+                    </a>
+                  {% endif %}
+                  {% if pedido.estado != "facturado" %}
+                    <form method="post" action="/pedidos/{{ pedido.id }}/anular" onsubmit="return confirm('¿Anular este pedido?');">
+                      <button class="danger-button" type="submit">Anular</button>
+                    </form>
+                  {% endif %}
                 </div>
               </div>
             {% endfor %}

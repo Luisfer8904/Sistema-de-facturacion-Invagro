@@ -94,6 +94,42 @@ CREATE TABLE IF NOT EXISTS `inva-facturas` (
     INDEX idx_estado (estado)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Tabla de Pedidos
+CREATE TABLE IF NOT EXISTS `inva-pedidos` (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    numero_pedido VARCHAR(50) UNIQUE NOT NULL,
+    cliente_id INT,
+    usuario_id INT,
+    rtn VARCHAR(20),
+    fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    subtotal DECIMAL(10,2),
+    isv DECIMAL(10,2),
+    descuento DECIMAL(10,2),
+    total DECIMAL(10,2),
+    estado ENUM('pendiente', 'listo', 'facturado', 'anulado') DEFAULT 'pendiente',
+    FOREIGN KEY (cliente_id) REFERENCES `inva-clientes`(id) ON DELETE SET NULL,
+    FOREIGN KEY (usuario_id) REFERENCES `inva-usuarios`(id) ON DELETE SET NULL,
+    INDEX idx_numero_pedido (numero_pedido),
+    INDEX idx_fecha_pedido (fecha),
+    INDEX idx_estado_pedido (estado)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Tabla de Detalle Pedidos
+CREATE TABLE IF NOT EXISTS `inva-detalle_pedidos` (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    pedido_id INT NOT NULL,
+    producto_id INT NOT NULL,
+    cantidad INT NOT NULL,
+    precio_unitario DECIMAL(10,2) NOT NULL,
+    subtotal DECIMAL(10,2) NOT NULL,
+    descuento DECIMAL(10,2) DEFAULT 0,
+    isv_aplica BOOLEAN DEFAULT FALSE,
+    FOREIGN KEY (pedido_id) REFERENCES `inva-pedidos`(id) ON DELETE CASCADE,
+    FOREIGN KEY (producto_id) REFERENCES `inva-productos`(id) ON DELETE RESTRICT,
+    INDEX idx_pedido_id (pedido_id),
+    INDEX idx_producto_id_pedido (producto_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Tabla de Facturas Contado
 CREATE TABLE IF NOT EXISTS `inva-facturas_contado` (
     id INT AUTO_INCREMENT PRIMARY KEY,

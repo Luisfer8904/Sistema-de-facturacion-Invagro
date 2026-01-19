@@ -31,7 +31,9 @@ from models import (
     Categoria,
     Cliente,
     DetalleFacturaContado,
+    DetallePedido,
     FacturaContado,
+    Pedido,
     Producto,
     User,
     db,
@@ -103,6 +105,9 @@ def create_app():
                     next_num = int(suffix) + 1
 
         return f"{rango_info['prefix']}{next_num:0{rango_info['width']}d}"
+
+    def generate_order_number():
+        return f"PED-{datetime.utcnow():%Y%m%d%H%M%S}"
 
     def build_invoice_pdf_filename(numero_factura, token=None):
         safe_base = re.sub(r"[\\/\\s]+", "-", numero_factura).strip("-")
@@ -527,17 +532,212 @@ def create_app():
             return redirect(url_for("login"))
 
         clientes_list = Cliente.query.order_by(Cliente.nombre.asc()).all()
+        clientes_map = {cliente.id: cliente.nombre for cliente in clientes_list}
         categorias_list = Categoria.query.filter_by(activo=True).order_by(
             Categoria.nombre.asc()
         ).all()
         productos_list = Producto.query.filter_by(activo=True).order_by(Producto.nombre.asc()).all()
+        pedidos_listos = (
+            Pedido.query.filter_by(estado="listo")
+            .order_by(Pedido.fecha.desc())
+            .all()
+        )
         return render_template(
             "facturacion.html",
             user=session["user"],
             clientes=clientes_list,
+            clientes_map=clientes_map,
             categorias=categorias_list,
             productos=productos_list,
+            pedidos_listos=pedidos_listos,
         )
+
+    @app.get("/pedidos")
+    def pedidos():
+        if not session.get("user"):
+            return redirect(url_for("login"))
+
+        clientes_list = Cliente.query.order_by(Cliente.nombre.asc()).all()
+        clientes_map = {cliente.id: cliente.nombre for cliente in clientes_list}
+        pedidos_list = Pedido.query.order_by(Pedido.fecha.desc()).all()
+        pedidos_view = []
+        for pedido in pedidos_list:
+            fecha_label = pedido.fecha.strftime("%d/%m/%Y") if pedido.fecha else "-"
+            estado_label = (pedido.estado or "-").replace("_", " ").upper()
+            pedidos_view.append(
+                {
+                    "id": pedido.id,
+                    "numero_pedido": pedido.numero_pedido,
+                    "cliente_id": pedido.cliente_id,
+                    "fecha_label": fecha_label,
+                    "total": pedido.total or Decimal("0"),
+                    "estado": pedido.estado or "-",
+                    "estado_label": estado_label,
+                }
+            )
+        return render_template(
+            "pedidos.html",
+            user=session["user"],
+            pedidos=pedidos_view,
+            clientes_map=clientes_map,
+        )
+
+    @app.post("/pedidos")
+    def crear_pedido():
+        if not session.get("user"):
+            return jsonify({"error": "No autorizado."}), 401
+
+        data = request.get_json(silent=True) or {}
+        cliente_id = data.get("cliente_id") or None
+        rtn = (data.get("rtn") or "").strip() or None
+        fecha_raw = (data.get("fecha") or "").strip()
+        items = data.get("items") or []
+        pedido_id = data.get("pedido_id")
+
+        if not items:
+            return jsonify({"error": "No hay productos en el pedido."}), 400
+
+        if fecha_raw:
+            try:
+                fecha_pedido = datetime.strptime(fecha_raw, "%Y-%m-%d")
+            except ValueError:
+                return jsonify({"error": "Fecha invalida."}), 400
+        else:
+            fecha_pedido = datetime.utcnow()
+
+        producto_ids = []
+        parsed_items = []
+        for item in items:
+            try:
+                producto_id = int(item.get("producto_id"))
+                cantidad = int(item.get("cantidad"))
+                descuento = Decimal(str(item.get("descuento", 0) or 0))
+            except (TypeError, ValueError):
+                return jsonify({"error": "Producto o cantidad invalida."}), 400
+            if cantidad <= 0:
+                return jsonify({"error": "Cantidad invalida."}), 400
+            if descuento < 0:
+                return jsonify({"error": "Descuento invalido."}), 400
+            producto_ids.append(producto_id)
+            parsed_items.append((producto_id, cantidad, descuento))
+
+        productos = Producto.query.filter(Producto.id.in_(producto_ids)).all()
+        productos_map = {producto.id: producto for producto in productos}
+        if len(productos_map) != len(set(producto_ids)):
+            return jsonify({"error": "Producto no encontrado."}), 400
+
+        subtotal = Decimal("0")
+        isv = Decimal("0")
+        descuento_total = Decimal("0")
+        detalles = []
+        for producto_id, cantidad, descuento in parsed_items:
+            producto = productos_map[producto_id]
+            precio = Decimal(str(producto.precio))
+            linea_bruta = precio * Decimal(cantidad)
+            descuento_unit = min(descuento, precio)
+            descuento_aplicado = descuento_unit * Decimal(cantidad)
+            linea_neta = max(Decimal("0"), (precio - descuento_unit) * Decimal(cantidad))
+            subtotal += linea_bruta
+            descuento_total += descuento_aplicado
+            if producto.isv_aplica:
+                isv += linea_neta * Decimal("0.15")
+            detalles.append((producto, cantidad, precio, linea_neta, descuento_unit))
+
+        total = max(Decimal("0"), subtotal - descuento_total) + isv
+
+        usuario = User.query.filter_by(username=session["user"]).first()
+        usuario_id = usuario.id if usuario else None
+        numero_pedido = generate_order_number()
+
+        try:
+            pedido = Pedido(
+                numero_pedido=numero_pedido,
+                cliente_id=cliente_id,
+                usuario_id=usuario_id,
+                rtn=rtn,
+                fecha=fecha_pedido,
+                subtotal=subtotal,
+                isv=isv,
+                descuento=descuento_total,
+                total=total,
+                estado="pendiente",
+            )
+            db.session.add(pedido)
+            db.session.flush()
+            for producto, cantidad, precio, linea, descuento_unit in detalles:
+                db.session.add(
+                    DetallePedido(
+                        pedido_id=pedido.id,
+                        producto_id=producto.id,
+                        cantidad=cantidad,
+                        precio_unitario=precio,
+                        subtotal=linea,
+                        descuento=descuento_unit,
+                        isv_aplica=producto.isv_aplica,
+                    )
+                )
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            return jsonify({"error": "No se pudo guardar el pedido."}), 500
+
+        return jsonify({"pedido_id": pedido.id, "numero_pedido": numero_pedido})
+
+    @app.get("/pedidos/<int:pedido_id>/data")
+    def obtener_pedido(pedido_id):
+        if not session.get("user"):
+            return jsonify({"error": "No autorizado."}), 401
+
+        pedido = Pedido.query.get_or_404(pedido_id)
+        detalles = (
+            DetallePedido.query.filter_by(pedido_id=pedido.id)
+            .order_by(DetallePedido.id.asc())
+            .all()
+        )
+        items = [
+            {
+                "producto_id": detalle.producto_id,
+                "cantidad": int(detalle.cantidad),
+                "descuento": float(detalle.descuento or 0),
+            }
+            for detalle in detalles
+        ]
+        return jsonify(
+            {
+                "pedido_id": pedido.id,
+                "numero_pedido": pedido.numero_pedido,
+                "cliente_id": pedido.cliente_id,
+                "rtn": pedido.rtn or "",
+                "items": items,
+            }
+        )
+
+    @app.post("/pedidos/<int:pedido_id>/listo")
+    def marcar_pedido_listo(pedido_id):
+        if not session.get("user"):
+            return redirect(url_for("login"))
+
+        pedido = Pedido.query.get_or_404(pedido_id)
+        if pedido.estado not in {"facturado", "anulado"}:
+            pedido.estado = "listo"
+            try:
+                db.session.commit()
+            except SQLAlchemyError:
+                db.session.rollback()
+        return redirect(url_for("pedidos"))
+
+    @app.post("/pedidos/<int:pedido_id>/anular")
+    def anular_pedido(pedido_id):
+        if not session.get("user"):
+            return redirect(url_for("login"))
+
+        pedido = Pedido.query.get_or_404(pedido_id)
+        pedido.estado = "anulado"
+        try:
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+        return redirect(url_for("pedidos"))
 
     @app.route("/productos", methods=["GET", "POST"])
     def productos():
@@ -1969,7 +2169,15 @@ def create_app():
                             isv_aplica=producto.isv_aplica,
                         )
                     )
-
+            if pedido_id:
+                try:
+                    pedido_ref = int(pedido_id)
+                except (TypeError, ValueError):
+                    pedido_ref = None
+                if pedido_ref:
+                    pedido = Pedido.query.get(pedido_ref)
+                    if pedido:
+                        pedido.estado = "facturado"
             db.session.commit()
         except SQLAlchemyError:
             db.session.rollback()
