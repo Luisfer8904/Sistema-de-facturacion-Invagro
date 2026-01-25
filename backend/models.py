@@ -203,3 +203,49 @@ class DetallePedido(db.Model):
     subtotal = db.Column(db.Numeric(10, 2), nullable=False)
     descuento = db.Column(db.Numeric(10, 2), default=0)
     isv_aplica = db.Column(db.Boolean, default=False)
+
+
+class ChatSession(db.Model):
+    __tablename__ = "chat_sessions"
+    __table_args__ = {"extend_existing": True}
+
+    id = db.Column(db.String(36), primary_key=True)
+    username = db.Column(db.String(50))
+    created_at = db.Column(db.DateTime)
+    updated_at = db.Column(db.DateTime)
+
+
+class ChatMessage(db.Model):
+    __tablename__ = "chat_messages"
+    __table_args__ = {"extend_existing": True}
+
+    id = db.Column(db.Integer, primary_key=True)
+    session_id = db.Column(db.String(36), db.ForeignKey("chat_sessions.id"))
+    role = db.Column(db.String(20))
+    content = db.Column(db.Text)
+    created_at = db.Column(db.DateTime)
+
+
+class ChatSummary(db.Model):
+    __tablename__ = "chat_summaries"
+    __table_args__ = {"extend_existing": True}
+
+    id = db.Column(db.Integer, primary_key=True)
+    session_id = db.Column(db.String(36), db.ForeignKey("chat_sessions.id"))
+    summary = db.Column(db.Text)
+    updated_at = db.Column(db.DateTime)
+
+
+class ChatAudit(db.Model):
+    __tablename__ = "chat_audit"
+    __table_args__ = {"extend_existing": True}
+
+    id = db.Column(db.Integer, primary_key=True)
+    session_id = db.Column(db.String(36))
+    username = db.Column(db.String(50))
+    question = db.Column(db.Text)
+    tool_name = db.Column(db.String(64))
+    params_json = db.Column(db.Text)
+    elapsed_ms = db.Column(db.Integer)
+    rows_returned = db.Column(db.Integer)
+    created_at = db.Column(db.DateTime)

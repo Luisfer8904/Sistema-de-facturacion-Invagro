@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import re
@@ -6,9 +7,10 @@ import unicodedata
 from datetime import datetime, timedelta
 from decimal import Decimal
 from uuid import uuid4
+import urllib.request
 
 import click
-from sqlalchemy import bindparam, func, text
+from sqlalchemy import bindparam, create_engine, func, text
 from flask import Flask, jsonify, redirect, render_template, request, session, url_for
 from sqlalchemy.exc import SQLAlchemyError
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -31,6 +33,10 @@ from models import (
     AjustesNegocio,
     Categoria,
     Cliente,
+    ChatAudit,
+    ChatMessage,
+    ChatSession,
+    ChatSummary,
     DetalleFacturaContado,
     DetallePedido,
     FacturaContado,
@@ -45,6 +51,22 @@ def create_app():
     app = Flask(__name__)
     app.config.from_object("config.Config")
     db.init_app(app)
+
+    chat_db_user = os.getenv("CHAT_DB_USER")
+    chat_db_pass = os.getenv("CHAT_DB_PASS")
+    chat_db_host = os.getenv("CHAT_DB_HOST") or app.config.get("DB_HOST")
+    chat_db_port = os.getenv("CHAT_DB_PORT") or app.config.get("DB_PORT", "3306")
+    chat_db_name = os.getenv("CHAT_DB_NAME") or app.config.get("DB_NAME")
+    if chat_db_user and chat_db_pass and chat_db_host and chat_db_name:
+        app.config["CHAT_DB_URI"] = (
+            f"mysql+pymysql://{chat_db_user}:{chat_db_pass}@{chat_db_host}:{chat_db_port}/{chat_db_name}"
+        )
+    else:
+        app.config["CHAT_DB_URI"] = None
+
+    app.config["CHAT_LLM_API_KEY"] = os.getenv("CHAT_LLM_API_KEY")
+    app.config["CHAT_LLM_BASE_URL"] = os.getenv("CHAT_LLM_BASE_URL", "").strip()
+    app.config["CHAT_LLM_MODEL"] = os.getenv("CHAT_LLM_MODEL", "").strip()
 
     upload_folder = os.path.join(app.static_folder, "uploads", "productos")
     try:
@@ -119,6 +141,584 @@ def create_app():
                 safe_name = f"{safe_name}-{safe_token}"
         return f"{safe_name}.pdf"
 
+    def normalize_text(text_value):
+        if not text_value:
+            return ""
+        normalized = unicodedata.normalize("NFKD", text_value)
+        normalized = "".join(ch for ch in normalized if not unicodedata.combining(ch))
+        normalized = re.sub(r"\s+", " ", normalized)
+        return normalized.strip().lower()
+
+    def get_chat_engine():
+        uri = app.config.get("CHAT_DB_URI")
+        if not uri:
+            return None
+        return create_engine(uri, pool_pre_ping=True)
+
+    def run_chat_query(sql, params):
+        statement = text(sql)
+        if "cliente_ids" in params:
+            statement = statement.bindparams(bindparam("cliente_ids", expanding=True))
+        engine = get_chat_engine()
+        if engine:
+            with engine.connect() as connection:
+                return connection.execute(statement, params).mappings().all()
+        return db.session.execute(statement, params).mappings().all()
+
+    def format_money(value):
+        if value is None:
+            return "0.00"
+        return f"{float(value):,.2f}"
+
+    def format_int(value):
+        if value is None:
+            return "0"
+        return f"{int(value):,}"
+
+    def sales_cte_sql():
+        return """
+            WITH ventas AS (
+                SELECT f.cliente_id AS cliente_id, d.producto_id AS producto_id, d.cantidad AS cantidad, d.subtotal AS subtotal, f.fecha AS fecha
+                FROM `inva-facturas_contado` f
+                JOIN `inva-detalle_facturas_contado` d ON d.factura_id = f.id
+                UNION ALL
+                SELECT f.cliente_id, d.producto_id, d.cantidad, d.subtotal, f.fecha
+                FROM `inva-facturas_credito` f
+                JOIN `inva-detalle_facturas_credito` d ON d.factura_id = f.id
+                UNION ALL
+                SELECT p.cliente_id, d.producto_id, d.cantidad, d.subtotal, p.fecha
+                FROM `inva-pedidos` p
+                JOIN `inva-detalle_pedidos` d ON d.pedido_id = p.id
+            )
+        """
+
+    def parse_date(value):
+        if not value:
+            return None
+        if isinstance(value, datetime):
+            return value
+        for fmt in ("%Y-%m-%d", "%d/%m/%Y"):
+            try:
+                return datetime.strptime(str(value), fmt)
+            except ValueError:
+                continue
+        return None
+
+    def ensure_date_range(start, end, max_days=730):
+        if not start or not end:
+            return False
+        if end < start:
+            return False
+        if (end - start).days > max_days:
+            return False
+        return True
+
+    def find_clientes_by_name(name):
+        if not name:
+            return []
+        return Cliente.query.filter(Cliente.nombre.ilike(f"%{name.strip()}%")).all()
+
+    TOOL_DEFS = [
+        {
+            "type": "function",
+            "function": {
+                "name": "top_productos",
+                "description": "Top productos vendidos en un rango de fechas.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "fecha_inicio": {"type": "string", "description": "YYYY-MM-DD"},
+                        "fecha_fin": {"type": "string", "description": "YYYY-MM-DD"},
+                        "limite": {"type": "integer", "description": "Max 50"},
+                    },
+                    "required": ["fecha_inicio", "fecha_fin"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "clientes_inactivos",
+                "description": "Clientes sin compras en los ultimos N dias.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {"dias": {"type": "integer", "description": "Cantidad de dias"}},
+                    "required": ["dias"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "compras_por_cliente",
+                "description": "Totales de compras de un cliente en un rango.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "cliente_id": {"type": "integer"},
+                        "fecha_inicio": {"type": "string", "description": "YYYY-MM-DD"},
+                        "fecha_fin": {"type": "string", "description": "YYYY-MM-DD"},
+                    },
+                    "required": ["cliente_id", "fecha_inicio", "fecha_fin"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "productos_por_cliente",
+                "description": "Productos comprados por un cliente en un rango.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "cliente_id": {"type": "integer"},
+                        "fecha_inicio": {"type": "string", "description": "YYYY-MM-DD"},
+                        "fecha_fin": {"type": "string", "description": "YYYY-MM-DD"},
+                        "limite": {"type": "integer", "description": "Max 50"},
+                    },
+                    "required": ["cliente_id", "fecha_inicio", "fecha_fin"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "productos_disminuidos",
+                "description": "Productos con disminucion de compras comparando dos anos.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "cliente_id": {"type": "integer"},
+                        "year_actual": {"type": "integer"},
+                        "year_pasado": {"type": "integer"},
+                    },
+                    "required": ["cliente_id", "year_actual", "year_pasado"],
+                },
+            },
+        },
+    ]
+
+    def call_llm(messages, tools=None, tool_choice="auto"):
+        api_key = app.config.get("CHAT_LLM_API_KEY")
+        model = app.config.get("CHAT_LLM_MODEL")
+        if not api_key or not model:
+            return None, "LLM no configurado."
+        base_url = app.config.get("CHAT_LLM_BASE_URL") or "https://api.openai.com"
+        url = base_url.rstrip("/") + "/v1/chat/completions"
+        payload = {
+            "model": model,
+            "messages": messages,
+            "temperature": 0.2,
+        }
+        if tools:
+            payload["tools"] = tools
+            payload["tool_choice"] = tool_choice
+        data = json.dumps(payload).encode("utf-8")
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {api_key}",
+        }
+        try:
+            req = urllib.request.Request(url, data=data, headers=headers, method="POST")
+            with urllib.request.urlopen(req, timeout=25) as response:
+                body = response.read().decode("utf-8")
+                return json.loads(body), None
+        except Exception as exc:
+            return None, str(exc)
+
+    def get_or_create_chat_session(username):
+        session_id = session.get("chat_session_id")
+        chat_session = None
+        if session_id:
+            chat_session = ChatSession.query.get(session_id)
+        if not chat_session:
+            session_id = str(uuid4())
+            chat_session = ChatSession(
+                id=session_id,
+                username=username,
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow(),
+            )
+            db.session.add(chat_session)
+            db.session.commit()
+            session["chat_session_id"] = session_id
+        else:
+            chat_session.updated_at = datetime.utcnow()
+            db.session.commit()
+        return chat_session
+
+    def store_chat_message(session_id, role, content):
+        message = ChatMessage(
+            session_id=session_id,
+            role=role,
+            content=content,
+            created_at=datetime.utcnow(),
+        )
+        db.session.add(message)
+        chat_session = ChatSession.query.get(session_id)
+        if chat_session:
+            chat_session.updated_at = datetime.utcnow()
+        db.session.commit()
+
+    def get_recent_messages(session_id, limit=8):
+        return (
+            ChatMessage.query.filter_by(session_id=session_id)
+            .order_by(ChatMessage.id.desc())
+            .limit(limit)
+            .all()[::-1]
+        )
+
+    def get_chat_summary(session_id):
+        return (
+            ChatSummary.query.filter_by(session_id=session_id)
+            .order_by(ChatSummary.updated_at.desc())
+            .first()
+        )
+
+    def summarize_messages(messages):
+        if not messages:
+            return ""
+        joined = "\n".join([f"{msg.role}: {msg.content}" for msg in messages])
+        system_prompt = (
+            "Resume en 3-5 puntos lo esencial de la conversacion, en espanol y "
+            "sin detalles numericos."
+        )
+        response, err = call_llm(
+            [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": joined},
+            ]
+        )
+        if response and response.get("choices"):
+            return response["choices"][0]["message"].get("content", "").strip()
+        return joined[:800]
+
+    def maybe_update_summary(session_id):
+        total_messages = ChatMessage.query.filter_by(session_id=session_id).count()
+        if total_messages < 12 or total_messages % 6 != 0:
+            return
+        messages = (
+            ChatMessage.query.filter_by(session_id=session_id)
+            .order_by(ChatMessage.id.asc())
+            .all()
+        )
+        summary_text = summarize_messages(messages[:-8])
+        if not summary_text:
+            return
+        summary = get_chat_summary(session_id)
+        if summary:
+            summary.summary = summary_text
+            summary.updated_at = datetime.utcnow()
+        else:
+            summary = ChatSummary(
+                session_id=session_id,
+                summary=summary_text,
+                updated_at=datetime.utcnow(),
+            )
+            db.session.add(summary)
+        db.session.commit()
+
+    def build_system_prompt():
+        today = datetime.now().strftime("%Y-%m-%d")
+        return (
+            "Eres un asistente analitico para ventas y clientes. Responde en espanol. "
+            "Si falta informacion (fechas, cliente, periodo), pide una aclaracion antes "
+            "de ejecutar herramientas. No intentes modificar datos. "
+            "Explica el criterio de analisis en 2-4 frases y luego da el resultado. "
+            f"Fecha actual: {today}."
+        )
+
+    def reject_if_mutation_request(text_value):
+        normalized = normalize_text(text_value)
+        blocked = [
+            "insert",
+            "update",
+            "delete",
+            "drop",
+            "alter",
+            "elimina",
+            "borra",
+            "borrar",
+            "modifica",
+            "modificar",
+            "actualiza",
+            "actualizar",
+            "agrega",
+            "agregar",
+        ]
+        return any(word in normalized for word in blocked)
+
+    def execute_tool(tool_name, params, user_message):
+        start_time = time.time()
+        result = {"rows": [], "meta": {}}
+        if tool_name == "top_productos":
+            fecha_inicio = parse_date(params.get("fecha_inicio"))
+            fecha_fin = parse_date(params.get("fecha_fin"))
+            limite = min(int(params.get("limite", 10) or 10), 50)
+            if not fecha_inicio or not fecha_fin:
+                return None, "Necesito fecha de inicio y fin."
+            fecha_fin_inclusive = fecha_fin + timedelta(days=1)
+            if not ensure_date_range(fecha_inicio, fecha_fin_inclusive):
+                return None, "Rango de fechas invalido o muy amplio."
+            sql = sales_cte_sql() + """
+                SELECT p.nombre AS producto,
+                       SUM(v.cantidad) AS qty_total,
+                       SUM(v.subtotal) AS total
+                FROM ventas v
+                JOIN `inva-productos` p ON p.id = v.producto_id
+                WHERE v.fecha >= :start_date AND v.fecha < :end_date
+                GROUP BY p.id, p.nombre
+                ORDER BY qty_total DESC, total DESC
+                LIMIT :limite
+            """
+            rows = run_chat_query(
+                sql, {"start_date": fecha_inicio, "end_date": fecha_fin_inclusive, "limite": limite}
+            )
+            result["rows"] = rows
+            result["meta"] = {
+                "fecha_inicio": fecha_inicio.strftime("%Y-%m-%d"),
+                "fecha_fin": fecha_fin.strftime("%Y-%m-%d"),
+                "limite": limite,
+            }
+        elif tool_name == "clientes_inactivos":
+            dias = int(params.get("dias", 0) or 0)
+            if dias <= 0 or dias > 730:
+                return None, "Indica un numero de dias entre 1 y 730."
+            cutoff = datetime.now() - timedelta(days=dias)
+            sql = sales_cte_sql() + """
+                , ultimas AS (
+                    SELECT cliente_id, MAX(fecha) AS ultima_compra
+                    FROM ventas
+                    WHERE cliente_id IS NOT NULL
+                    GROUP BY cliente_id
+                )
+                SELECT c.id AS cliente_id, c.nombre AS cliente, u.ultima_compra AS ultima_compra
+                FROM `inva-clientes` c
+                LEFT JOIN ultimas u ON u.cliente_id = c.id
+                WHERE u.ultima_compra IS NULL OR u.ultima_compra < :cutoff
+                ORDER BY u.ultima_compra ASC
+                LIMIT 50
+            """
+            rows = run_chat_query(sql, {"cutoff": cutoff})
+            result["rows"] = rows
+            result["meta"] = {"dias": dias}
+        elif tool_name in {"compras_por_cliente", "productos_por_cliente", "productos_disminuidos"}:
+            cliente_id = params.get("cliente_id")
+            if not cliente_id:
+                posibles = find_clientes_by_name(user_message)
+                if len(posibles) == 1:
+                    cliente_id = posibles[0].id
+                else:
+                    return None, "Necesito el cliente especifico (nombre o ID)."
+            try:
+                cliente_id = int(cliente_id)
+            except (TypeError, ValueError):
+                return None, "El cliente_id no es valido."
+
+            if tool_name == "compras_por_cliente":
+                fecha_inicio = parse_date(params.get("fecha_inicio"))
+                fecha_fin = parse_date(params.get("fecha_fin"))
+                if not fecha_inicio or not fecha_fin:
+                    return None, "Necesito fecha de inicio y fin."
+                fecha_fin_inclusive = fecha_fin + timedelta(days=1)
+                if not ensure_date_range(fecha_inicio, fecha_fin_inclusive):
+                    return None, "Rango de fechas invalido o muy amplio."
+                sql = sales_cte_sql() + """
+                    SELECT COUNT(*) AS lineas,
+                           SUM(v.cantidad) AS qty_total,
+                           SUM(v.subtotal) AS total,
+                           MAX(v.fecha) AS ultima_compra
+                    FROM ventas v
+                    WHERE v.cliente_id = :cliente_id
+                      AND v.fecha >= :start_date AND v.fecha < :end_date
+                """
+                rows = run_chat_query(
+                    sql,
+                    {"cliente_id": cliente_id, "start_date": fecha_inicio, "end_date": fecha_fin_inclusive},
+                )
+                result["rows"] = rows
+                result["meta"] = {
+                    "cliente_id": cliente_id,
+                    "fecha_inicio": fecha_inicio.strftime("%Y-%m-%d"),
+                    "fecha_fin": fecha_fin.strftime("%Y-%m-%d"),
+                }
+            elif tool_name == "productos_por_cliente":
+                fecha_inicio = parse_date(params.get("fecha_inicio"))
+                fecha_fin = parse_date(params.get("fecha_fin"))
+                limite = min(int(params.get("limite", 30) or 30), 50)
+                if not fecha_inicio or not fecha_fin:
+                    return None, "Necesito fecha de inicio y fin."
+                fecha_fin_inclusive = fecha_fin + timedelta(days=1)
+                if not ensure_date_range(fecha_inicio, fecha_fin_inclusive):
+                    return None, "Rango de fechas invalido o muy amplio."
+                sql = sales_cte_sql() + """
+                    SELECT p.nombre AS producto,
+                           SUM(v.cantidad) AS qty_total,
+                           SUM(v.subtotal) AS total
+                    FROM ventas v
+                    JOIN `inva-productos` p ON p.id = v.producto_id
+                    WHERE v.cliente_id = :cliente_id
+                      AND v.fecha >= :start_date AND v.fecha < :end_date
+                    GROUP BY p.id, p.nombre
+                    ORDER BY qty_total DESC, total DESC
+                    LIMIT :limite
+                """
+                rows = run_chat_query(
+                    sql,
+                    {
+                        "cliente_id": cliente_id,
+                        "start_date": fecha_inicio,
+                        "end_date": fecha_fin_inclusive,
+                        "limite": limite,
+                    },
+                )
+                result["rows"] = rows
+                result["meta"] = {
+                    "cliente_id": cliente_id,
+                    "fecha_inicio": fecha_inicio.strftime("%Y-%m-%d"),
+                    "fecha_fin": fecha_fin.strftime("%Y-%m-%d"),
+                    "limite": limite,
+                }
+            else:
+                year_actual = int(params.get("year_actual", 0) or 0)
+                year_pasado = int(params.get("year_pasado", 0) or 0)
+                if year_actual <= 0 or year_pasado <= 0:
+                    return None, "Necesito year_actual y year_pasado."
+                sql = sales_cte_sql() + """
+                    SELECT p.nombre AS producto,
+                           SUM(CASE WHEN YEAR(v.fecha) = :year_actual THEN v.cantidad ELSE 0 END) AS qty_actual,
+                           SUM(CASE WHEN YEAR(v.fecha) = :year_pasado THEN v.cantidad ELSE 0 END) AS qty_pasado,
+                           SUM(CASE WHEN YEAR(v.fecha) = :year_actual THEN v.subtotal ELSE 0 END) AS total_actual,
+                           SUM(CASE WHEN YEAR(v.fecha) = :year_pasado THEN v.subtotal ELSE 0 END) AS total_pasado
+                    FROM ventas v
+                    JOIN `inva-productos` p ON p.id = v.producto_id
+                    WHERE v.cliente_id = :cliente_id
+                    GROUP BY p.id, p.nombre
+                    HAVING (SUM(CASE WHEN YEAR(v.fecha) = :year_actual THEN v.cantidad ELSE 0 END)
+                            < SUM(CASE WHEN YEAR(v.fecha) = :year_pasado THEN v.cantidad ELSE 0 END))
+                        OR (SUM(CASE WHEN YEAR(v.fecha) = :year_actual THEN v.subtotal ELSE 0 END)
+                            < SUM(CASE WHEN YEAR(v.fecha) = :year_pasado THEN v.subtotal ELSE 0 END))
+                    ORDER BY (SUM(CASE WHEN YEAR(v.fecha) = :year_pasado THEN v.cantidad ELSE 0 END)
+                              - SUM(CASE WHEN YEAR(v.fecha) = :year_actual THEN v.cantidad ELSE 0 END)) DESC
+                    LIMIT 50
+                """
+                rows = run_chat_query(
+                    sql,
+                    {
+                        "cliente_id": cliente_id,
+                        "year_actual": year_actual,
+                        "year_pasado": year_pasado,
+                    },
+                )
+                result["rows"] = rows
+                result["meta"] = {
+                    "cliente_id": cliente_id,
+                    "year_actual": year_actual,
+                    "year_pasado": year_pasado,
+                }
+        else:
+            return None, "Tool no permitida."
+
+        elapsed_ms = int((time.time() - start_time) * 1000)
+        audit = ChatAudit(
+            session_id=session.get("chat_session_id"),
+            username=session.get("user"),
+            question=user_message,
+            tool_name=tool_name,
+            params_json=json.dumps(params, ensure_ascii=False),
+            elapsed_ms=elapsed_ms,
+            rows_returned=len(result["rows"]),
+            created_at=datetime.utcnow(),
+        )
+        db.session.add(audit)
+        db.session.commit()
+        return result, None
+
+    def pick_tool_fallback(message):
+        normalized = normalize_text(message)
+        if "disminuido" in normalized and "compra" in normalized:
+            return "productos_disminuidos"
+        if "producto mas vendido" in normalized or "top productos" in normalized:
+            return "top_productos"
+        if "productos" in normalized and "compra" in normalized:
+            return "productos_por_cliente"
+        if "clientes" in normalized and "inact" in normalized:
+            return "clientes_inactivos"
+        if "compras" in normalized and "cliente" in normalized:
+            return "compras_por_cliente"
+        return None
+
+    def build_llm_messages(session_id, user_message):
+        summary = get_chat_summary(session_id)
+        recent = get_recent_messages(session_id, limit=8)
+        messages = [{"role": "system", "content": build_system_prompt()}]
+        if summary and summary.summary:
+            messages.append({"role": "system", "content": f"Resumen: {summary.summary}"})
+        for msg in recent:
+            messages.append({"role": msg.role, "content": msg.content})
+        messages.append({"role": "user", "content": user_message})
+        return messages
+
+    def format_tool_result_for_user(tool_name, result):
+        rows = result.get("rows", [])
+        meta = result.get("meta", {})
+        if tool_name == "top_productos":
+            if not rows:
+                return "No encontre ventas en ese rango."
+            lines = [
+                f"Analice ventas del {meta.get('fecha_inicio')} al {meta.get('fecha_fin')} y ordene por cantidad."
+            ]
+            for row in rows:
+                lines.append(
+                    f"- {row['producto']}: {format_int(row['qty_total'])} unidades | L {format_money(row['total'])}"
+                )
+            return "\n".join(lines)
+        if tool_name == "clientes_inactivos":
+            if not rows:
+                return "No hay clientes inactivos en ese periodo."
+            lines = [
+                f"Busque clientes sin compras en los ultimos {meta.get('dias')} dias."
+            ]
+            for row in rows:
+                fecha = row.get("ultima_compra")
+                fecha_txt = fecha.strftime("%Y-%m-%d") if fecha else "sin compras"
+                lines.append(f"- {row['cliente']}: {fecha_txt}")
+            return "\n".join(lines)
+        if tool_name == "compras_por_cliente":
+            if not rows:
+                return "No hay compras en ese periodo."
+            row = rows[0]
+            fecha = row.get("ultima_compra")
+            fecha_txt = fecha.strftime("%Y-%m-%d") if fecha else "sin compras"
+            return (
+                "Resumi las compras del cliente en el periodo solicitado.\n"
+                f"Total lineas: {format_int(row.get('lineas'))}, unidades: {format_int(row.get('qty_total'))}, "
+                f"monto: L {format_money(row.get('total'))}, ultima compra: {fecha_txt}."
+            )
+        if tool_name == "productos_por_cliente":
+            if not rows:
+                return "No hay productos comprados en ese periodo."
+            lines = [
+                "Liste productos por cantidad y monto dentro del periodo solicitado."
+            ]
+            for row in rows:
+                lines.append(
+                    f"- {row['producto']}: {format_int(row['qty_total'])} unidades | L {format_money(row['total'])}"
+                )
+            return "\n".join(lines)
+        if tool_name == "productos_disminuidos":
+            if not rows:
+                return "No hay productos con disminucion en los anos indicados."
+            lines = [
+                f"Compare {meta.get('year_pasado')} vs {meta.get('year_actual')} para el cliente."
+            ]
+            for row in rows:
+                lines.append(
+                    f"- {row['producto']}: {format_int(row['qty_pasado'])} -> {format_int(row['qty_actual'])} unidades | "
+                    f"L {format_money(row['total_pasado'])} -> L {format_money(row['total_actual'])}"
+                )
+            return "\n".join(lines)
+        return "Listo."
     def normalize_text(text_value):
         if not text_value:
             return ""
@@ -2282,164 +2882,90 @@ def create_app():
 
     @app.post("/api/chat")
     def chat_api():
+        if not session.get("user"):
+            return jsonify({"error": "No autorizado."}), 401
         payload = request.get_json(silent=True) or {}
         message = (payload.get("message") or "").strip()
         if not message:
             return jsonify({"error": "Mensaje vacio."}), 400
 
-        normalized = normalize_text(message)
-        now = datetime.now()
-
-        if "disminuido" in normalized and "compra" in normalized:
-            match = re.search(r"compra(?:s)?\\s+(?:de\\s+)?(.+)$", message, re.IGNORECASE)
-            cliente_nombre = match.group(1).strip() if match else ""
-            clientes = find_clientes_by_name(cliente_nombre)
-            if not clientes:
-                return jsonify({"reply": f"No encontre cliente con nombre parecido a '{cliente_nombre}'."})
-            if len(clientes) > 1:
-                nombres = ", ".join([c.nombre for c in clientes[:5]])
-                return jsonify({"reply": f"Encontre varios clientes: {nombres}. Se mas especifico."})
-
-            year_current = now.year
-            year_prev = year_current - 1
-            sql = sales_cte_sql() + """
-                SELECT p.nombre AS producto,
-                       SUM(CASE WHEN YEAR(v.fecha) = :year_current THEN v.cantidad ELSE 0 END) AS qty_current,
-                       SUM(CASE WHEN YEAR(v.fecha) = :year_prev THEN v.cantidad ELSE 0 END) AS qty_prev,
-                       SUM(CASE WHEN YEAR(v.fecha) = :year_current THEN v.subtotal ELSE 0 END) AS total_current,
-                       SUM(CASE WHEN YEAR(v.fecha) = :year_prev THEN v.subtotal ELSE 0 END) AS total_prev
-                FROM ventas v
-                JOIN `inva-productos` p ON p.id = v.producto_id
-                WHERE v.cliente_id IN :cliente_ids
-                GROUP BY p.id, p.nombre
-                HAVING (SUM(CASE WHEN YEAR(v.fecha) = :year_current THEN v.cantidad ELSE 0 END)
-                        < SUM(CASE WHEN YEAR(v.fecha) = :year_prev THEN v.cantidad ELSE 0 END))
-                    OR (SUM(CASE WHEN YEAR(v.fecha) = :year_current THEN v.subtotal ELSE 0 END)
-                        < SUM(CASE WHEN YEAR(v.fecha) = :year_prev THEN v.subtotal ELSE 0 END))
-                ORDER BY (SUM(CASE WHEN YEAR(v.fecha) = :year_prev THEN v.cantidad ELSE 0 END)
-                          - SUM(CASE WHEN YEAR(v.fecha) = :year_current THEN v.cantidad ELSE 0 END)) DESC
-                LIMIT 20
-            """
-            rows = run_chat_query(
-                sql,
+        if reject_if_mutation_request(message):
+            return jsonify(
                 {
-                    "cliente_ids": [clientes[0].id],
-                    "year_current": year_current,
-                    "year_prev": year_prev,
-                },
+                    "reply": "Solo puedo hacer consultas. Si quieres modificar datos, hazlo desde los modulos del sistema."
+                }
             )
-            if not rows:
-                return jsonify({"reply": f"No veo productos con disminucion para {clientes[0].nombre} entre {year_prev} y {year_current}."})
 
-            lines = [
-                f"Productos con disminucion para {clientes[0].nombre} ({year_prev} vs {year_current}):"
-            ]
-            for row in rows:
-                lines.append(
-                    f"- {row['producto']}: {format_int(row['qty_prev'])} -> {format_int(row['qty_current'])} unidades | L {format_money(row['total_prev'])} -> L {format_money(row['total_current'])}"
+        username = session.get("user")
+        chat_session = get_or_create_chat_session(username)
+        store_chat_message(chat_session.id, "user", message)
+
+        messages = build_llm_messages(chat_session.id, message)
+        llm_response, llm_error = call_llm(messages, tools=TOOL_DEFS, tool_choice="auto")
+        tool_name = None
+        tool_params = {}
+        if llm_response and llm_response.get("choices"):
+            assistant_message = llm_response["choices"][0]["message"]
+            tool_calls = assistant_message.get("tool_calls") or []
+            if tool_calls:
+                tool_call = tool_calls[0]
+                tool_name = tool_call.get("function", {}).get("name")
+                args = tool_call.get("function", {}).get("arguments", "{}")
+                try:
+                    tool_params = json.loads(args) if isinstance(args, str) else args
+                except json.JSONDecodeError:
+                    tool_params = {}
+            elif assistant_message.get("content"):
+                reply = assistant_message.get("content", "").strip()
+                if reply:
+                    store_chat_message(chat_session.id, "assistant", reply)
+                    maybe_update_summary(chat_session.id)
+                    return jsonify({"reply": reply})
+
+        if not tool_name:
+            tool_name = pick_tool_fallback(message)
+            if not tool_name:
+                reply = (
+                    "Necesito mas detalles para ayudar. Indica cliente, fechas o periodo "
+                    "y la pregunta exacta."
                 )
-            return jsonify({"reply": "\n".join(lines)})
+                store_chat_message(chat_session.id, "assistant", reply)
+                maybe_update_summary(chat_session.id)
+                return jsonify({"reply": reply})
 
-        if "productos" in normalized and "compra" in normalized:
-            match = re.search(r"productos\\s+compra\\s+(?:de\\s+)?(.+)$", message, re.IGNORECASE)
-            cliente_nombre = match.group(1).strip() if match else ""
-            clientes = find_clientes_by_name(cliente_nombre)
-            if not clientes:
-                return jsonify({"reply": f"No encontre cliente con nombre parecido a '{cliente_nombre}'."})
-            if len(clientes) > 1:
-                nombres = ", ".join([c.nombre for c in clientes[:5]])
-                return jsonify({"reply": f"Encontre varios clientes: {nombres}. Se mas especifico."})
+        result, error = execute_tool(tool_name, tool_params, message)
+        if error:
+            store_chat_message(chat_session.id, "assistant", error)
+            maybe_update_summary(chat_session.id)
+            return jsonify({"reply": error})
 
-            sql = sales_cte_sql() + """
-                SELECT p.nombre AS producto,
-                       SUM(v.cantidad) AS qty_total,
-                       SUM(v.subtotal) AS total
-                FROM ventas v
-                JOIN `inva-productos` p ON p.id = v.producto_id
-                WHERE v.cliente_id IN :cliente_ids
-                GROUP BY p.id, p.nombre
-                ORDER BY qty_total DESC, total DESC
-                LIMIT 30
-            """
-            rows = run_chat_query(sql, {"cliente_ids": [clientes[0].id]})
-            if not rows:
-                return jsonify({"reply": f"No hay compras registradas para {clientes[0].nombre}."})
+        tool_call_id = "tool-call-1"
+        tool_payload = json.dumps(result, default=str, ensure_ascii=False)
+        followup_messages = messages + [
+            {
+                "role": "assistant",
+                "content": None,
+                "tool_calls": [
+                    {
+                        "id": tool_call_id,
+                        "type": "function",
+                        "function": {"name": tool_name, "arguments": json.dumps(tool_params)},
+                    }
+                ],
+            },
+            {"role": "tool", "tool_call_id": tool_call_id, "content": tool_payload},
+        ]
 
-            lines = [f"Productos comprados por {clientes[0].nombre} (totales):"]
-            for row in rows:
-                lines.append(
-                    f"- {row['producto']}: {format_int(row['qty_total'])} unidades | L {format_money(row['total'])}"
-                )
-            return jsonify({"reply": "\n".join(lines)})
+        final_response, _ = call_llm(followup_messages)
+        reply = None
+        if final_response and final_response.get("choices"):
+            reply = final_response["choices"][0]["message"].get("content")
+        if not reply:
+            reply = format_tool_result_for_user(tool_name, result)
 
-        if "producto mas vendido" in normalized and "enero" in normalized:
-            year = now.year
-            start = datetime(year, 1, 1)
-            end = datetime(year, 2, 1)
-            base_sql = sales_cte_sql() + """
-                SELECT p.nombre AS producto,
-                       SUM(v.cantidad) AS qty_total,
-                       SUM(v.subtotal) AS total
-                FROM ventas v
-                JOIN `inva-productos` p ON p.id = v.producto_id
-                WHERE v.fecha >= :start_date AND v.fecha < :end_date
-                GROUP BY p.id, p.nombre
-            """
-            top_qty = run_chat_query(
-                base_sql + "ORDER BY qty_total DESC, total DESC LIMIT 1",
-                {"start_date": start, "end_date": end},
-            )
-            top_total = run_chat_query(
-                base_sql + "ORDER BY total DESC, qty_total DESC LIMIT 1",
-                {"start_date": start, "end_date": end},
-            )
-
-            if not top_qty:
-                return jsonify({"reply": f"No hay ventas registradas en enero {year}."})
-
-            qty_row = top_qty[0]
-            total_row = top_total[0] if top_total else qty_row
-            reply = (
-                f"Producto mas vendido en enero {year} por cantidad: {qty_row['producto']} ({format_int(qty_row['qty_total'])} unidades, L {format_money(qty_row['total'])}).\n"
-                f"Por monto: {total_row['producto']} (L {format_money(total_row['total'])}, {format_int(total_row['qty_total'])} unidades)."
-            )
-            return jsonify({"reply": reply})
-
-        if "clientes" in normalized and "dejado de comprar" in normalized:
-            cutoff = now - timedelta(days=90)
-            sql = sales_cte_sql() + """
-                , ultimas AS (
-                    SELECT cliente_id, MAX(fecha) AS ultima_compra
-                    FROM ventas
-                    WHERE cliente_id IS NOT NULL
-                    GROUP BY cliente_id
-                )
-                SELECT c.nombre AS cliente, u.ultima_compra AS ultima_compra
-                FROM `inva-clientes` c
-                LEFT JOIN ultimas u ON u.cliente_id = c.id
-                WHERE u.ultima_compra IS NULL OR u.ultima_compra < :cutoff
-                ORDER BY u.ultima_compra ASC
-                LIMIT 30
-            """
-            rows = run_chat_query(sql, {"cutoff": cutoff})
-            if not rows:
-                return jsonify({"reply": "No hay clientes inactivos en los ultimos 90 dias."})
-
-            lines = ["Clientes sin compras en los ultimos 90 dias:"]
-            for row in rows:
-                fecha = row["ultima_compra"]
-                fecha_txt = fecha.strftime("%Y-%m-%d") if fecha else "sin compras"
-                lines.append(f"- {row['cliente']}: {fecha_txt}")
-            return jsonify({"reply": "\n".join(lines)})
-
-        ejemplo = (
-            "Preguntas que puedo responder ahora:\n"
-            "- que productos ha disminuido en compra Linares Vet\n"
-            "- que productos compra valle de agalta\n"
-            "- cual fue el producto mas vendido en enero de este ano\n"
-            "- que clientes han dejado de comprar"
-        )
-        return jsonify({"reply": ejemplo})
+        store_chat_message(chat_session.id, "assistant", reply)
+        maybe_update_summary(chat_session.id)
+        return jsonify({"reply": reply})
 
     @app.get("/health")
     def health_check():
