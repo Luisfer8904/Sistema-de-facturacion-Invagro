@@ -19,5 +19,23 @@
       </nav>
     </header>
     {% block content %}{% endblock %}
+    <div class="chat-overlay" id="chatOverlay" aria-hidden="true">
+      <div class="chat-drawer" role="dialog" aria-modal="true" aria-labelledby="chatTitle">
+        <header class="chat-header">
+          <div>
+            <h3 id="chatTitle">Chat IA</h3>
+            <p>Consultas de ventas y clientes</p>
+          </div>
+          <button class="chat-close" type="button" onclick="closeChat()" aria-label="Cerrar chat">×</button>
+        </header>
+        <div class="chat-messages" id="chatMessages" aria-live="polite"></div>
+        <form class="chat-input" onsubmit="return sendMessage(event)">
+          <input id="chatInput" type="text" placeholder="Escribe tu pregunta..." autocomplete="off" />
+          <button type="submit">Enviar</button>
+        </form>
+      </div>
+    </div>
+
+    <script src="/static/js/chat_widget.js"></script>
   </body>
 </html>

@@ -2,12 +2,13 @@ import logging
 import os
 import re
 import time
+import unicodedata
 from datetime import datetime, timedelta
 from decimal import Decimal
 from uuid import uuid4
 
 import click
-from sqlalchemy import func
+from sqlalchemy import bindparam, func, text
 from flask import Flask, jsonify, redirect, render_template, request, session, url_for
 from sqlalchemy.exc import SQLAlchemyError
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -117,6 +118,52 @@ def create_app():
             if safe_token:
                 safe_name = f"{safe_name}-{safe_token}"
         return f"{safe_name}.pdf"
+
+    def normalize_text(text_value):
+        if not text_value:
+            return ""
+        normalized = unicodedata.normalize("NFKD", text_value)
+        normalized = "".join(ch for ch in normalized if not unicodedata.combining(ch))
+        normalized = re.sub(r"\s+", " ", normalized)
+        return normalized.strip().lower()
+
+    def find_clientes_by_name(name):
+        if not name:
+            return []
+        return Cliente.query.filter(Cliente.nombre.ilike(f"%{name.strip()}%")).all()
+
+    def run_chat_query(sql, params):
+        statement = text(sql)
+        if "cliente_ids" in params:
+            statement = statement.bindparams(bindparam("cliente_ids", expanding=True))
+        return db.session.execute(statement, params).mappings().all()
+
+    def format_money(value):
+        if value is None:
+            return "0.00"
+        return f"{float(value):,.2f}"
+
+    def format_int(value):
+        if value is None:
+            return "0"
+        return f"{int(value):,}"
+
+    def sales_cte_sql():
+        return """
+            WITH ventas AS (
+                SELECT f.cliente_id AS cliente_id, d.producto_id AS producto_id, d.cantidad AS cantidad, d.subtotal AS subtotal, f.fecha AS fecha
+                FROM `inva-facturas_contado` f
+                JOIN `inva-detalle_facturas_contado` d ON d.factura_id = f.id
+                UNION ALL
+                SELECT f.cliente_id, d.producto_id, d.cantidad, d.subtotal, f.fecha
+                FROM `inva-facturas_credito` f
+                JOIN `inva-detalle_facturas_credito` d ON d.factura_id = f.id
+                UNION ALL
+                SELECT p.cliente_id, d.producto_id, d.cantidad, d.subtotal, p.fecha
+                FROM `inva-pedidos` p
+                JOIN `inva-detalle_pedidos` d ON d.pedido_id = p.id
+            )
+        """
 
     def cleanup_old_pdfs(folder_path, max_age_seconds=86400, prefix=None):
         cutoff = time.time() - max_age_seconds
@@ -2232,6 +2279,167 @@ def create_app():
                 "pdf_url": pdf_url,
             }
         )
+
+    @app.post("/api/chat")
+    def chat_api():
+        payload = request.get_json(silent=True) or {}
+        message = (payload.get("message") or "").strip()
+        if not message:
+            return jsonify({"error": "Mensaje vacio."}), 400
+
+        normalized = normalize_text(message)
+        now = datetime.now()
+
+        if "disminuido" in normalized and "compra" in normalized:
+            match = re.search(r"compra(?:s)?\\s+(?:de\\s+)?(.+)$", message, re.IGNORECASE)
+            cliente_nombre = match.group(1).strip() if match else ""
+            clientes = find_clientes_by_name(cliente_nombre)
+            if not clientes:
+                return jsonify({"reply": f"No encontre cliente con nombre parecido a '{cliente_nombre}'."})
+            if len(clientes) > 1:
+                nombres = ", ".join([c.nombre for c in clientes[:5]])
+                return jsonify({"reply": f"Encontre varios clientes: {nombres}. Se mas especifico."})
+
+            year_current = now.year
+            year_prev = year_current - 1
+            sql = sales_cte_sql() + """
+                SELECT p.nombre AS producto,
+                       SUM(CASE WHEN YEAR(v.fecha) = :year_current THEN v.cantidad ELSE 0 END) AS qty_current,
+                       SUM(CASE WHEN YEAR(v.fecha) = :year_prev THEN v.cantidad ELSE 0 END) AS qty_prev,
+                       SUM(CASE WHEN YEAR(v.fecha) = :year_current THEN v.subtotal ELSE 0 END) AS total_current,
+                       SUM(CASE WHEN YEAR(v.fecha) = :year_prev THEN v.subtotal ELSE 0 END) AS total_prev
+                FROM ventas v
+                JOIN `inva-productos` p ON p.id = v.producto_id
+                WHERE v.cliente_id IN :cliente_ids
+                GROUP BY p.id, p.nombre
+                HAVING (SUM(CASE WHEN YEAR(v.fecha) = :year_current THEN v.cantidad ELSE 0 END)
+                        < SUM(CASE WHEN YEAR(v.fecha) = :year_prev THEN v.cantidad ELSE 0 END))
+                    OR (SUM(CASE WHEN YEAR(v.fecha) = :year_current THEN v.subtotal ELSE 0 END)
+                        < SUM(CASE WHEN YEAR(v.fecha) = :year_prev THEN v.subtotal ELSE 0 END))
+                ORDER BY (SUM(CASE WHEN YEAR(v.fecha) = :year_prev THEN v.cantidad ELSE 0 END)
+                          - SUM(CASE WHEN YEAR(v.fecha) = :year_current THEN v.cantidad ELSE 0 END)) DESC
+                LIMIT 20
+            """
+            rows = run_chat_query(
+                sql,
+                {
+                    "cliente_ids": [clientes[0].id],
+                    "year_current": year_current,
+                    "year_prev": year_prev,
+                },
+            )
+            if not rows:
+                return jsonify({"reply": f"No veo productos con disminucion para {clientes[0].nombre} entre {year_prev} y {year_current}."})
+
+            lines = [
+                f"Productos con disminucion para {clientes[0].nombre} ({year_prev} vs {year_current}):"
+            ]
+            for row in rows:
+                lines.append(
+                    f"- {row['producto']}: {format_int(row['qty_prev'])} -> {format_int(row['qty_current'])} unidades | L {format_money(row['total_prev'])} -> L {format_money(row['total_current'])}"
+                )
+            return jsonify({"reply": "\n".join(lines)})
+
+        if "productos" in normalized and "compra" in normalized:
+            match = re.search(r"productos\\s+compra\\s+(?:de\\s+)?(.+)$", message, re.IGNORECASE)
+            cliente_nombre = match.group(1).strip() if match else ""
+            clientes = find_clientes_by_name(cliente_nombre)
+            if not clientes:
+                return jsonify({"reply": f"No encontre cliente con nombre parecido a '{cliente_nombre}'."})
+            if len(clientes) > 1:
+                nombres = ", ".join([c.nombre for c in clientes[:5]])
+                return jsonify({"reply": f"Encontre varios clientes: {nombres}. Se mas especifico."})
+
+            sql = sales_cte_sql() + """
+                SELECT p.nombre AS producto,
+                       SUM(v.cantidad) AS qty_total,
+                       SUM(v.subtotal) AS total
+                FROM ventas v
+                JOIN `inva-productos` p ON p.id = v.producto_id
+                WHERE v.cliente_id IN :cliente_ids
+                GROUP BY p.id, p.nombre
+                ORDER BY qty_total DESC, total DESC
+                LIMIT 30
+            """
+            rows = run_chat_query(sql, {"cliente_ids": [clientes[0].id]})
+            if not rows:
+                return jsonify({"reply": f"No hay compras registradas para {clientes[0].nombre}."})
+
+            lines = [f"Productos comprados por {clientes[0].nombre} (totales):"]
+            for row in rows:
+                lines.append(
+                    f"- {row['producto']}: {format_int(row['qty_total'])} unidades | L {format_money(row['total'])}"
+                )
+            return jsonify({"reply": "\n".join(lines)})
+
+        if "producto mas vendido" in normalized and "enero" in normalized:
+            year = now.year
+            start = datetime(year, 1, 1)
+            end = datetime(year, 2, 1)
+            base_sql = sales_cte_sql() + """
+                SELECT p.nombre AS producto,
+                       SUM(v.cantidad) AS qty_total,
+                       SUM(v.subtotal) AS total
+                FROM ventas v
+                JOIN `inva-productos` p ON p.id = v.producto_id
+                WHERE v.fecha >= :start_date AND v.fecha < :end_date
+                GROUP BY p.id, p.nombre
+            """
+            top_qty = run_chat_query(
+                base_sql + "ORDER BY qty_total DESC, total DESC LIMIT 1",
+                {"start_date": start, "end_date": end},
+            )
+            top_total = run_chat_query(
+                base_sql + "ORDER BY total DESC, qty_total DESC LIMIT 1",
+                {"start_date": start, "end_date": end},
+            )
+
+            if not top_qty:
+                return jsonify({"reply": f"No hay ventas registradas en enero {year}."})
+
+            qty_row = top_qty[0]
+            total_row = top_total[0] if top_total else qty_row
+            reply = (
+                f"Producto mas vendido en enero {year} por cantidad: {qty_row['producto']} ({format_int(qty_row['qty_total'])} unidades, L {format_money(qty_row['total'])}).\n"
+                f"Por monto: {total_row['producto']} (L {format_money(total_row['total'])}, {format_int(total_row['qty_total'])} unidades)."
+            )
+            return jsonify({"reply": reply})
+
+        if "clientes" in normalized and "dejado de comprar" in normalized:
+            cutoff = now - timedelta(days=90)
+            sql = sales_cte_sql() + """
+                , ultimas AS (
+                    SELECT cliente_id, MAX(fecha) AS ultima_compra
+                    FROM ventas
+                    WHERE cliente_id IS NOT NULL
+                    GROUP BY cliente_id
+                )
+                SELECT c.nombre AS cliente, u.ultima_compra AS ultima_compra
+                FROM `inva-clientes` c
+                LEFT JOIN ultimas u ON u.cliente_id = c.id
+                WHERE u.ultima_compra IS NULL OR u.ultima_compra < :cutoff
+                ORDER BY u.ultima_compra ASC
+                LIMIT 30
+            """
+            rows = run_chat_query(sql, {"cutoff": cutoff})
+            if not rows:
+                return jsonify({"reply": "No hay clientes inactivos en los ultimos 90 dias."})
+
+            lines = ["Clientes sin compras en los ultimos 90 dias:"]
+            for row in rows:
+                fecha = row["ultima_compra"]
+                fecha_txt = fecha.strftime("%Y-%m-%d") if fecha else "sin compras"
+                lines.append(f"- {row['cliente']}: {fecha_txt}")
+            return jsonify({"reply": "\n".join(lines)})
+
+        ejemplo = (
+            "Preguntas que puedo responder ahora:\n"
+            "- que productos ha disminuido en compra Linares Vet\n"
+            "- que productos compra valle de agalta\n"
+            "- cual fue el producto mas vendido en enero de este ano\n"
+            "- que clientes han dejado de comprar"
+        )
+        return jsonify({"reply": ejemplo})
 
     @app.get("/health")
     def health_check():
