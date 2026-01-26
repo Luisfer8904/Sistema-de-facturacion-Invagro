@@ -6,6 +6,10 @@ function openChat() {
   if (!overlay) return;
   overlay.classList.add("open");
   overlay.setAttribute("aria-hidden", "false");
+  document.querySelectorAll(".chat-trigger").forEach((el) => {
+    el.classList.add("active");
+    el.setAttribute("aria-pressed", "true");
+  });
   const input = document.getElementById("chatInput");
   if (input) {
     input.focus();
@@ -17,6 +21,10 @@ function closeChat() {
   if (!overlay) return;
   overlay.classList.remove("open");
   overlay.setAttribute("aria-hidden", "true");
+  document.querySelectorAll(".chat-trigger").forEach((el) => {
+    el.classList.remove("active");
+    el.setAttribute("aria-pressed", "false");
+  });
 }
 
 function loadChatHistory() {
