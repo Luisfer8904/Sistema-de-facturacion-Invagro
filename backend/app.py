@@ -335,6 +335,22 @@ def create_app():
                         text_chunks.append(part.get("text", ""))
         return {"text": "\n".join([t for t in text_chunks if t]), "tool_calls": tool_calls}
 
+    def to_responses_input(messages):
+        if not messages:
+            return []
+        if isinstance(messages[0], dict) and messages[0].get("type"):
+            return messages
+        converted = []
+        for msg in messages:
+            content = msg.get("content", "")
+            converted.append(
+                {
+                    "role": msg.get("role", "user"),
+                    "content": [{"type": "input_text", "text": content}],
+                }
+            )
+        return converted
+
     def call_llm(messages, tools=None, tool_choice="auto"):
         api_key = app.config.get("CHAT_LLM_API_KEY")
         model = app.config.get("CHAT_LLM_MODEL")
@@ -344,7 +360,7 @@ def create_app():
         url = base_url.rstrip("/") + "/v1/responses"
         payload = {
             "model": model,
-            "input": messages,
+            "input": to_responses_input(messages),
             "temperature": 0.2,
             "parallel_tool_calls": False,
         }
@@ -2942,16 +2958,12 @@ def create_app():
         llm_response, llm_error = call_llm(messages, tools=TOOL_DEFS, tool_choice="auto")
         tool_name = None
         tool_params = {}
-        tool_call_id = None
-        prior_output_items = []
         if llm_response:
             parsed = extract_response_text_and_calls(llm_response)
             tool_calls = parsed.get("tool_calls", [])
-            prior_output_items = llm_response.get("output", []) or []
             if tool_calls:
                 tool_call = tool_calls[0]
                 tool_name = tool_call.get("name")
-                tool_call_id = tool_call.get("call_id")
                 args = tool_call.get("arguments", "{}")
                 try:
                     tool_params = json.loads(args) if isinstance(args, str) else args
@@ -2963,6 +2975,10 @@ def create_app():
                     store_chat_message(chat_session.id, "assistant", reply)
                     maybe_update_summary(chat_session.id)
                     return jsonify({"reply": reply})
+        if llm_error:
+            store_chat_message(chat_session.id, "assistant", llm_error)
+            maybe_update_summary(chat_session.id)
+            return jsonify({"reply": f"No pude conectar con el modelo: {llm_error}"})
 
         if not tool_name:
             tool_name = pick_tool_fallback(message)
@@ -2981,22 +2997,28 @@ def create_app():
             maybe_update_summary(chat_session.id)
             return jsonify({"reply": error})
 
-        tool_call_id = tool_call_id or "tool-call-1"
         tool_payload = json.dumps(result, default=str, ensure_ascii=False)
-        followup_messages = messages + prior_output_items + [
+        final_messages = [
+            {"role": "system", "content": build_system_prompt()},
             {
-                "type": "function_call_output",
-                "call_id": tool_call_id,
-                "output": tool_payload,
-            }
+                "role": "user",
+                "content": (
+                    f"Pregunta: {message}\n"
+                    f"Datos JSON de {tool_name}: {tool_payload}\n"
+                    "Responde con explicacion breve del criterio y luego el resultado."
+                ),
+            },
         ]
 
-        final_response, _ = call_llm(followup_messages)
+        final_response, final_error = call_llm(final_messages)
         reply = None
         if final_response:
             reply = extract_response_text_and_calls(final_response).get("text")
         if not reply:
-            reply = format_tool_result_for_user(tool_name, result)
+            if final_error:
+                reply = f"No pude generar respuesta con el modelo: {final_error}"
+            else:
+                reply = format_tool_result_for_user(tool_name, result)
 
         store_chat_message(chat_session.id, "assistant", reply)
         maybe_update_summary(chat_session.id)
