@@ -306,6 +306,22 @@ def create_app():
             return "facturas"
         return None
 
+    def extract_query(text):
+        if not text:
+            return None
+        quoted = re.search(r"\"([^\"]+)\"|'([^']+)'", text)
+        if quoted:
+            return (quoted.group(1) or quoted.group(2)).strip()
+        normalized = normalize_text(text)
+        for keyword in ["clientes", "cliente", "productos", "producto", "facturas", "factura"]:
+            if keyword in normalized:
+                parts = normalized.split(keyword, 1)
+                if len(parts) > 1:
+                    candidate = parts[1].strip(" :,-")
+                    if candidate:
+                        return candidate
+        return None
+
     def build_db_summary(intent, rows):
         if not rows:
             return "No se encontraron resultados."
@@ -673,6 +689,8 @@ def create_app():
             "Eres un asistente analitico para ventas y clientes. Responde en espanol. "
             "Si falta informacion (fechas, cliente, periodo), pide una aclaracion antes "
             "de ejecutar herramientas. No intentes modificar datos. "
+            "Usa los datos proporcionados en el contexto; no digas que no tienes acceso "
+            "a la base de datos. Si no hay resultados, indica que no se encontraron. "
             "Explica el criterio de analisis en 2-4 frases y luego da el resultado. "
             f"Fecha actual: {today}."
         )
@@ -3152,19 +3170,24 @@ def create_app():
 
             request_id = uuid4().hex
             intent = detect_intent(message)
+            query_hint = extract_query(message)
             db_summary = ""
             if intent:
                 try:
                     if intent == "clientes":
-                        rows = fetch_clients(limit=50)
+                        rows = fetch_clients(limit=50, q=query_hint)
                     elif intent == "productos":
-                        rows = fetch_products(limit=50)
+                        rows = fetch_products(limit=50, q=query_hint)
                     else:
                         rows = fetch_invoices(limit=20)
                     db_summary = build_db_summary(intent, rows)
                 except Exception as exc:
                     app.logger.error("DB query failed request_id=%s error=%s", request_id, exc)
                     db_summary = "No se pudo consultar la base de datos."
+
+            if db_summary == "No se pudo consultar la base de datos.":
+                store_chat_message(chat_session.id, "assistant", db_summary)
+                return jsonify({"reply": db_summary})
 
             messages = build_llm_messages(chat_session.id, message)
             if db_summary:
