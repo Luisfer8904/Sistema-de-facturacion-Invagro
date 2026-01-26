@@ -224,96 +224,86 @@ def create_app():
     TOOL_DEFS = [
         {
             "type": "function",
-            "function": {
-                "name": "top_productos",
-                "description": "Top productos vendidos en un rango de fechas.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "fecha_inicio": {"type": "string", "description": "YYYY-MM-DD"},
-                        "fecha_fin": {"type": "string", "description": "YYYY-MM-DD"},
-                        "limite": {
-                            "type": ["integer", "null"],
-                            "description": "Max 50 (opcional)",
-                        },
+            "name": "top_productos",
+            "description": "Top productos vendidos en un rango de fechas.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "fecha_inicio": {"type": "string", "description": "YYYY-MM-DD"},
+                    "fecha_fin": {"type": "string", "description": "YYYY-MM-DD"},
+                    "limite": {
+                        "type": ["integer", "null"],
+                        "description": "Max 50 (opcional)",
                     },
-                    "required": ["fecha_inicio", "fecha_fin", "limite"],
-                    "additionalProperties": False,
                 },
-                "strict": True,
+                "required": ["fecha_inicio", "fecha_fin", "limite"],
+                "additionalProperties": False,
             },
+            "strict": True,
         },
         {
             "type": "function",
-            "function": {
-                "name": "clientes_inactivos",
-                "description": "Clientes sin compras en los ultimos N dias.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {"dias": {"type": "integer", "description": "Cantidad de dias"}},
-                    "required": ["dias"],
-                    "additionalProperties": False,
-                },
-                "strict": True,
+            "name": "clientes_inactivos",
+            "description": "Clientes sin compras en los ultimos N dias.",
+            "parameters": {
+                "type": "object",
+                "properties": {"dias": {"type": "integer", "description": "Cantidad de dias"}},
+                "required": ["dias"],
+                "additionalProperties": False,
             },
+            "strict": True,
         },
         {
             "type": "function",
-            "function": {
-                "name": "compras_por_cliente",
-                "description": "Totales de compras de un cliente en un rango.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "cliente_id": {"type": "integer"},
-                        "fecha_inicio": {"type": "string", "description": "YYYY-MM-DD"},
-                        "fecha_fin": {"type": "string", "description": "YYYY-MM-DD"},
-                    },
-                    "required": ["cliente_id", "fecha_inicio", "fecha_fin"],
-                    "additionalProperties": False,
+            "name": "compras_por_cliente",
+            "description": "Totales de compras de un cliente en un rango.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "cliente_id": {"type": "integer"},
+                    "fecha_inicio": {"type": "string", "description": "YYYY-MM-DD"},
+                    "fecha_fin": {"type": "string", "description": "YYYY-MM-DD"},
                 },
-                "strict": True,
+                "required": ["cliente_id", "fecha_inicio", "fecha_fin"],
+                "additionalProperties": False,
             },
+            "strict": True,
         },
         {
             "type": "function",
-            "function": {
-                "name": "productos_por_cliente",
-                "description": "Productos comprados por un cliente en un rango.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "cliente_id": {"type": "integer"},
-                        "fecha_inicio": {"type": "string", "description": "YYYY-MM-DD"},
-                        "fecha_fin": {"type": "string", "description": "YYYY-MM-DD"},
-                        "limite": {
-                            "type": ["integer", "null"],
-                            "description": "Max 50 (opcional)",
-                        },
+            "name": "productos_por_cliente",
+            "description": "Productos comprados por un cliente en un rango.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "cliente_id": {"type": "integer"},
+                    "fecha_inicio": {"type": "string", "description": "YYYY-MM-DD"},
+                    "fecha_fin": {"type": "string", "description": "YYYY-MM-DD"},
+                    "limite": {
+                        "type": ["integer", "null"],
+                        "description": "Max 50 (opcional)",
                     },
-                    "required": ["cliente_id", "fecha_inicio", "fecha_fin", "limite"],
-                    "additionalProperties": False,
                 },
-                "strict": True,
+                "required": ["cliente_id", "fecha_inicio", "fecha_fin", "limite"],
+                "additionalProperties": False,
             },
+            "strict": True,
         },
         {
             "type": "function",
-            "function": {
-                "name": "productos_disminuidos",
-                "description": "Productos con disminucion de compras comparando dos anos.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "cliente_id": {"type": "integer"},
-                        "year_actual": {"type": "integer"},
-                        "year_pasado": {"type": "integer"},
-                    },
-                    "required": ["cliente_id", "year_actual", "year_pasado"],
-                    "additionalProperties": False,
+            "name": "productos_disminuidos",
+            "description": "Productos con disminucion de compras comparando dos anos.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "cliente_id": {"type": "integer"},
+                    "year_actual": {"type": "integer"},
+                    "year_pasado": {"type": "integer"},
                 },
-                "strict": True,
+                "required": ["cliente_id", "year_actual", "year_pasado"],
+                "additionalProperties": False,
             },
+            "strict": True,
         },
     ]
 
@@ -371,6 +361,13 @@ def create_app():
                 issues.append(f"input[{idx}] role={role} type={ctype}")
         return issues
 
+    def validate_tools(tools):
+        issues = []
+        for idx, tool in enumerate(tools):
+            if not tool.get("name"):
+                issues.append(f"tools[{idx}] missing name")
+        return issues
+
     def call_llm(messages, tools=None, tool_choice="auto"):
         api_key = app.config.get("CHAT_LLM_API_KEY")
         model = app.config.get("CHAT_LLM_MODEL")
@@ -389,12 +386,15 @@ def create_app():
         payload = {
             "model": model,
             "input": input_payload,
-            "temperature": 0.2,
             "parallel_tool_calls": False,
         }
         if tools:
-            payload["tools"] = tools
-            payload["tool_choice"] = tool_choice
+            tool_issues = validate_tools(tools)
+            if tool_issues:
+                app.logger.error("Tools invalid: %s", "; ".join(tool_issues))
+            else:
+                payload["tools"] = tools
+                payload["tool_choice"] = tool_choice
         data = json.dumps(payload).encode("utf-8")
         headers = {
             "Content-Type": "application/json",
@@ -412,6 +412,16 @@ def create_app():
                 app.logger.error(
                     "OpenAI 400 input issues: %s", "; ".join(issues)
                 )
+            app.logger.error(
+                "OpenAI 400 debug model=%s inputs=%s roles=%s types=%s",
+                model,
+                len(input_payload),
+                [item.get("role") for item in input_payload],
+                [
+                    (item.get("content") or [{}])[0].get("type")
+                    for item in input_payload
+                ],
+            )
             app.logger.error("OpenAI error %s: %s", exc.code, body)
             return None, f"OpenAI {exc.code}: {body}"
         except Exception as exc:
