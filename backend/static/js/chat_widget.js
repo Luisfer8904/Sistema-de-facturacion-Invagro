@@ -103,7 +103,7 @@ function sendMessage(event) {
     .then(async (resp) => {
       const data = await resp.json().catch(() => ({}));
       if (!resp.ok) {
-        const errorText = data.error || "No se pudo procesar la consulta.";
+        const errorText = data.error || data.detail || `Error ${resp.status}`;
         appendMessage("assistant", errorText, true);
         return;
       }
