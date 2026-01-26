@@ -220,7 +220,7 @@ class ChatMessage(db.Model):
     __table_args__ = {"extend_existing": True}
 
     id = db.Column(db.Integer, primary_key=True)
-    session_id = db.Column(db.String(36), db.ForeignKey("chat_sessions.id"))
+    session_id = db.Column(db.String(36), db.ForeignKey("inva-chat_sessions.id"))
     role = db.Column(db.String(20))
     content = db.Column(db.Text)
     created_at = db.Column(db.DateTime)
@@ -231,7 +231,7 @@ class ChatSummary(db.Model):
     __table_args__ = {"extend_existing": True}
 
     id = db.Column(db.Integer, primary_key=True)
-    session_id = db.Column(db.String(36), db.ForeignKey("chat_sessions.id"))
+    session_id = db.Column(db.String(36), db.ForeignKey("inva-chat_sessions.id"))
     summary = db.Column(db.Text)
     updated_at = db.Column(db.DateTime)
 
