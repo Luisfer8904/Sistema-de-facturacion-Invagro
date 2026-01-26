@@ -206,7 +206,7 @@ class DetallePedido(db.Model):
 
 
 class ChatSession(db.Model):
-    __tablename__ = "chat_sessions"
+    __tablename__ = "inva-chat_sessions"
     __table_args__ = {"extend_existing": True}
 
     id = db.Column(db.String(36), primary_key=True)
@@ -216,7 +216,7 @@ class ChatSession(db.Model):
 
 
 class ChatMessage(db.Model):
-    __tablename__ = "chat_messages"
+    __tablename__ = "inva-chat_messages"
     __table_args__ = {"extend_existing": True}
 
     id = db.Column(db.Integer, primary_key=True)
@@ -227,7 +227,7 @@ class ChatMessage(db.Model):
 
 
 class ChatSummary(db.Model):
-    __tablename__ = "chat_summaries"
+    __tablename__ = "inva-chat_summaries"
     __table_args__ = {"extend_existing": True}
 
     id = db.Column(db.Integer, primary_key=True)
@@ -237,7 +237,7 @@ class ChatSummary(db.Model):
 
 
 class ChatAudit(db.Model):
-    __tablename__ = "chat_audit"
+    __tablename__ = "inva-chat_audit"
     __table_args__ = {"extend_existing": True}
 
     id = db.Column(db.Integer, primary_key=True)
