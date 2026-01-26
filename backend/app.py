@@ -356,21 +356,39 @@ def create_app():
             )
         return converted
 
+    def validate_responses_input(input_payload):
+        issues = []
+        for idx, item in enumerate(input_payload):
+            role = item.get("role")
+            content = item.get("content") or []
+            if not content:
+                issues.append(f"input[{idx}] role={role} content vacio")
+                continue
+            ctype = content[0].get("type")
+            if role == "assistant" and ctype != "output_text":
+                issues.append(f"input[{idx}] role=assistant type={ctype}")
+            if role in {"user", "system"} and ctype != "input_text":
+                issues.append(f"input[{idx}] role={role} type={ctype}")
+        return issues
+
     def call_llm(messages, tools=None, tool_choice="auto"):
         api_key = app.config.get("CHAT_LLM_API_KEY")
         model = app.config.get("CHAT_LLM_MODEL")
         if not api_key:
+            app.logger.error("Missing CHAT_LLM_API_KEY")
             return None, "Falta CHAT_LLM_API_KEY en el entorno."
         if not model:
+            app.logger.error("Missing CHAT_LLM_MODEL")
             return None, "Falta CHAT_LLM_MODEL en el entorno."
         base_url = app.config.get("CHAT_LLM_BASE_URL") or "https://api.openai.com"
         base_url = base_url.rstrip("/")
         if base_url.endswith("/v1"):
             base_url = base_url[:-3]
         url = base_url + "/v1/responses"
+        input_payload = to_responses_input(messages)
         payload = {
             "model": model,
-            "input": to_responses_input(messages),
+            "input": input_payload,
             "temperature": 0.2,
             "parallel_tool_calls": False,
         }
@@ -389,6 +407,11 @@ def create_app():
                 return json.loads(body), None
         except urllib.error.HTTPError as exc:
             body = exc.read().decode("utf-8") if exc.fp else ""
+            issues = validate_responses_input(input_payload)
+            if issues:
+                app.logger.error(
+                    "OpenAI 400 input issues: %s", "; ".join(issues)
+                )
             app.logger.error("OpenAI error %s: %s", exc.code, body)
             return None, f"OpenAI {exc.code}: {body}"
         except Exception as exc:
