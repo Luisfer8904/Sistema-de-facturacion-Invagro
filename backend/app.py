@@ -229,10 +229,15 @@ def create_app():
                     "properties": {
                         "fecha_inicio": {"type": "string", "description": "YYYY-MM-DD"},
                         "fecha_fin": {"type": "string", "description": "YYYY-MM-DD"},
-                        "limite": {"type": "integer", "description": "Max 50"},
+                        "limite": {
+                            "type": ["integer", "null"],
+                            "description": "Max 50 (opcional)",
+                        },
                     },
-                    "required": ["fecha_inicio", "fecha_fin"],
+                    "required": ["fecha_inicio", "fecha_fin", "limite"],
+                    "additionalProperties": False,
                 },
+                "strict": True,
             },
         },
         {
@@ -244,7 +249,9 @@ def create_app():
                     "type": "object",
                     "properties": {"dias": {"type": "integer", "description": "Cantidad de dias"}},
                     "required": ["dias"],
+                    "additionalProperties": False,
                 },
+                "strict": True,
             },
         },
         {
@@ -260,7 +267,9 @@ def create_app():
                         "fecha_fin": {"type": "string", "description": "YYYY-MM-DD"},
                     },
                     "required": ["cliente_id", "fecha_inicio", "fecha_fin"],
+                    "additionalProperties": False,
                 },
+                "strict": True,
             },
         },
         {
@@ -274,10 +283,15 @@ def create_app():
                         "cliente_id": {"type": "integer"},
                         "fecha_inicio": {"type": "string", "description": "YYYY-MM-DD"},
                         "fecha_fin": {"type": "string", "description": "YYYY-MM-DD"},
-                        "limite": {"type": "integer", "description": "Max 50"},
+                        "limite": {
+                            "type": ["integer", "null"],
+                            "description": "Max 50 (opcional)",
+                        },
                     },
-                    "required": ["cliente_id", "fecha_inicio", "fecha_fin"],
+                    "required": ["cliente_id", "fecha_inicio", "fecha_fin", "limite"],
+                    "additionalProperties": False,
                 },
+                "strict": True,
             },
         },
         {
@@ -293,10 +307,33 @@ def create_app():
                         "year_pasado": {"type": "integer"},
                     },
                     "required": ["cliente_id", "year_actual", "year_pasado"],
+                    "additionalProperties": False,
                 },
+                "strict": True,
             },
         },
     ]
+
+    def extract_response_text_and_calls(response_json):
+        output_items = response_json.get("output", [])
+        tool_calls = []
+        text_chunks = []
+        for item in output_items:
+            item_type = item.get("type")
+            if item_type == "function_call":
+                tool_calls.append(
+                    {
+                        "call_id": item.get("call_id"),
+                        "name": item.get("name"),
+                        "arguments": item.get("arguments"),
+                    }
+                )
+            elif item_type == "message":
+                content = item.get("content") or []
+                for part in content:
+                    if part.get("type") == "output_text":
+                        text_chunks.append(part.get("text", ""))
+        return {"text": "\n".join([t for t in text_chunks if t]), "tool_calls": tool_calls}
 
     def call_llm(messages, tools=None, tool_choice="auto"):
         api_key = app.config.get("CHAT_LLM_API_KEY")
@@ -304,11 +341,12 @@ def create_app():
         if not api_key or not model:
             return None, "LLM no configurado."
         base_url = app.config.get("CHAT_LLM_BASE_URL") or "https://api.openai.com"
-        url = base_url.rstrip("/") + "/v1/chat/completions"
+        url = base_url.rstrip("/") + "/v1/responses"
         payload = {
             "model": model,
-            "messages": messages,
+            "input": messages,
             "temperature": 0.2,
+            "parallel_tool_calls": False,
         }
         if tools:
             payload["tools"] = tools
@@ -2904,19 +2942,23 @@ def create_app():
         llm_response, llm_error = call_llm(messages, tools=TOOL_DEFS, tool_choice="auto")
         tool_name = None
         tool_params = {}
-        if llm_response and llm_response.get("choices"):
-            assistant_message = llm_response["choices"][0]["message"]
-            tool_calls = assistant_message.get("tool_calls") or []
+        tool_call_id = None
+        prior_output_items = []
+        if llm_response:
+            parsed = extract_response_text_and_calls(llm_response)
+            tool_calls = parsed.get("tool_calls", [])
+            prior_output_items = llm_response.get("output", []) or []
             if tool_calls:
                 tool_call = tool_calls[0]
-                tool_name = tool_call.get("function", {}).get("name")
-                args = tool_call.get("function", {}).get("arguments", "{}")
+                tool_name = tool_call.get("name")
+                tool_call_id = tool_call.get("call_id")
+                args = tool_call.get("arguments", "{}")
                 try:
                     tool_params = json.loads(args) if isinstance(args, str) else args
                 except json.JSONDecodeError:
                     tool_params = {}
-            elif assistant_message.get("content"):
-                reply = assistant_message.get("content", "").strip()
+            elif parsed.get("text"):
+                reply = parsed.get("text", "").strip()
                 if reply:
                     store_chat_message(chat_session.id, "assistant", reply)
                     maybe_update_summary(chat_session.id)
@@ -2939,27 +2981,20 @@ def create_app():
             maybe_update_summary(chat_session.id)
             return jsonify({"reply": error})
 
-        tool_call_id = "tool-call-1"
+        tool_call_id = tool_call_id or "tool-call-1"
         tool_payload = json.dumps(result, default=str, ensure_ascii=False)
-        followup_messages = messages + [
+        followup_messages = messages + prior_output_items + [
             {
-                "role": "assistant",
-                "content": None,
-                "tool_calls": [
-                    {
-                        "id": tool_call_id,
-                        "type": "function",
-                        "function": {"name": tool_name, "arguments": json.dumps(tool_params)},
-                    }
-                ],
-            },
-            {"role": "tool", "tool_call_id": tool_call_id, "content": tool_payload},
+                "type": "function_call_output",
+                "call_id": tool_call_id,
+                "output": tool_payload,
+            }
         ]
 
         final_response, _ = call_llm(followup_messages)
         reply = None
-        if final_response and final_response.get("choices"):
-            reply = final_response["choices"][0]["message"].get("content")
+        if final_response:
+            reply = extract_response_text_and_calls(final_response).get("text")
         if not reply:
             reply = format_tool_result_for_user(tool_name, result)
 
