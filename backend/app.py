@@ -327,23 +327,26 @@ def create_app():
             return "No se encontraron resultados."
         lines = []
         if intent == "clientes":
+            lines.append("Clientes:")
             for row in rows:
                 lines.append(
                     f"- {row.get('id')}: {row.get('nombre')} ({row.get('ruc_dni') or 'sin doc'})"
                 )
         elif intent == "productos":
+            lines.append("Productos:")
             for row in rows:
                 lines.append(
                     f"- {row.get('id')}: {row.get('nombre')} ({row.get('codigo')}) L {row.get('precio')}"
                 )
         elif intent == "facturas":
+            lines.append("Facturas:")
             for row in rows:
                 fecha = row.get("fecha")
                 fecha_txt = fecha.strftime("%Y-%m-%d") if fecha else "sin fecha"
                 lines.append(
                     f"- {row.get('numero_factura')} cliente {row.get('cliente_id')} {fecha_txt} L {row.get('total')} {row.get('estado')}"
                 )
-        return "\n".join(lines[:50])
+        return "\n".join(lines[:21])
 
     TOOL_DEFS = [
         {
@@ -917,7 +920,7 @@ def create_app():
 
     def build_llm_messages(session_id, user_message):
         summary = get_chat_summary(session_id)
-        recent = get_recent_messages(session_id, limit=8)
+        recent = get_recent_messages(session_id, limit=4)
         messages = [{"role": "system", "content": build_system_prompt()}]
         if summary and summary.summary:
             messages.append({"role": "system", "content": f"Resumen: {summary.summary}"})
@@ -3175,9 +3178,9 @@ def create_app():
             if intent:
                 try:
                     if intent == "clientes":
-                        rows = fetch_clients(limit=50, q=query_hint)
+                        rows = fetch_clients(limit=20, q=query_hint)
                     elif intent == "productos":
-                        rows = fetch_products(limit=50, q=query_hint)
+                        rows = fetch_products(limit=20, q=query_hint)
                     else:
                         rows = fetch_invoices(limit=20)
                     db_summary = build_db_summary(intent, rows)
@@ -3188,6 +3191,15 @@ def create_app():
             if db_summary == "No se pudo consultar la base de datos.":
                 store_chat_message(chat_session.id, "assistant", db_summary)
                 return jsonify({"reply": db_summary})
+
+            if intent and db_summary:
+                reply = (
+                    f"{db_summary}\n\nTotal mostrado: {min(len(db_summary.splitlines()) - 1, 20)}"
+                    if db_summary != "No se encontraron resultados."
+                    else db_summary
+                )
+                store_chat_message(chat_session.id, "assistant", reply)
+                return jsonify({"reply": reply})
 
             messages = build_llm_messages(chat_session.id, message)
             if db_summary:
