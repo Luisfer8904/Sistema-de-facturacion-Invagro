@@ -82,7 +82,7 @@ echo -e "\n${YELLOW}⚙️  Paso 9: Configurando Supervisor...${NC}"
 sudo tee /etc/supervisor/conf.d/invagro.conf > /dev/null <<EOF
 [program:invagro]
 directory=$APP_DIR
-command=$APP_DIR/venv/bin/gunicorn --workers 3 --bind 127.0.0.1:5000 wsgi:app
+command=$APP_DIR/venv/bin/gunicorn --workers 3 --timeout 120 --graceful-timeout 30 --bind 127.0.0.1:5000 wsgi:app
 user=$APP_USER
 autostart=true
 autorestart=true

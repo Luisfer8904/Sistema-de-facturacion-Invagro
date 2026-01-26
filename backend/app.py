@@ -399,33 +399,44 @@ def create_app():
             "Content-Type": "application/json",
             "Authorization": f"Bearer {api_key}",
         }
-        try:
-            req = urllib.request.Request(url, data=data, headers=headers, method="POST")
-            with urllib.request.urlopen(req, timeout=25) as response:
-                body = response.read().decode("utf-8")
-                return json.loads(body), None
-        except urllib.error.HTTPError as exc:
-            body = exc.read().decode("utf-8") if exc.fp else ""
-            issues = validate_responses_input(input_payload)
-            if issues:
-                app.logger.error(
-                    "OpenAI 400 input issues: %s", "; ".join(issues)
-                )
-            app.logger.error(
-                "OpenAI 400 debug model=%s inputs=%s roles=%s types=%s",
-                model,
-                len(input_payload),
-                [item.get("role") for item in input_payload],
-                [
-                    (item.get("content") or [{}])[0].get("type")
-                    for item in input_payload
-                ],
-            )
-            app.logger.error("OpenAI error %s: %s", exc.code, body)
-            return None, f"OpenAI {exc.code}: {body}"
-        except Exception as exc:
-            app.logger.exception("OpenAI request failed")
-            return None, str(exc)
+        retryable = {429, 500, 502, 503, 504}
+        delays = [1, 2, 4]
+        for attempt in range(1, len(delays) + 2):
+            try:
+                req = urllib.request.Request(url, data=data, headers=headers, method="POST")
+                with urllib.request.urlopen(req, timeout=20) as response:
+                    body = response.read().decode("utf-8")
+                    return json.loads(body), None
+            except urllib.error.HTTPError as exc:
+                body = exc.read().decode("utf-8") if exc.fp else ""
+                code = exc.code
+                if code == 400:
+                    issues = validate_responses_input(input_payload)
+                    if issues:
+                        app.logger.error(
+                            "OpenAI 400 input issues: %s", "; ".join(issues)
+                        )
+                    app.logger.error(
+                        "OpenAI 400 debug model=%s inputs=%s roles=%s types=%s",
+                        model,
+                        len(input_payload),
+                        [item.get("role") for item in input_payload],
+                        [
+                            (item.get("content") or [{}])[0].get("type")
+                            for item in input_payload
+                        ],
+                    )
+                app.logger.error("OpenAI error %s (attempt %s): %s", code, attempt, body)
+                if code in retryable and attempt <= len(delays):
+                    time.sleep(delays[attempt - 1])
+                    continue
+                return None, f"OpenAI {code}: {body}"
+            except Exception as exc:
+                app.logger.error("OpenAI request failed (attempt %s): %s", attempt, exc)
+                if attempt <= len(delays):
+                    time.sleep(delays[attempt - 1])
+                    continue
+                return None, str(exc)
 
     def get_or_create_chat_session(username):
         session_id = session.get("chat_session_id")
@@ -490,34 +501,41 @@ def create_app():
                 {"role": "user", "content": joined},
             ]
         )
-        if response and response.get("choices"):
-            return response["choices"][0]["message"].get("content", "").strip()
-        return joined[:800]
+        if err:
+            app.logger.error("Resumen LLM fallo: %s", err)
+            return ""
+        if response:
+            summary_text = extract_response_text_and_calls(response).get("text", "")
+            return summary_text.strip() or ""
+        return ""
 
     def maybe_update_summary(session_id):
-        total_messages = ChatMessage.query.filter_by(session_id=session_id).count()
-        if total_messages < 12 or total_messages % 6 != 0:
-            return
-        messages = (
-            ChatMessage.query.filter_by(session_id=session_id)
-            .order_by(ChatMessage.id.asc())
-            .all()
-        )
-        summary_text = summarize_messages(messages[:-8])
-        if not summary_text:
-            return
-        summary = get_chat_summary(session_id)
-        if summary:
-            summary.summary = summary_text
-            summary.updated_at = datetime.utcnow()
-        else:
-            summary = ChatSummary(
-                session_id=session_id,
-                summary=summary_text,
-                updated_at=datetime.utcnow(),
+        try:
+            total_messages = ChatMessage.query.filter_by(session_id=session_id).count()
+            if total_messages < 12 or total_messages % 6 != 0:
+                return
+            messages = (
+                ChatMessage.query.filter_by(session_id=session_id)
+                .order_by(ChatMessage.id.asc())
+                .all()
             )
-            db.session.add(summary)
-        db.session.commit()
+            summary_text = summarize_messages(messages[:-8])
+            if not summary_text:
+                return
+            summary = get_chat_summary(session_id)
+            if summary:
+                summary.summary = summary_text
+                summary.updated_at = datetime.utcnow()
+            else:
+                summary = ChatSummary(
+                    session_id=session_id,
+                    summary=summary_text,
+                    updated_at=datetime.utcnow(),
+                )
+                db.session.add(summary)
+            db.session.commit()
+        except Exception as exc:
+            app.logger.error("Fallo resumen, continuando sin resumen: %s", exc)
 
     def build_system_prompt():
         today = datetime.now().strftime("%Y-%m-%d")
@@ -3007,7 +3025,11 @@ def create_app():
             if llm_error:
                 store_chat_message(chat_session.id, "assistant", llm_error)
                 maybe_update_summary(chat_session.id)
-                return jsonify({"reply": f"No pude conectar con el modelo: {llm_error}"})
+                return jsonify(
+                    {
+                        "reply": "El asistente no esta disponible temporalmente. Intenta de nuevo."
+                    }
+                )
 
             reply = None
             if llm_response:
