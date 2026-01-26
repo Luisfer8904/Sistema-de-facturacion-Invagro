@@ -346,10 +346,12 @@ def create_app():
         converted = []
         for msg in messages:
             content = msg.get("content", "")
+            role = msg.get("role", "user")
+            content_type = "output_text" if role == "assistant" else "input_text"
             converted.append(
                 {
-                    "role": msg.get("role", "user"),
-                    "content": [{"type": "input_text", "text": content}],
+                    "role": role,
+                    "content": [{"type": content_type, "text": content}],
                 }
             )
         return converted
