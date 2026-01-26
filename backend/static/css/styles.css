@@ -1700,6 +1700,35 @@ body {
   transform: translateX(0);
 }
 
+.chat-fab {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: none;
+  background: #2c7a3f;
+  color: #ffffff;
+  font-size: 1.4rem;
+  box-shadow: 0 12px 24px rgba(17, 41, 32, 0.25);
+  cursor: pointer;
+  z-index: 2100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.chat-fab:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 16px 30px rgba(17, 41, 32, 0.3);
+}
+
+.chat-fab.active {
+  background: #1f5f31;
+}
+
 .chat-header {
   padding: 18px 20px;
   border-bottom: 1px solid #e5e7eb;
@@ -1800,5 +1829,10 @@ body {
 
   .chat-drawer {
     width: 100%;
+  }
+
+  .chat-fab {
+    right: 16px;
+    bottom: 16px;
   }
 }
