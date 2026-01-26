@@ -386,7 +386,6 @@ def create_app():
         payload = {
             "model": model,
             "input": input_payload,
-            "parallel_tool_calls": False,
         }
         if tools:
             tool_issues = validate_tools(tools)
@@ -3004,70 +3003,17 @@ def create_app():
             store_chat_message(chat_session.id, "user", message)
 
             messages = build_llm_messages(chat_session.id, message)
-            llm_response, llm_error = call_llm(messages, tools=TOOL_DEFS, tool_choice="auto")
-            tool_name = None
-            tool_params = {}
-            if llm_response:
-                parsed = extract_response_text_and_calls(llm_response)
-                tool_calls = parsed.get("tool_calls", [])
-                if tool_calls:
-                    tool_call = tool_calls[0]
-                    tool_name = tool_call.get("name")
-                    args = tool_call.get("arguments", "{}")
-                    try:
-                        tool_params = json.loads(args) if isinstance(args, str) else args
-                    except json.JSONDecodeError:
-                        tool_params = {}
-                elif parsed.get("text"):
-                    reply = parsed.get("text", "").strip()
-                    if reply:
-                        store_chat_message(chat_session.id, "assistant", reply)
-                        maybe_update_summary(chat_session.id)
-                        return jsonify({"reply": reply})
+            llm_response, llm_error = call_llm(messages)
             if llm_error:
                 store_chat_message(chat_session.id, "assistant", llm_error)
                 maybe_update_summary(chat_session.id)
                 return jsonify({"reply": f"No pude conectar con el modelo: {llm_error}"})
 
-            if not tool_name:
-                tool_name = pick_tool_fallback(message)
-                if not tool_name:
-                    reply = (
-                        "Necesito mas detalles para ayudar. Indica cliente, fechas o periodo "
-                        "y la pregunta exacta."
-                    )
-                    store_chat_message(chat_session.id, "assistant", reply)
-                    maybe_update_summary(chat_session.id)
-                    return jsonify({"reply": reply})
-
-            result, error = execute_tool(tool_name, tool_params, message)
-            if error:
-                store_chat_message(chat_session.id, "assistant", error)
-                maybe_update_summary(chat_session.id)
-                return jsonify({"reply": error})
-
-            tool_payload = json.dumps(result, default=str, ensure_ascii=False)
-            final_messages = [
-                {"role": "system", "content": build_system_prompt()},
-                {
-                    "role": "user",
-                    "content": (
-                        f"Pregunta: {message}\n"
-                        f"Datos JSON de {tool_name}: {tool_payload}\n"
-                        "Responde con explicacion breve del criterio y luego el resultado."
-                    ),
-                },
-            ]
-
-            final_response, final_error = call_llm(final_messages)
             reply = None
-            if final_response:
-                reply = extract_response_text_and_calls(final_response).get("text")
+            if llm_response:
+                reply = extract_response_text_and_calls(llm_response).get("text")
             if not reply:
-                if final_error:
-                    reply = f"No pude generar respuesta con el modelo: {final_error}"
-                else:
-                    reply = format_tool_result_for_user(tool_name, result)
+                reply = "No pude generar respuesta. Intenta reformular tu pregunta."
 
             store_chat_message(chat_session.id, "assistant", reply)
             maybe_update_summary(chat_session.id)
