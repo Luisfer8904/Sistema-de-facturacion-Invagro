@@ -78,7 +78,7 @@ DB_PASS=tu-password
 DB_NAME=invagro
 CHAT_LLM_API_KEY=tu-api-key
 CHAT_LLM_MODEL=gpt-5
-CHAT_LLM_BASE_URL=https://api.openai.com  # sin /v1
+CHAT_LLM_BASE_URL=https://api.openai.com/v1
 CHAT_DB_USER=usuario_chat_solo_lectura
 CHAT_DB_PASS=tu-password-chat
 CHAT_DB_HOST=tu-host-mysql
@@ -91,6 +91,21 @@ Para aplicar cambios en producción:
 ```bash
 sudo systemctl daemon-reload
 sudo systemctl restart invagro.service
+```
+
+Prueba rápida del chat:
+
+```bash
+curl -s -X POST https://tu-dominio.com/api/chat \\
+  -H "Content-Type: application/json" \\
+  -b "session=TU_SESSION" \\
+  -d '{\"message\":\"lista de clientes\"}'
+```
+
+En MySQL puedes verificar tablas con:
+
+```sql
+SHOW TABLES LIKE 'inva-%';
 ```
 
 ## Estructura del proyecto

@@ -7,8 +7,9 @@ import unicodedata
 from datetime import datetime, timedelta
 from decimal import Decimal
 from uuid import uuid4
-import urllib.error
-import urllib.request
+
+import pymysql
+import requests
 
 import click
 from sqlalchemy import bindparam, create_engine, func, text
@@ -67,9 +68,10 @@ def create_app():
 
     app.config["CHAT_LLM_API_KEY"] = os.getenv("CHAT_LLM_API_KEY")
     app.config["CHAT_LLM_BASE_URL"] = os.getenv(
-        "CHAT_LLM_BASE_URL", "https://api.openai.com"
+        "CHAT_LLM_BASE_URL", "https://api.openai.com/v1"
     ).strip()
     app.config["CHAT_LLM_MODEL"] = os.getenv("CHAT_LLM_MODEL", "").strip()
+    app.config["CHAT_SUMMARY_ENABLED"] = False
 
     upload_folder = os.path.join(app.static_folder, "uploads", "productos")
     try:
@@ -221,6 +223,112 @@ def create_app():
             return []
         return Cliente.query.filter(Cliente.nombre.ilike(f"%{name.strip()}%")).all()
 
+    def get_mysql_connection():
+        return pymysql.connect(
+            host=app.config.get("DB_HOST"),
+            port=int(app.config.get("DB_PORT", 3306)),
+            user=app.config.get("DB_USER"),
+            password=app.config.get("DB_PASS"),
+            database=app.config.get("DB_NAME"),
+            cursorclass=pymysql.cursors.DictCursor,
+            connect_timeout=5,
+            read_timeout=10,
+            write_timeout=10,
+            charset="utf8mb4",
+        )
+
+    def fetch_clients(limit=50, q=None):
+        limit = min(int(limit or 50), 50)
+        sql = (
+            "SELECT id, nombre, ruc_dni, telefono, email "
+            "FROM `inva-clientes` "
+        )
+        params = []
+        if q:
+            sql += "WHERE nombre LIKE %s OR ruc_dni LIKE %s OR id = %s "
+            like_q = f"%{q}%"
+            params.extend([like_q, like_q, q if str(q).isdigit() else -1])
+        sql += "ORDER BY nombre ASC LIMIT %s"
+        params.append(limit)
+        with get_mysql_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(sql, params)
+                return cur.fetchall()
+
+    def fetch_products(limit=50, q=None):
+        limit = min(int(limit or 50), 50)
+        sql = (
+            "SELECT id, codigo, nombre, categoria, precio, stock, activo "
+            "FROM `inva-productos` "
+        )
+        params = []
+        if q:
+            sql += "WHERE nombre LIKE %s OR codigo LIKE %s OR id = %s "
+            like_q = f"%{q}%"
+            params.extend([like_q, like_q, q if str(q).isdigit() else -1])
+        sql += "ORDER BY nombre ASC LIMIT %s"
+        params.append(limit)
+        with get_mysql_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(sql, params)
+                return cur.fetchall()
+
+    def fetch_invoices(limit=20, date_from=None, date_to=None):
+        limit = min(int(limit or 20), 20)
+        sql = (
+            "SELECT id, numero_factura, cliente_id, fecha, total, estado "
+            "FROM `inva-facturas` "
+        )
+        params = []
+        clauses = []
+        if date_from:
+            clauses.append("fecha >= %s")
+            params.append(date_from)
+        if date_to:
+            clauses.append("fecha <= %s")
+            params.append(date_to)
+        if clauses:
+            sql += "WHERE " + " AND ".join(clauses) + " "
+        sql += "ORDER BY fecha DESC LIMIT %s"
+        params.append(limit)
+        with get_mysql_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(sql, params)
+                return cur.fetchall()
+
+    def detect_intent(text):
+        normalized = normalize_text(text)
+        if any(word in normalized for word in ["cliente", "clientes", "lista de clientes", "top clientes"]):
+            return "clientes"
+        if any(word in normalized for word in ["producto", "productos", "inventario"]):
+            return "productos"
+        if any(word in normalized for word in ["factura", "facturas", "venta", "ventas"]):
+            return "facturas"
+        return None
+
+    def build_db_summary(intent, rows):
+        if not rows:
+            return "No se encontraron resultados."
+        lines = []
+        if intent == "clientes":
+            for row in rows:
+                lines.append(
+                    f"- {row.get('id')}: {row.get('nombre')} ({row.get('ruc_dni') or 'sin doc'})"
+                )
+        elif intent == "productos":
+            for row in rows:
+                lines.append(
+                    f"- {row.get('id')}: {row.get('nombre')} ({row.get('codigo')}) L {row.get('precio')}"
+                )
+        elif intent == "facturas":
+            for row in rows:
+                fecha = row.get("fecha")
+                fecha_txt = fecha.strftime("%Y-%m-%d") if fecha else "sin fecha"
+                lines.append(
+                    f"- {row.get('numero_factura')} cliente {row.get('cliente_id')} {fecha_txt} L {row.get('total')} {row.get('estado')}"
+                )
+        return "\n".join(lines[:50])
+
     TOOL_DEFS = [
         {
             "type": "function",
@@ -368,7 +476,7 @@ def create_app():
                 issues.append(f"tools[{idx}] missing name")
         return issues
 
-    def call_llm(messages, tools=None, tool_choice="auto"):
+    def call_llm(messages, tools=None, tool_choice="auto", request_id=None):
         api_key = app.config.get("CHAT_LLM_API_KEY")
         model = app.config.get("CHAT_LLM_MODEL")
         if not api_key:
@@ -377,11 +485,12 @@ def create_app():
         if not model:
             app.logger.error("Missing CHAT_LLM_MODEL")
             return None, "Falta CHAT_LLM_MODEL en el entorno."
-        base_url = app.config.get("CHAT_LLM_BASE_URL") or "https://api.openai.com"
+        base_url = app.config.get("CHAT_LLM_BASE_URL") or "https://api.openai.com/v1"
         base_url = base_url.rstrip("/")
         if base_url.endswith("/v1"):
-            base_url = base_url[:-3]
-        url = base_url + "/v1/responses"
+            url = base_url + "/responses"
+        else:
+            url = base_url + "/v1/responses"
         input_payload = to_responses_input(messages)
         payload = {
             "model": model,
@@ -399,17 +508,22 @@ def create_app():
             "Content-Type": "application/json",
             "Authorization": f"Bearer {api_key}",
         }
-        retryable = {429, 500, 502, 503, 504}
-        delays = [1, 2, 4]
+        retryable = {500, 502, 503, 504}
+        delays = [0.5, 1.5]
         for attempt in range(1, len(delays) + 2):
             try:
-                req = urllib.request.Request(url, data=data, headers=headers, method="POST")
-                with urllib.request.urlopen(req, timeout=20) as response:
-                    body = response.read().decode("utf-8")
-                    return json.loads(body), None
-            except urllib.error.HTTPError as exc:
-                body = exc.read().decode("utf-8") if exc.fp else ""
-                code = exc.code
+                start_time = time.time()
+                response = requests.post(
+                    url,
+                    headers=headers,
+                    data=data,
+                    timeout=20,
+                )
+                duration_ms = int((time.time() - start_time) * 1000)
+                if response.status_code >= 200 and response.status_code < 300:
+                    return response.json(), None
+                code = response.status_code
+                body = response.text or ""
                 if code == 400:
                     issues = validate_responses_input(input_payload)
                     if issues:
@@ -417,7 +531,8 @@ def create_app():
                             "OpenAI 400 input issues: %s", "; ".join(issues)
                         )
                     app.logger.error(
-                        "OpenAI 400 debug model=%s inputs=%s roles=%s types=%s",
+                        "OpenAI 400 debug request_id=%s model=%s inputs=%s roles=%s types=%s",
+                        request_id,
                         model,
                         len(input_payload),
                         [item.get("role") for item in input_payload],
@@ -426,13 +541,26 @@ def create_app():
                             for item in input_payload
                         ],
                     )
-                app.logger.error("OpenAI error %s (attempt %s): %s", code, attempt, body)
+                app.logger.error(
+                    "OpenAI error request_id=%s status=%s duration_ms=%s attempt=%s",
+                    request_id,
+                    code,
+                    duration_ms,
+                    attempt,
+                )
+                if code == 429 and "insufficient_quota" in body:
+                    return None, "No hay saldo disponible en OpenAI."
                 if code in retryable and attempt <= len(delays):
                     time.sleep(delays[attempt - 1])
                     continue
                 return None, f"OpenAI {code}: {body}"
             except Exception as exc:
-                app.logger.error("OpenAI request failed (attempt %s): %s", attempt, exc)
+                app.logger.error(
+                    "OpenAI request failed request_id=%s attempt=%s error=%s",
+                    request_id,
+                    attempt,
+                    exc,
+                )
                 if attempt <= len(delays):
                     time.sleep(delays[attempt - 1])
                     continue
@@ -510,6 +638,8 @@ def create_app():
         return ""
 
     def maybe_update_summary(session_id):
+        if not app.config.get("CHAT_SUMMARY_ENABLED"):
+            return
         try:
             total_messages = ChatMessage.query.filter_by(session_id=session_id).count()
             if total_messages < 12 or total_messages % 6 != 0:
@@ -3020,8 +3150,33 @@ def create_app():
             chat_session = get_or_create_chat_session(username)
             store_chat_message(chat_session.id, "user", message)
 
+            request_id = uuid4().hex
+            intent = detect_intent(message)
+            db_summary = ""
+            if intent:
+                try:
+                    if intent == "clientes":
+                        rows = fetch_clients(limit=50)
+                    elif intent == "productos":
+                        rows = fetch_products(limit=50)
+                    else:
+                        rows = fetch_invoices(limit=20)
+                    db_summary = build_db_summary(intent, rows)
+                except Exception as exc:
+                    app.logger.error("DB query failed request_id=%s error=%s", request_id, exc)
+                    db_summary = "No se pudo consultar la base de datos."
+
             messages = build_llm_messages(chat_session.id, message)
-            llm_response, llm_error = call_llm(messages)
+            if db_summary:
+                messages.insert(
+                    1,
+                    {
+                        "role": "system",
+                        "content": f"Datos relevantes de la base de datos:\n{db_summary}",
+                    },
+                )
+
+            llm_response, llm_error = call_llm(messages, request_id=request_id)
             if llm_error:
                 store_chat_message(chat_session.id, "assistant", llm_error)
                 maybe_update_summary(chat_session.id)
