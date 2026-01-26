@@ -76,6 +76,21 @@ DB_PORT=3306
 DB_USER=tu-usuario
 DB_PASS=tu-password
 DB_NAME=invagro
+CHAT_LLM_API_KEY=tu-api-key
+CHAT_LLM_MODEL=gpt-5
+CHAT_LLM_BASE_URL=https://api.openai.com
+CHAT_DB_USER=usuario_chat_solo_lectura
+CHAT_DB_PASS=tu-password-chat
+CHAT_DB_HOST=tu-host-mysql
+CHAT_DB_PORT=3306
+CHAT_DB_NAME=invagro
+```
+
+Para aplicar cambios en producción:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl restart invagro.service
 ```
 
 ## Estructura del proyecto

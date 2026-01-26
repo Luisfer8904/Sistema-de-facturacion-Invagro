@@ -7,6 +7,7 @@ import unicodedata
 from datetime import datetime, timedelta
 from decimal import Decimal
 from uuid import uuid4
+import urllib.error
 import urllib.request
 
 import click
@@ -65,7 +66,9 @@ def create_app():
         app.config["CHAT_DB_URI"] = None
 
     app.config["CHAT_LLM_API_KEY"] = os.getenv("CHAT_LLM_API_KEY")
-    app.config["CHAT_LLM_BASE_URL"] = os.getenv("CHAT_LLM_BASE_URL", "").strip()
+    app.config["CHAT_LLM_BASE_URL"] = os.getenv(
+        "CHAT_LLM_BASE_URL", "https://api.openai.com"
+    ).strip()
     app.config["CHAT_LLM_MODEL"] = os.getenv("CHAT_LLM_MODEL", "").strip()
 
     upload_folder = os.path.join(app.static_folder, "uploads", "productos")
@@ -354,10 +357,15 @@ def create_app():
     def call_llm(messages, tools=None, tool_choice="auto"):
         api_key = app.config.get("CHAT_LLM_API_KEY")
         model = app.config.get("CHAT_LLM_MODEL")
-        if not api_key or not model:
-            return None, "LLM no configurado."
+        if not api_key:
+            return None, "Falta CHAT_LLM_API_KEY en el entorno."
+        if not model:
+            return None, "Falta CHAT_LLM_MODEL en el entorno."
         base_url = app.config.get("CHAT_LLM_BASE_URL") or "https://api.openai.com"
-        url = base_url.rstrip("/") + "/v1/responses"
+        base_url = base_url.rstrip("/")
+        if base_url.endswith("/v1"):
+            base_url = base_url[:-3]
+        url = base_url + "/v1/responses"
         payload = {
             "model": model,
             "input": to_responses_input(messages),
@@ -377,7 +385,12 @@ def create_app():
             with urllib.request.urlopen(req, timeout=25) as response:
                 body = response.read().decode("utf-8")
                 return json.loads(body), None
+        except urllib.error.HTTPError as exc:
+            body = exc.read().decode("utf-8") if exc.fp else ""
+            app.logger.error("OpenAI error %s: %s", exc.code, body)
+            return None, f"OpenAI {exc.code}: {body}"
         except Exception as exc:
+            app.logger.exception("OpenAI request failed")
             return None, str(exc)
 
     def get_or_create_chat_session(username):
