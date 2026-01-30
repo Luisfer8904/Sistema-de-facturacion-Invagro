@@ -36,16 +36,39 @@
 
       <main class="content-area">
         {% if recibo_url %}
-          <div class="flash-messages">
-            <div class="alert alert-success">
-              Recibo generado:
-              <a href="{{ recibo_url }}" target="_blank">Ver PDF</a>
-              {% if whatsapp_url %}
-                &nbsp;|&nbsp;
-                <a href="{{ whatsapp_url }}" target="_blank">Enviar por WhatsApp</a>
-              {% endif %}
+          <div class="modal open" id="receipt-modal">
+            <div class="modal-card">
+              <div class="modal-header">
+                <h3>Recibo generado</h3>
+                <button class="modal-close" type="button" data-receipt-close>×</button>
+              </div>
+              <div class="account-modal-body">
+                <p>El recibo de cobro esta listo.</p>
+                <div class="report-actions">
+                  <a class="primary-button" href="{{ recibo_url }}" target="_blank">Ver PDF</a>
+                  {% if whatsapp_url %}
+                    <a class="secondary-button" href="{{ whatsapp_url }}" target="_blank">Enviar por WhatsApp</a>
+                  {% endif %}
+                </div>
+              </div>
             </div>
           </div>
+          <script>
+            const receiptModal = document.getElementById("receipt-modal");
+            const receiptCloseButtons = receiptModal
+              ? receiptModal.querySelectorAll("[data-receipt-close]")
+              : [];
+            if (receiptModal) {
+              receiptCloseButtons.forEach((btn) =>
+                btn.addEventListener("click", () => receiptModal.classList.remove("open"))
+              );
+              receiptModal.addEventListener("click", (event) => {
+                if (event.target === receiptModal) {
+                  receiptModal.classList.remove("open");
+                }
+              });
+            }
+          </script>
         {% endif %}
         <section class="pos-search">
           <input
