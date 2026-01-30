@@ -101,6 +101,16 @@ def create_app():
         os.makedirs(receipt_folder, exist_ok=True)
     except PermissionError:
         app.logger.warning("No se pudo crear la carpeta de recibos.")
+        receipt_folder = None
+    if not receipt_folder or not os.path.isdir(receipt_folder):
+        fallback_folder = os.path.join("/tmp", "invagro-receipts")
+        try:
+            os.makedirs(fallback_folder, exist_ok=True)
+            receipt_folder = fallback_folder
+            app.logger.warning("Usando carpeta temporal de recibos: %s", receipt_folder)
+        except PermissionError:
+            receipt_folder = None
+            app.logger.warning("No se pudo crear la carpeta temporal de recibos.")
     app.config["RECEIPT_PDF_FOLDER"] = receipt_folder
 
     allowed_extensions = {"jpg", "jpeg", "png", "webp"}
@@ -170,7 +180,7 @@ def create_app():
 
     def cleanup_old_receipts(days=3):
         folder = app.config.get("RECEIPT_PDF_FOLDER")
-        if not folder:
+        if not folder or not os.path.isdir(folder):
             return
         cutoff = time.time() - days * 24 * 60 * 60
         try:
@@ -1340,6 +1350,9 @@ def create_app():
         doc.build(story)
 
     def create_receipt_pdf(file_path, settings, factura, cliente, usuario, monto, saldo):
+        parent_dir = os.path.dirname(file_path)
+        if parent_dir and not os.path.isdir(parent_dir):
+            os.makedirs(parent_dir, exist_ok=True)
         styles = getSampleStyleSheet()
         doc = SimpleDocTemplate(
             file_path,
@@ -2738,7 +2751,7 @@ def create_app():
         if not session.get("user"):
             return redirect(url_for("login"))
         folder = app.config.get("RECEIPT_PDF_FOLDER")
-        if not folder:
+        if not folder or not os.path.isdir(folder):
             abort(404)
         return send_from_directory(folder, filename, as_attachment=False)
 
