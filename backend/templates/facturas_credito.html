@@ -35,6 +35,18 @@
       </div>
 
       <main class="content-area">
+        {% if recibo_url %}
+          <div class="flash-messages">
+            <div class="alert alert-success">
+              Recibo generado:
+              <a href="{{ recibo_url }}" target="_blank">Ver PDF</a>
+              {% if whatsapp_url %}
+                &nbsp;|&nbsp;
+                <a href="{{ whatsapp_url }}" target="_blank">Enviar por WhatsApp</a>
+              {% endif %}
+            </div>
+          </div>
+        {% endif %}
         <section class="pos-search">
           <input
             type="text"

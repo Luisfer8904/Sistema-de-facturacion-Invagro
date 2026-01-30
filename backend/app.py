@@ -10,6 +10,7 @@ from uuid import uuid4
 
 import pymysql
 import requests
+import urllib.parse
 
 import click
 from sqlalchemy import bindparam, create_engine, func, text, or_
@@ -85,6 +86,12 @@ def create_app():
     except PermissionError:
         app.logger.warning("No se pudo crear la carpeta de facturas.")
     app.config["INVOICE_PDF_FOLDER"] = invoice_folder
+    receipt_folder = os.path.join(app.static_folder, "receipts")
+    try:
+        os.makedirs(receipt_folder, exist_ok=True)
+    except PermissionError:
+        app.logger.warning("No se pudo crear la carpeta de recibos.")
+    app.config["RECEIPT_PDF_FOLDER"] = receipt_folder
 
     allowed_extensions = {"jpg", "jpeg", "png", "webp"}
 
@@ -145,6 +152,26 @@ def create_app():
             if safe_token:
                 safe_name = f"{safe_name}-{safe_token}"
         return f"{safe_name}.pdf"
+
+    def build_receipt_pdf_filename(numero_factura, abono_id):
+        safe_base = re.sub(r"[\\/\\s]+", "-", numero_factura).strip("-")
+        safe_name = secure_filename(safe_base) or "recibo"
+        return f"recibo-{safe_name}-{abono_id}.pdf"
+
+    def cleanup_old_receipts(days=3):
+        folder = app.config.get("RECEIPT_PDF_FOLDER")
+        if not folder:
+            return
+        cutoff = time.time() - days * 24 * 60 * 60
+        try:
+            for filename in os.listdir(folder):
+                path = os.path.join(folder, filename)
+                if not os.path.isfile(path):
+                    continue
+                if os.path.getmtime(path) < cutoff:
+                    os.remove(path)
+        except Exception:
+            app.logger.exception("No se pudo limpiar recibos antiguos.")
 
     def normalize_text(text_value):
         if not text_value:
@@ -1300,6 +1327,69 @@ def create_app():
             footer_blocks.append(Paragraph(footer_text, styles["Normal"]))
         if footer_blocks:
             story.append(KeepTogether(footer_blocks))
+        doc.build(story)
+
+    def create_receipt_pdf(file_path, settings, factura, cliente, usuario, monto, saldo):
+        styles = getSampleStyleSheet()
+        doc = SimpleDocTemplate(
+            file_path,
+            pagesize=letter,
+            leftMargin=22,
+            rightMargin=22,
+            topMargin=22,
+            bottomMargin=22,
+        )
+        story = []
+
+        header_title = Paragraph("<b>RECIBO DE COBRO</b>", styles["Title"])
+        story.append(header_title)
+        story.append(Spacer(1, 6))
+
+        negocio = settings.nombre if settings and settings.nombre else "Negocio"
+        story.append(Paragraph(f"{negocio}", styles["Normal"]))
+        if settings:
+            if settings.rtn:
+                story.append(Paragraph(f"RTN: {settings.rtn}", styles["Normal"]))
+            if settings.telefono:
+                story.append(Paragraph(f"Telefono: {settings.telefono}", styles["Normal"]))
+            if settings.email:
+                story.append(Paragraph(f"Email: {settings.email}", styles["Normal"]))
+        story.append(Spacer(1, 8))
+
+        cliente_nombre = cliente.nombre if cliente else "N/A"
+        story.append(Paragraph(f"Cliente: {cliente_nombre}", styles["Normal"]))
+        if cliente and cliente.ruc_dni:
+            story.append(Paragraph(f"Documento: {cliente.ruc_dni}", styles["Normal"]))
+        fecha_factura = factura.fecha.strftime("%d/%m/%Y") if factura.fecha else "-"
+        story.append(Paragraph(f"Factura: {factura.numero_factura}", styles["Normal"]))
+        story.append(Paragraph(f"Fecha factura: {fecha_factura}", styles["Normal"]))
+        story.append(Paragraph(f"Fecha pago: {datetime.utcnow().strftime('%d/%m/%Y %H:%M')}", styles["Normal"]))
+        if usuario:
+            nombre_usuario = usuario.nombre_completo or usuario.username
+            story.append(Paragraph(f"Cobrador: {nombre_usuario}", styles["Normal"]))
+
+        story.append(Spacer(1, 10))
+        data = [
+            ["Total factura", f"L {float(factura.total or 0):,.2f}"],
+            ["Monto pagado", f"L {float(monto):,.2f}"],
+            ["Saldo restante", f"L {float(saldo):,.2f}"],
+        ]
+        table = Table(data, colWidths=[180, 130])
+        table.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#f3f4f6")),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.HexColor("#111827")),
+                    ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#d1d5db")),
+                    ("FONTNAME", (0, 0), (-1, -1), "Helvetica"),
+                    ("ALIGN", (1, 0), (-1, -1), "RIGHT"),
+                ]
+            )
+        )
+        story.append(table)
+        story.append(Spacer(1, 12))
+        story.append(Paragraph("Gracias por su pago.", styles["Normal"]))
+
         doc.build(story)
 
     if not app.debug and not app.testing:
@@ -2584,6 +2674,8 @@ def create_app():
         if not session.get("user"):
             return redirect(url_for("login"))
 
+        cleanup_old_receipts()
+
         try:
             facturas_raw = FacturaContado.query.filter_by(estado="credito").order_by(
                 FacturaContado.fecha.desc()
@@ -2612,11 +2704,23 @@ def create_app():
             )
         clientes = Cliente.query.all()
         clientes_map = {cliente.id: cliente.nombre for cliente in clientes}
+        recibo_filename = request.args.get("recibo")
+        recibo_url = None
+        whatsapp_url = None
+        if recibo_filename:
+            recibo_url = url_for("static", filename=f"receipts/{recibo_filename}")
+            full_link = request.url_root.rstrip("/") + recibo_url
+            whatsapp_url = (
+                "https://wa.me/?text="
+                + urllib.parse.quote(f"Recibo de cobro: {full_link}")
+            )
         return render_template(
             "facturas_credito.html",
             user=session["user"],
             facturas=facturas,
             clientes_map=clientes_map,
+            recibo_url=recibo_url,
+            whatsapp_url=whatsapp_url,
         )
 
     @app.post("/facturas/credito/<int:factura_id>/cobrar")
@@ -2632,25 +2736,47 @@ def create_app():
         if factura.estado != "credito":
             return redirect(url_for("facturas_credito"))
 
+        recibo_filename = None
         try:
             usuario = User.query.filter_by(username=session["user"]).first()
             usuario_id = usuario.id if usuario else None
             saldo = (factura.total or Decimal("0")) - (factura.pago or Decimal("0"))
             if saldo > 0:
-                db.session.add(
-                    AbonoFactura(
-                        factura_id=factura.id,
-                        usuario_id=usuario_id,
-                        monto=saldo,
-                        fecha=datetime.utcnow(),
-                    )
+                abono = AbonoFactura(
+                    factura_id=factura.id,
+                    usuario_id=usuario_id,
+                    monto=saldo,
+                    fecha=datetime.utcnow(),
                 )
+                db.session.add(abono)
+                db.session.flush()
             factura.estado = "pagada"
             factura.pago = factura.total
             factura.cambio = Decimal("0")
             db.session.commit()
+            if saldo > 0:
+                try:
+                    settings = get_business_settings()
+                    cliente = Cliente.query.get(factura.cliente_id) if factura.cliente_id else None
+                    recibo_filename = build_receipt_pdf_filename(
+                        factura.numero_factura, abono.id
+                    )
+                    pdf_path = os.path.join(app.config["RECEIPT_PDF_FOLDER"], recibo_filename)
+                    create_receipt_pdf(
+                        pdf_path,
+                        settings,
+                        factura,
+                        cliente,
+                        usuario,
+                        saldo,
+                        Decimal("0"),
+                    )
+                except Exception:
+                    app.logger.exception("No se pudo generar recibo de cobro.")
         except SQLAlchemyError:
             db.session.rollback()
+        if recibo_filename:
+            return redirect(url_for("facturas_credito", recibo=recibo_filename))
         return redirect(url_for("facturas_credito"))
 
     @app.post("/facturas/credito/<int:factura_id>/abonos")
@@ -2675,25 +2801,46 @@ def create_app():
         if monto > saldo:
             return redirect(url_for("facturas_credito"))
 
+        recibo_filename = None
         try:
             usuario = User.query.filter_by(username=session["user"]).first()
             usuario_id = usuario.id if usuario else None
-            db.session.add(
-                AbonoFactura(
-                    factura_id=factura.id,
-                    usuario_id=usuario_id,
-                    monto=monto,
-                    fecha=datetime.utcnow(),
-                )
+            abono = AbonoFactura(
+                factura_id=factura.id,
+                usuario_id=usuario_id,
+                monto=monto,
+                fecha=datetime.utcnow(),
             )
+            db.session.add(abono)
+            db.session.flush()
             factura.pago = pago_actual + monto
             nuevo_saldo = saldo - monto
             if nuevo_saldo <= 0:
                 factura.estado = "pagada"
                 factura.cambio = Decimal("0")
             db.session.commit()
+            try:
+                settings = get_business_settings()
+                cliente = Cliente.query.get(factura.cliente_id) if factura.cliente_id else None
+                recibo_filename = build_receipt_pdf_filename(
+                    factura.numero_factura, abono.id
+                )
+                pdf_path = os.path.join(app.config["RECEIPT_PDF_FOLDER"], recibo_filename)
+                create_receipt_pdf(
+                    pdf_path,
+                    settings,
+                    factura,
+                    cliente,
+                    usuario,
+                    monto,
+                    max(Decimal("0"), nuevo_saldo),
+                )
+            except Exception:
+                app.logger.exception("No se pudo generar recibo de abono.")
         except SQLAlchemyError:
             db.session.rollback()
+        if recibo_filename:
+            return redirect(url_for("facturas_credito", recibo=recibo_filename))
         return redirect(url_for("facturas_credito"))
 
     @app.get("/facturas/historial")
