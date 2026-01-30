@@ -12,7 +12,7 @@ import pymysql
 import requests
 
 import click
-from sqlalchemy import bindparam, create_engine, func, text
+from sqlalchemy import bindparam, create_engine, func, text, or_
 from flask import Flask, jsonify, redirect, render_template, request, session, url_for
 from sqlalchemy.exc import SQLAlchemyError
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -1476,7 +1476,11 @@ def create_app():
 
         clientes_list = Cliente.query.order_by(Cliente.nombre.asc()).all()
         clientes_map = {cliente.id: cliente.nombre for cliente in clientes_list}
-        pedidos_list = Pedido.query.order_by(Pedido.fecha.desc()).all()
+        pedidos_list = (
+            Pedido.query.filter(or_(Pedido.estado.is_(None), Pedido.estado != "facturado"))
+            .order_by(Pedido.fecha.desc())
+            .all()
+        )
         pedidos_view = []
         for pedido in pedidos_list:
             fecha_label = pedido.fecha.strftime("%d/%m/%Y") if pedido.fecha else "-"
