@@ -14,7 +14,17 @@ import urllib.parse
 
 import click
 from sqlalchemy import bindparam, create_engine, func, text, or_
-from flask import Flask, jsonify, redirect, render_template, request, session, url_for
+from flask import (
+    Flask,
+    abort,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    send_from_directory,
+    session,
+    url_for,
+)
 from sqlalchemy.exc import SQLAlchemyError
 from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
@@ -2708,7 +2718,7 @@ def create_app():
         recibo_url = None
         whatsapp_url = None
         if recibo_filename:
-            recibo_url = url_for("static", filename=f"receipts/{recibo_filename}")
+            recibo_url = url_for("receipt_file", filename=recibo_filename)
             full_link = request.url_root.rstrip("/") + recibo_url
             whatsapp_url = (
                 "https://wa.me/?text="
@@ -2722,6 +2732,15 @@ def create_app():
             recibo_url=recibo_url,
             whatsapp_url=whatsapp_url,
         )
+
+    @app.get("/receipts/<path:filename>")
+    def receipt_file(filename):
+        if not session.get("user"):
+            return redirect(url_for("login"))
+        folder = app.config.get("RECEIPT_PDF_FOLDER")
+        if not folder:
+            abort(404)
+        return send_from_directory(folder, filename, as_attachment=False)
 
     @app.post("/facturas/credito/<int:factura_id>/cobrar")
     def cobrar_factura_credito(factura_id):
