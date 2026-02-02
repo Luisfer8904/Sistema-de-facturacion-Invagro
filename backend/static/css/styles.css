@@ -474,21 +474,30 @@ body {
 .dashboard-container {
   display: flex;
   min-height: 100vh;
+  --sidebar-expanded: 260px;
+  --sidebar-collapsed: 76px;
 }
 
 .sidebar {
-  width: 260px;
+  width: var(--sidebar-collapsed);
   background: linear-gradient(180deg, #2c7a3f, #2c3e50);
   color: #ffffff;
   position: fixed;
   inset: 0 auto 0 0;
   padding: 24px 0;
+  transition: width 0.2s ease;
+}
+
+.sidebar:hover,
+.sidebar:focus-within {
+  width: var(--sidebar-expanded);
 }
 
 .sidebar-header {
   text-align: center;
   padding: 0 20px 20px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  transition: padding 0.2s ease;
 }
 
 .sidebar-logo {
@@ -498,6 +507,7 @@ body {
   object-fit: cover;
   border: 3px solid #ffffff;
   margin-bottom: 10px;
+  transition: width 0.2s ease, height 0.2s ease, margin 0.2s ease;
 }
 
 .sidebar-nav {
@@ -511,6 +521,20 @@ body {
   text-decoration: none;
   border-left: 4px solid transparent;
   transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sidebar-nav .nav-icon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.sidebar-nav .nav-text {
+  white-space: nowrap;
+  transition: opacity 0.2s ease, width 0.2s ease;
 }
 
 .sidebar-nav .nav-item:hover,
@@ -534,11 +558,51 @@ body {
   border-radius: 50%;
   object-fit: cover;
   border: 2px solid #ffffff;
+  transition: width 0.2s ease, height 0.2s ease;
 }
 
 .main-content {
-  margin-left: 260px;
+  margin-left: var(--sidebar-collapsed);
   flex: 1;
+  transition: margin-left 0.2s ease;
+}
+
+.sidebar:hover ~ .main-content,
+.sidebar:focus-within ~ .main-content {
+  margin-left: var(--sidebar-expanded);
+}
+
+.sidebar:not(:hover):not(:focus-within) .nav-text {
+  opacity: 0;
+  width: 0;
+  overflow: hidden;
+}
+
+.sidebar:not(:hover):not(:focus-within) .nav-item {
+  justify-content: center;
+  padding: 14px 0;
+}
+
+.sidebar:not(:hover):not(:focus-within) .sidebar-header h3 {
+  opacity: 0;
+  height: 0;
+  margin: 0;
+  overflow: hidden;
+}
+
+.sidebar:not(:hover):not(:focus-within) .sidebar-logo {
+  width: 46px;
+  height: 46px;
+  margin-bottom: 0;
+}
+
+.sidebar:not(:hover):not(:focus-within) .sidebar-footer {
+  justify-content: center;
+}
+
+.sidebar:not(:hover):not(:focus-within) .sidebar-mascot {
+  width: 42px;
+  height: 42px;
 }
 
 .topbar {
@@ -1653,12 +1717,35 @@ body {
 @media (max-width: 900px) {
   .dashboard-container {
     flex-direction: column;
+    --sidebar-expanded: 100%;
+    --sidebar-collapsed: 100%;
   }
 
   .sidebar {
     position: relative;
     width: 100%;
     height: auto;
+  }
+
+  .sidebar:hover,
+  .sidebar:focus-within {
+    width: 100%;
+  }
+
+  .sidebar:not(:hover):not(:focus-within) .nav-text {
+    opacity: 1;
+    width: auto;
+  }
+
+  .sidebar:not(:hover):not(:focus-within) .nav-item {
+    justify-content: flex-start;
+    padding: 14px 26px;
+  }
+
+  .sidebar:not(:hover):not(:focus-within) .sidebar-header h3 {
+    opacity: 1;
+    height: auto;
+    margin: initial;
   }
 
   .main-content {
