@@ -1409,6 +1409,7 @@ def create_app():
         if request.method == "POST":
             username = request.form.get("username", "").strip()
             password = request.form.get("password", "").strip()
+            remember = request.form.get("remember") == "on"
 
             if not username or not password:
                 return render_template(
@@ -1430,6 +1431,7 @@ def create_app():
                     error="Usuario o contrasena incorrectos.",
                 )
 
+            session.permanent = remember
             session["user"] = user.username
             return redirect(url_for("dashboard"))
 
@@ -1493,7 +1495,7 @@ def create_app():
 
     @app.get("/logout")
     def logout():
-        session.pop("user", None)
+        session.clear()
         return redirect(url_for("login"))
 
     @app.route("/clientes", methods=["GET", "POST"])
