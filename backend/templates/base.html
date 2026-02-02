@@ -7,17 +7,20 @@
     <link rel="icon" href="/static/assets/logo-cuadrado.png" />
     <link rel="stylesheet" href="/static/css/styles.css" />
   </head>
-  <body class="{% block body_class %}page{% endblock %}">
-    <header class="site-header">
-      <a href="/" class="logo">
-        <img src="/static/assets/logo.jpg" alt="Logo Invagro" class="logo-image" />
-        <span>Invagro</span>
-      </a>
-      <nav class="menu">
-        <a href="/">Inicio</a>
-        <a href="/login">Ingresar</a>
-      </nav>
-    </header>
+  {% set body_class_value = self.body_class() %}
+  <body class="{{ body_class_value }}">
+    {% if "dashboard-page" not in body_class_value %}
+      <header class="site-header">
+        <a href="/" class="logo">
+          <img src="/static/assets/logo.jpg" alt="Logo Invagro" class="logo-image" />
+          <span>Invagro</span>
+        </a>
+        <nav class="menu">
+          <a href="/">Inicio</a>
+          <a href="/login">Ingresar</a>
+        </nav>
+      </header>
+    {% endif %}
     {% block content %}{% endblock %}
     <div class="chat-overlay" id="chatOverlay" aria-hidden="true">
       <div class="chat-drawer" role="dialog" aria-modal="true" aria-labelledby="chatTitle">
