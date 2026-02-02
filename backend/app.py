@@ -2746,6 +2746,57 @@ def create_app():
             whatsapp_url=whatsapp_url,
         )
 
+    @app.get("/pagos")
+    def pagos():
+        if not session.get("user"):
+            return redirect(url_for("login"))
+
+        try:
+            pagos_raw = (
+                db.session.query(AbonoFactura, FacturaContado, Cliente, User)
+                .outerjoin(FacturaContado, AbonoFactura.factura_id == FacturaContado.id)
+                .outerjoin(Cliente, FacturaContado.cliente_id == Cliente.id)
+                .outerjoin(User, AbonoFactura.usuario_id == User.id)
+                .order_by(AbonoFactura.fecha.desc())
+                .all()
+            )
+        except SQLAlchemyError:
+            db.session.rollback()
+            pagos_raw = []
+
+        pagos_view = []
+        for abono, factura, cliente, usuario in pagos_raw:
+            fecha = abono.fecha if abono else None
+            fecha_label = fecha.strftime("%d/%m/%Y") if fecha else "-"
+            fecha_iso = fecha.strftime("%Y-%m-%d") if fecha else ""
+            numero_factura = factura.numero_factura if factura else "-"
+            cliente_nombre = cliente.nombre if cliente else "N/A"
+            usuario_nombre = (
+                usuario.nombre_completo
+                if usuario and usuario.nombre_completo
+                else (usuario.username if usuario else "N/A")
+            )
+            saldo = Decimal("0")
+            if factura:
+                saldo = (factura.total or Decimal("0")) - (factura.pago or Decimal("0"))
+            pagos_view.append(
+                {
+                    "fecha_label": fecha_label,
+                    "fecha_iso": fecha_iso,
+                    "numero_factura": numero_factura,
+                    "cliente": cliente_nombre,
+                    "monto": abono.monto if abono else Decimal("0"),
+                    "saldo": saldo,
+                    "usuario": usuario_nombre,
+                }
+            )
+
+        return render_template(
+            "pagos.html",
+            user=session["user"],
+            pagos=pagos_view,
+        )
+
     @app.get("/receipts/<path:filename>")
     def receipt_file(filename):
         if not session.get("user"):

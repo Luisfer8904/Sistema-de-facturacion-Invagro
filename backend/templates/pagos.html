@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% block title %}Pagos | Invagro{% endblock %}
+{% block body_class %}page dashboard-page{% endblock %}
+{% block content %}
+  <div class="dashboard-container">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <img class="sidebar-logo" src="/static/assets/logo.jpg" alt="Invagro" />
+        <h3>Invagro</h3>
+      </div>
+      <nav class="sidebar-nav">
+        <a class="nav-item" href="/dashboard">Dashboard</a>
+        <a class="nav-item" href="/facturacion">Facturacion</a>
+        <a class="nav-item" href="/pedidos">Pedidos</a>
+        <a class="nav-item" href="/facturas/credito">Facturas credito</a>
+        <a class="nav-item active" href="/pagos">Pagos</a>
+        <a class="nav-item" href="/facturas/historial">Historial facturas</a>
+        <a class="nav-item" href="/clientes">Clientes</a>
+        <a class="nav-item" href="/productos">Productos</a>
+        <a class="nav-item" href="/reportes">Reportes</a>
+        <a class="nav-item" href="/ajustes">Ajustes</a>
+      </nav>
+      <div class="sidebar-footer">
+        <img class="sidebar-mascot" src="/static/assets/mascota.jpeg" alt="Mascota" />
+      </div>
+    </aside>
+
+    <div class="main-content">
+      <div class="topbar">
+        <div class="topbar-left">
+          <h2>Pagos</h2>
+        </div>
+        <div class="topbar-right">
+          <span class="user-pill">Sesion: {{ user }}</span>
+        </div>
+      </div>
+
+      <main class="content-area">
+        <section class="pos-search">
+          <input
+            type="text"
+            placeholder="Buscar por cliente, factura o usuario"
+            id="payments-search"
+          />
+          <input type="date" id="payments-from" />
+          <input type="date" id="payments-to" />
+          <button class="primary-button" type="button" id="clear-payments-search">
+            Limpiar
+          </button>
+        </section>
+        <section class="module-table">
+          <div class="table-header table-seven">
+            <span>Fecha</span>
+            <span>Factura</span>
+            <span>Cliente</span>
+            <span>Monto</span>
+            <span>Saldo</span>
+            <span>Usuario</span>
+            <span>Acciones</span>
+          </div>
+          {% if pagos %}
+            {% for pago in pagos %}
+              <div
+                class="table-row table-seven"
+                data-name="{{ pago.cliente }}"
+                data-invoice="{{ pago.numero_factura }}"
+                data-user="{{ pago.usuario }}"
+                data-date="{{ pago.fecha_iso }}"
+              >
+                <span>{{ pago.fecha_label }}</span>
+                <span>{{ pago.numero_factura }}</span>
+                <span>{{ pago.cliente }}</span>
+                <span>L {{ "%.2f"|format(pago.monto or 0) }}</span>
+                <span>L {{ "%.2f"|format(pago.saldo or 0) }}</span>
+                <span>{{ pago.usuario }}</span>
+                <span>-</span>
+              </div>
+            {% endfor %}
+          {% else %}
+            <div class="table-row table-seven">
+              <span>Sin registros</span>
+              <span>-</span>
+              <span>-</span>
+              <span>-</span>
+              <span>-</span>
+              <span>-</span>
+              <span>-</span>
+            </div>
+          {% endif %}
+        </section>
+      </main>
+    </div>
+  </div>
+  <script>
+    const paymentsSearch = document.getElementById("payments-search");
+    const paymentsFrom = document.getElementById("payments-from");
+    const paymentsTo = document.getElementById("payments-to");
+    const clearPaymentsSearch = document.getElementById("clear-payments-search");
+    const paymentRows = Array.from(document.querySelectorAll(".table-row.table-seven"));
+
+    const applyPaymentFilter = () => {
+      const query = paymentsSearch ? paymentsSearch.value.trim().toLowerCase() : "";
+      const fromDate = paymentsFrom ? paymentsFrom.value : "";
+      const toDate = paymentsTo ? paymentsTo.value : "";
+      paymentRows.forEach((row) => {
+        const name = (row.dataset.name || "").toLowerCase();
+        const invoice = (row.dataset.invoice || "").toLowerCase();
+        const user = (row.dataset.user || "").toLowerCase();
+        const date = row.dataset.date || "";
+        const matchesText = !query || name.includes(query) || invoice.includes(query) || user.includes(query);
+        const matchesFrom = !fromDate || (date && date >= fromDate);
+        const matchesTo = !toDate || (date && date <= toDate);
+        row.style.display = matchesText && matchesFrom && matchesTo ? "grid" : "none";
+      });
+    };
+
+    if (paymentsSearch) {
+      paymentsSearch.addEventListener("input", applyPaymentFilter);
+    }
+    if (paymentsFrom) {
+      paymentsFrom.addEventListener("change", applyPaymentFilter);
+    }
+    if (paymentsTo) {
+      paymentsTo.addEventListener("change", applyPaymentFilter);
+    }
+    if (clearPaymentsSearch) {
+      clearPaymentsSearch.addEventListener("click", () => {
+        if (paymentsSearch) paymentsSearch.value = "";
+        if (paymentsFrom) paymentsFrom.value = "";
+        if (paymentsTo) paymentsTo.value = "";
+        applyPaymentFilter();
+      });
+    }
+  </script>
+{% endblock %}
