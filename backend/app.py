@@ -1402,7 +1402,7 @@ def create_app():
 
     @app.get("/")
     def landing():
-        return render_template("index.html")
+        return render_template("landing.html")
 
     @app.route("/login", methods=["GET", "POST"])
     def login():
