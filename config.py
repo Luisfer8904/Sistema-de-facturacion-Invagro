@@ -26,7 +26,7 @@ class Config:
     SESSION_COOKIE_SECURE = False  # Cambiar a True en producción con HTTPS
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = 'Lax'
-    PERMANENT_SESSION_LIFETIME = timedelta(days=30)
+    PERMANENT_SESSION_LIFETIME = timedelta(days=7)
     
     # Aplicación
     APP_NAME = os.environ.get('APP_NAME', 'Invagro - Sistema de Facturación')
