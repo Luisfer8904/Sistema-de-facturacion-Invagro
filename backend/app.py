@@ -102,15 +102,6 @@ def create_app():
     except PermissionError:
         app.logger.warning("No se pudo crear la carpeta de recibos.")
         receipt_folder = None
-    if not receipt_folder or not os.path.isdir(receipt_folder):
-        fallback_folder = os.path.join("/tmp", "invagro-receipts")
-        try:
-            os.makedirs(fallback_folder, exist_ok=True)
-            receipt_folder = fallback_folder
-            app.logger.warning("Usando carpeta temporal de recibos: %s", receipt_folder)
-        except PermissionError:
-            receipt_folder = None
-            app.logger.warning("No se pudo crear la carpeta temporal de recibos.")
     app.config["RECEIPT_PDF_FOLDER"] = receipt_folder
 
     allowed_extensions = {"jpg", "jpeg", "png", "webp"}
@@ -178,20 +169,8 @@ def create_app():
         safe_name = secure_filename(safe_base) or "recibo"
         return f"recibo-{safe_name}-{abono_id}.pdf"
 
-    def cleanup_old_receipts(days=3):
-        folder = app.config.get("RECEIPT_PDF_FOLDER")
-        if not folder or not os.path.isdir(folder):
-            return
-        cutoff = time.time() - days * 24 * 60 * 60
-        try:
-            for filename in os.listdir(folder):
-                path = os.path.join(folder, filename)
-                if not os.path.isfile(path):
-                    continue
-                if os.path.getmtime(path) < cutoff:
-                    os.remove(path)
-        except Exception:
-            app.logger.exception("No se pudo limpiar recibos antiguos.")
+    def cleanup_old_receipts():
+        return
 
     def normalize_text(text_value):
         if not text_value:
@@ -2697,8 +2676,6 @@ def create_app():
         if not session.get("user"):
             return redirect(url_for("login"))
 
-        cleanup_old_receipts()
-
         try:
             facturas_raw = FacturaContado.query.filter_by(estado="credito").order_by(
                 FacturaContado.fecha.desc()
@@ -2779,6 +2756,16 @@ def create_app():
             saldo = Decimal("0")
             if factura:
                 saldo = (factura.total or Decimal("0")) - (factura.pago or Decimal("0"))
+            recibo_filename = None
+            recibo_url = None
+            receipts_folder = app.config.get("RECEIPT_PDF_FOLDER")
+            if factura and abono and receipts_folder:
+                recibo_filename = build_receipt_pdf_filename(
+                    factura.numero_factura, abono.id
+                )
+                recibo_path = os.path.join(receipts_folder, recibo_filename)
+                if os.path.isfile(recibo_path):
+                    recibo_url = url_for("receipt_file", filename=recibo_filename)
             pagos_view.append(
                 {
                     "fecha_label": fecha_label,
@@ -2788,6 +2775,7 @@ def create_app():
                     "monto": abono.monto if abono else Decimal("0"),
                     "saldo": saldo,
                     "usuario": usuario_nombre,
+                    "recibo_url": recibo_url,
                 }
             )
 

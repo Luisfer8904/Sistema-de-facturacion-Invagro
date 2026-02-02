@@ -56,7 +56,7 @@
             <span>Monto</span>
             <span>Saldo</span>
             <span>Usuario</span>
-            <span>Acciones</span>
+            <span>Recibo</span>
           </div>
           {% if pagos %}
             {% for pago in pagos %}
@@ -73,7 +73,13 @@
                 <span>L {{ "%.2f"|format(pago.monto or 0) }}</span>
                 <span>L {{ "%.2f"|format(pago.saldo or 0) }}</span>
                 <span>{{ pago.usuario }}</span>
-                <span>-</span>
+                <span>
+                  {% if pago.recibo_url %}
+                    <a class="secondary-button" href="{{ pago.recibo_url }}" target="_blank">Ver PDF</a>
+                  {% else %}
+                    -
+                  {% endif %}
+                </span>
               </div>
             {% endfor %}
           {% else %}
