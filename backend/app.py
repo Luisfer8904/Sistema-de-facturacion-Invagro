@@ -1449,6 +1449,9 @@ def create_app():
             clientes_count = Cliente.query.count()
             productos_count = Producto.query.filter_by(activo=True).count()
             facturas_credito_count = FacturaContado.query.filter_by(estado="credito").count()
+            pedidos_total = (
+                db.session.query(func.coalesce(func.sum(Pedido.total), 0)).scalar() or 0
+            )
             credito_total = (
                 db.session.query(func.coalesce(func.sum(FacturaContado.total), 0))
                 .filter(FacturaContado.estado == "credito")
@@ -1478,6 +1481,7 @@ def create_app():
             clientes_count = 0
             productos_count = 0
             facturas_credito_count = 0
+            pedidos_total = 0
             credito_total = 0
             credito_menor_30 = 0
             credito_mayor_30 = 0
@@ -1488,6 +1492,7 @@ def create_app():
             clientes_count=clientes_count,
             productos_count=productos_count,
             facturas_credito_count=facturas_credito_count,
+            pedidos_total=pedidos_total,
             credito_total=credito_total,
             credito_menor_30=credito_menor_30,
             credito_mayor_30=credito_mayor_30,

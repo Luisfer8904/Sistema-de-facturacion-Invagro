@@ -37,9 +37,25 @@
       </div>
 
       <main class="content-area">
-        <section class="welcome-card">
-          <h1>Bienvenido</h1>
-          <p>Tu panel de control esta listo para gestionar la facturacion.</p>
+        <section class="welcome-card dashboard-hero">
+          <div class="welcome-content">
+            <h1>Bienvenido, {{ user }}</h1>
+            <p>Tu panel de control esta listo para gestionar la facturacion y las ventas del dia.</p>
+            <div class="hero-actions">
+              <a class="primary-button" href="/facturacion">Nueva factura</a>
+              <a class="secondary-button" href="/reportes">Ver reportes</a>
+            </div>
+          </div>
+          <div class="welcome-metrics">
+            <div class="metric">
+              <span>Total pedidos</span>
+              <strong>L {{ "{:,.2f}".format(pedidos_total or 0) }}</strong>
+            </div>
+            <div class="metric">
+              <span>Credito pendiente</span>
+              <strong>{{ "{:,}".format(facturas_credito_count or 0) }}</strong>
+            </div>
+          </div>
         </section>
 
         <section class="modules-grid">
@@ -71,6 +87,10 @@
         </section>
 
         <section class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-label">Total pedidos</div>
+            <div class="stat-value">L {{ "{:,.2f}".format(pedidos_total or 0) }}</div>
+          </div>
           <div class="stat-card">
             <div class="stat-label">Credito pendiente</div>
             <div class="stat-value">{{ "{:,}".format(facturas_credito_count or 0) }}</div>
