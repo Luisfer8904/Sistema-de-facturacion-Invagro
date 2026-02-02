@@ -103,15 +103,23 @@
           <div class="pos-client">
             <div>
               <label>Cliente</label>
-              <input type="text" id="cliente-search" placeholder="Buscar cliente..." />
-              <select id="cliente-select">
-                <option value="">Selecciona un cliente</option>
-                {% for cliente in clientes %}
-                  <option value="{{ cliente.id }}" data-rtn="{{ cliente.ruc_dni or '' }}">
-                    {{ cliente.nombre }}
-                  </option>
-                {% endfor %}
-              </select>
+              <div class="cliente-dropdown" id="cliente-dropdown">
+                <button type="button" class="cliente-dropdown-toggle" id="cliente-toggle">
+                  Selecciona un cliente
+                </button>
+                <div class="cliente-dropdown-panel" id="cliente-panel">
+                  <input type="text" id="cliente-search" placeholder="Buscar cliente..." />
+                  <div class="cliente-options" id="cliente-options"></div>
+                </div>
+                <select id="cliente-select" class="cliente-select-hidden">
+                  <option value="">Selecciona un cliente</option>
+                  {% for cliente in clientes %}
+                    <option value="{{ cliente.id }}" data-rtn="{{ cliente.ruc_dni or '' }}">
+                      {{ cliente.nombre }}
+                    </option>
+                  {% endfor %}
+                </select>
+              </div>
             </div>
             <div>
               <label>RTN</label>
@@ -273,6 +281,10 @@
     const clearSearch = document.getElementById("clear-search");
     const tabs = document.querySelectorAll(".pos-tabs .tab");
     const clientSelect = document.getElementById("cliente-select");
+    const clientDropdown = document.getElementById("cliente-dropdown");
+    const clientToggle = document.getElementById("cliente-toggle");
+    const clientPanel = document.getElementById("cliente-panel");
+    const clientOptionsContainer = document.getElementById("cliente-options");
     const clientSearch = document.getElementById("cliente-search");
     const clientRtnInput = document.getElementById("cliente-rtn");
     const pedidoSelect = document.getElementById("pedido-select");
@@ -316,37 +328,100 @@
       return new Date(date.getTime() - offset).toISOString().slice(0, 10);
     };
 
-    const renderClientOptions = (query) => {
+    const updateClientSelection = () => {
       if (!clientSelect) {
         return;
       }
+      const option = clientSelect.options[clientSelect.selectedIndex];
+      const label = option && option.value ? option.textContent.trim() : "Selecciona un cliente";
+      if (clientToggle) {
+        clientToggle.textContent = label;
+      }
+      if (clientRtnInput) {
+        clientRtnInput.value = option ? option.dataset.rtn || "" : "";
+      }
+    };
+
+    const renderClientOptions = (query) => {
+      if (!clientOptionsContainer) {
+        return;
+      }
       const normalized = (query || "").toLowerCase().trim();
-      const currentValue = clientSelect.value;
-      clientSelect.innerHTML = "";
-      const emptyOption = document.createElement("option");
-      emptyOption.value = "";
-      emptyOption.textContent = "Selecciona un cliente";
-      clientSelect.appendChild(emptyOption);
+      clientOptionsContainer.innerHTML = "";
+      let matches = 0;
       clientOptions.forEach((option) => {
         if (!option.value) {
           return;
         }
         const name = (option.textContent || "").toLowerCase();
         if (!normalized || name.includes(normalized)) {
-          const cloned = option.cloneNode(true);
-          if (cloned.value === currentValue) {
-            cloned.selected = true;
+          matches += 1;
+          const item = document.createElement("button");
+          item.type = "button";
+          item.className = "cliente-option";
+          item.dataset.value = option.value;
+          item.dataset.rtn = option.dataset.rtn || "";
+          item.textContent = option.textContent.trim();
+          if (clientSelect && clientSelect.value === option.value) {
+            item.classList.add("active");
           }
-          clientSelect.appendChild(cloned);
+          item.addEventListener("click", () => {
+            if (clientSelect) {
+              clientSelect.value = option.value;
+            }
+            updateClientSelection();
+            if (clientSearch) {
+              renderClientOptions(clientSearch.value);
+            }
+            if (clientPanel) {
+              clientPanel.classList.remove("open");
+            }
+          });
+          clientOptionsContainer.appendChild(item);
         }
       });
+      if (matches === 0) {
+        const empty = document.createElement("div");
+        empty.className = "cliente-option-empty";
+        empty.textContent = "No hay resultados";
+        clientOptionsContainer.appendChild(empty);
+      }
     };
+
+    const closeClientDropdown = () => {
+      if (clientPanel) {
+        clientPanel.classList.remove("open");
+      }
+    };
+
+    if (clientToggle && clientPanel) {
+      clientToggle.addEventListener("click", () => {
+        clientPanel.classList.toggle("open");
+        if (clientPanel.classList.contains("open")) {
+          renderClientOptions(clientSearch ? clientSearch.value : "");
+        }
+        if (clientPanel.classList.contains("open") && clientSearch) {
+          clientSearch.focus();
+        }
+      });
+    }
 
     if (clientSearch) {
       clientSearch.addEventListener("input", (event) => {
         renderClientOptions(event.target.value);
       });
     }
+
+    if (clientDropdown) {
+      document.addEventListener("click", (event) => {
+        if (!clientDropdown.contains(event.target)) {
+          closeClientDropdown();
+        }
+      });
+    }
+
+    renderClientOptions("");
+    updateClientSelection();
 
     const updateTotals = () => {
       const rows = invoiceTable.querySelectorAll(".invoice-row");
@@ -492,8 +567,10 @@
 
     if (clientSelect && clientRtnInput) {
       clientSelect.addEventListener("change", () => {
-        const option = clientSelect.options[clientSelect.selectedIndex];
-        clientRtnInput.value = option ? option.dataset.rtn || "" : "";
+        updateClientSelection();
+        if (clientSearch) {
+          renderClientOptions(clientSearch.value);
+        }
       });
     }
 
@@ -525,8 +602,9 @@
         );
         if (option) {
           clientSelect.value = String(pedidoData.cliente_id);
-          if (clientRtnInput) {
-            clientRtnInput.value = option.dataset.rtn || pedidoData.rtn || "";
+          updateClientSelection();
+          if (clientRtnInput && pedidoData.rtn) {
+            clientRtnInput.value = pedidoData.rtn;
           }
         } else if (clientRtnInput) {
           clientRtnInput.value = pedidoData.rtn || "";
