@@ -103,6 +103,7 @@
           <div class="pos-client">
             <div>
               <label>Cliente</label>
+              <input type="text" id="cliente-search" placeholder="Buscar cliente..." />
               <select id="cliente-select">
                 <option value="">Selecciona un cliente</option>
                 {% for cliente in clientes %}
@@ -272,6 +273,7 @@
     const clearSearch = document.getElementById("clear-search");
     const tabs = document.querySelectorAll(".pos-tabs .tab");
     const clientSelect = document.getElementById("cliente-select");
+    const clientSearch = document.getElementById("cliente-search");
     const clientRtnInput = document.getElementById("cliente-rtn");
     const pedidoSelect = document.getElementById("pedido-select");
     const loadOrderButton = document.getElementById("load-order");
@@ -300,6 +302,9 @@
     const invoicePdfLink = document.getElementById("invoice-pdf-link");
     const invoiceWhatsappLink = document.getElementById("invoice-whatsapp-link");
     const productMap = new Map(productCards.map((card) => [card.dataset.id, card]));
+    const clientOptions = clientSelect
+      ? Array.from(clientSelect.querySelectorAll("option"))
+      : [];
     let modalTotalValue = 0;
     let modalInvoiceType = "contado";
     let currentPedidoId = null;
@@ -310,6 +315,38 @@
       const offset = date.getTimezoneOffset() * 60000;
       return new Date(date.getTime() - offset).toISOString().slice(0, 10);
     };
+
+    const renderClientOptions = (query) => {
+      if (!clientSelect) {
+        return;
+      }
+      const normalized = (query || "").toLowerCase().trim();
+      const currentValue = clientSelect.value;
+      clientSelect.innerHTML = "";
+      const emptyOption = document.createElement("option");
+      emptyOption.value = "";
+      emptyOption.textContent = "Selecciona un cliente";
+      clientSelect.appendChild(emptyOption);
+      clientOptions.forEach((option) => {
+        if (!option.value) {
+          return;
+        }
+        const name = (option.textContent || "").toLowerCase();
+        if (!normalized || name.includes(normalized)) {
+          const cloned = option.cloneNode(true);
+          if (cloned.value === currentValue) {
+            cloned.selected = true;
+          }
+          clientSelect.appendChild(cloned);
+        }
+      });
+    };
+
+    if (clientSearch) {
+      clientSearch.addEventListener("input", (event) => {
+        renderClientOptions(event.target.value);
+      });
+    }
 
     const updateTotals = () => {
       const rows = invoiceTable.querySelectorAll(".invoice-row");
