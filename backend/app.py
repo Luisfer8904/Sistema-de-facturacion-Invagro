@@ -100,8 +100,13 @@ def create_app():
     try:
         os.makedirs(receipt_folder, exist_ok=True)
     except PermissionError:
-        app.logger.warning("No se pudo crear la carpeta de recibos.")
-        receipt_folder = None
+        app.logger.warning("No se pudo crear la carpeta de recibos en static.")
+        receipt_folder = os.path.join(app.instance_path, "receipts")
+        try:
+            os.makedirs(receipt_folder, exist_ok=True)
+        except PermissionError:
+            app.logger.warning("No se pudo crear la carpeta de recibos en instance.")
+            receipt_folder = None
     app.config["RECEIPT_PDF_FOLDER"] = receipt_folder
 
     allowed_extensions = {"jpg", "jpeg", "png", "webp"}
@@ -168,6 +173,27 @@ def create_app():
         safe_base = re.sub(r"[\\/\\s]+", "-", numero_factura).strip("-")
         safe_name = secure_filename(safe_base) or "recibo"
         return f"recibo-{safe_name}-{abono_id}.pdf"
+
+    def generate_receipt_pdf(settings, factura, cliente, usuario, monto, saldo, abono_id):
+        receipts_folder = app.config.get("RECEIPT_PDF_FOLDER")
+        if not receipts_folder:
+            app.logger.warning("Carpeta de recibos no configurada.")
+            return None
+        recibo_filename = build_receipt_pdf_filename(factura.numero_factura, abono_id)
+        pdf_path = os.path.join(receipts_folder, recibo_filename)
+        create_receipt_pdf(
+            pdf_path,
+            settings,
+            factura,
+            cliente,
+            usuario,
+            monto,
+            saldo,
+        )
+        if os.path.isfile(pdf_path):
+            return recibo_filename
+        app.logger.warning("No se genero el PDF del recibo en %s.", pdf_path)
+        return None
 
     def cleanup_old_receipts():
         return
@@ -2835,19 +2861,19 @@ def create_app():
             if saldo > 0:
                 try:
                     settings = get_business_settings()
-                    cliente = Cliente.query.get(factura.cliente_id) if factura.cliente_id else None
-                    recibo_filename = build_receipt_pdf_filename(
-                        factura.numero_factura, abono.id
+                    cliente = (
+                        Cliente.query.get(factura.cliente_id)
+                        if factura.cliente_id
+                        else None
                     )
-                    pdf_path = os.path.join(app.config["RECEIPT_PDF_FOLDER"], recibo_filename)
-                    create_receipt_pdf(
-                        pdf_path,
+                    recibo_filename = generate_receipt_pdf(
                         settings,
                         factura,
                         cliente,
                         usuario,
                         saldo,
                         Decimal("0"),
+                        abono.id,
                     )
                 except Exception:
                     app.logger.exception("No se pudo generar recibo de cobro.")
@@ -2899,19 +2925,19 @@ def create_app():
             db.session.commit()
             try:
                 settings = get_business_settings()
-                cliente = Cliente.query.get(factura.cliente_id) if factura.cliente_id else None
-                recibo_filename = build_receipt_pdf_filename(
-                    factura.numero_factura, abono.id
+                cliente = (
+                    Cliente.query.get(factura.cliente_id)
+                    if factura.cliente_id
+                    else None
                 )
-                pdf_path = os.path.join(app.config["RECEIPT_PDF_FOLDER"], recibo_filename)
-                create_receipt_pdf(
-                    pdf_path,
+                recibo_filename = generate_receipt_pdf(
                     settings,
                     factura,
                     cliente,
                     usuario,
                     monto,
                     max(Decimal("0"), nuevo_saldo),
+                    abono.id,
                 )
             except Exception:
                 app.logger.exception("No se pudo generar recibo de abono.")
