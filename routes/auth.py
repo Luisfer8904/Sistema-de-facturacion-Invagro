@@ -18,7 +18,8 @@ def login():
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
-        remember = request.form.get('remember', False)
+        remember_raw = (request.form.get('remember') or '').strip().lower()
+        remember = remember_raw in {'on', 'true', '1', 'yes'}
         
         # Validar campos
         if not username or not password:

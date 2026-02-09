@@ -1,4 +1,5 @@
 import os
+from datetime import timedelta
 from dotenv import load_dotenv
 
 # Cargar variables de entorno
@@ -13,11 +14,16 @@ class Config:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ECHO = True
     
-    # Flask-Login
-    REMEMBER_COOKIE_DURATION = 3600  # 1 hora
+    # Sesion y recordar cuenta
+    REMEMBER_COOKIE_DURATION = timedelta(days=7)
+    REMEMBER_COOKIE_HTTPONLY = True
+    REMEMBER_COOKIE_SAMESITE = 'Lax'
+    REMEMBER_COOKIE_SECURE = False
     SESSION_COOKIE_SECURE = False
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = 'Lax'
+    SESSION_REFRESH_EACH_REQUEST = False
+    PERMANENT_SESSION_LIFETIME = timedelta(days=7)
     
     # Aplicación
     APP_NAME = os.environ.get('APP_NAME', 'Invagro - Sistema de Facturación')

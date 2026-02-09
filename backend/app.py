@@ -1435,7 +1435,8 @@ def create_app():
         if request.method == "POST":
             username = request.form.get("username", "").strip()
             password = request.form.get("password", "").strip()
-            remember = request.form.get("remember") == "on"
+            remember_raw = (request.form.get("remember") or "").strip().lower()
+            remember = remember_raw in {"on", "true", "1", "yes"}
 
             if not username or not password:
                 return render_template(

@@ -21,11 +21,15 @@ class Config:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ECHO = False
     
-    # Flask-Login
-    REMEMBER_COOKIE_DURATION = 3600  # 1 hora
+    # Sesion y recordar cuenta
+    REMEMBER_COOKIE_DURATION = timedelta(days=7)
+    REMEMBER_COOKIE_HTTPONLY = True
+    REMEMBER_COOKIE_SAMESITE = 'Lax'
+    REMEMBER_COOKIE_SECURE = False  # Cambiar a True en producción con HTTPS
     SESSION_COOKIE_SECURE = False  # Cambiar a True en producción con HTTPS
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = 'Lax'
+    SESSION_REFRESH_EACH_REQUEST = False
     PERMANENT_SESSION_LIFETIME = timedelta(days=7)
     
     # Aplicación
@@ -44,6 +48,7 @@ class ProductionConfig(Config):
     """Configuración para producción"""
     DEBUG = False
     SESSION_COOKIE_SECURE = True  # Requiere HTTPS
+    REMEMBER_COOKIE_SECURE = True  # Requiere HTTPS
     SQLALCHEMY_ECHO = False
 
 
