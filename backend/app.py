@@ -1432,6 +1432,9 @@ def create_app():
 
     @app.route("/login", methods=["GET", "POST"])
     def login():
+        if session.get("user"):
+            return redirect(url_for("dashboard"))
+
         if request.method == "POST":
             username = request.form.get("username", "").strip()
             password = request.form.get("password", "").strip()
