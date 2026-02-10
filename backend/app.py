@@ -198,6 +198,101 @@ def create_app():
     def cleanup_old_receipts():
         return
 
+    def _number_to_spanish_words(number):
+        unidades = {
+            0: "cero",
+            1: "uno",
+            2: "dos",
+            3: "tres",
+            4: "cuatro",
+            5: "cinco",
+            6: "seis",
+            7: "siete",
+            8: "ocho",
+            9: "nueve",
+            10: "diez",
+            11: "once",
+            12: "doce",
+            13: "trece",
+            14: "catorce",
+            15: "quince",
+            16: "dieciseis",
+            17: "diecisiete",
+            18: "dieciocho",
+            19: "diecinueve",
+            20: "veinte",
+            21: "veintiuno",
+            22: "veintidos",
+            23: "veintitres",
+            24: "veinticuatro",
+            25: "veinticinco",
+            26: "veintiseis",
+            27: "veintisiete",
+            28: "veintiocho",
+            29: "veintinueve",
+        }
+        decenas = {
+            30: "treinta",
+            40: "cuarenta",
+            50: "cincuenta",
+            60: "sesenta",
+            70: "setenta",
+            80: "ochenta",
+            90: "noventa",
+        }
+        centenas = {
+            100: "cien",
+            200: "doscientos",
+            300: "trescientos",
+            400: "cuatrocientos",
+            500: "quinientos",
+            600: "seiscientos",
+            700: "setecientos",
+            800: "ochocientos",
+            900: "novecientos",
+        }
+
+        if number < 30:
+            return unidades[number]
+        if number < 100:
+            decena = (number // 10) * 10
+            unidad = number % 10
+            return decenas[decena] if unidad == 0 else f"{decenas[decena]} y {unidades[unidad]}"
+        if number == 100:
+            return "cien"
+        if number < 1000:
+            centena = (number // 100) * 100
+            resto = number % 100
+            centena_text = "ciento" if centena == 100 else centenas[centena]
+            return centena_text if resto == 0 else f"{centena_text} {_number_to_spanish_words(resto)}"
+        if number < 2000:
+            resto = number % 1000
+            return "mil" if resto == 0 else f"mil {_number_to_spanish_words(resto)}"
+        if number < 1000000:
+            miles = number // 1000
+            resto = number % 1000
+            miles_text = f"{_number_to_spanish_words(miles)} mil"
+            return miles_text if resto == 0 else f"{miles_text} {_number_to_spanish_words(resto)}"
+        if number < 2000000:
+            resto = number % 1000000
+            return "un millon" if resto == 0 else f"un millon {_number_to_spanish_words(resto)}"
+        if number < 1000000000000:
+            millones = number // 1000000
+            resto = number % 1000000
+            millones_text = f"{_number_to_spanish_words(millones)} millones"
+            return millones_text if resto == 0 else f"{millones_text} {_number_to_spanish_words(resto)}"
+        return str(number)
+
+    def amount_to_words(amount):
+        amount_decimal = Decimal(str(amount or 0)).quantize(Decimal("0.01"))
+        entero = int(amount_decimal)
+        centavos = int((amount_decimal - Decimal(entero)) * 100)
+        entero_text = _number_to_spanish_words(entero)
+        if entero_text.endswith("uno"):
+            entero_text = f"{entero_text[:-3]}un"
+        moneda = "lempira" if entero == 1 else "lempiras"
+        return f"{entero_text} {moneda} con {centavos:02d}/100"
+
     def normalize_text(text_value):
         if not text_value:
             return ""
@@ -1247,6 +1342,7 @@ def create_app():
 
         isv_total = gravado_total * Decimal("0.15")
         total_final = Decimal(str(invoice.total or 0))
+        total_en_letras = amount_to_words(total_final).upper()
         descuento_valor = Decimal(str(getattr(invoice, "descuento", 0) or 0))
         totals_data = [
             ["DESCUENTOS Y REBAJAS", f"L {descuento_valor:.2f}"],
@@ -1277,7 +1373,7 @@ def create_app():
             "<b>DATOS DEL ADQUIRENTE EXONERADO</b><br/>"
             "N° ORDEN DE COMPRA EXENTA:<br/>"
             "N° CONST. REGISTRO EXONERADO:<br/>"
-            "N° REGISTRO SAG:"
+            f"N° REGISTRO SAG:<br/>TOTAL EN LETRAS: {total_en_letras}"
         )
         notes_paragraph = Paragraph(notes_text, styles["Normal"])
         bottom_block = Table(
