@@ -2502,14 +2502,18 @@ body {
 }
 
 .landing-v2-hero-card {
-  width: min(1180px, 100%);
-  border-radius: 24px;
-  padding: 24px 34px;
+  width: 100%;
+  border-radius: 36px;
+  padding: 40px 52px;
   color: var(--v2-white);
-  background: linear-gradient(140deg, #098d4a, #056a3a);
+  background: rgba(0, 120, 60, 0.85);
   position: relative;
   z-index: 2;
   box-shadow: 0 14px 30px rgba(9, 58, 33, 0.28);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 240px;
 }
 
 .landing-v2-kicker {
@@ -2523,13 +2527,15 @@ body {
   opacity: 0.86;
 }
 
-.landing-v2-hero-card h1 {
+.landing-v2-hero-card h1,
+.hero-title {
   font-size: clamp(2rem, 3.8vw, 3.8rem);
   line-height: 1.05;
   margin: 10px 0 12px;
 }
 
-.landing-v2-hero-card p {
+.landing-v2-hero-card p,
+.hero-description {
   max-width: 68ch;
   line-height: 1.6;
   color: rgba(255, 255, 255, 0.9);
@@ -2780,8 +2786,9 @@ body {
   }
 
   .landing-v2-hero-card {
-    border-radius: 16px;
-    padding: 18px 16px;
+    border-radius: 22px;
+    padding: 28px 22px;
+    min-height: 200px;
   }
 
   .landing-v2-intro {
