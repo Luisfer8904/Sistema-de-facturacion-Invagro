@@ -2400,19 +2400,19 @@ body {
 }
 
 .landing-v2-hero {
-  width: min(1280px, 94vw);
+  width: 100%;
   margin: 0 auto;
-  margin-top: 18px;
-  min-height: 710px;
-  border-radius: 0 0 28px 28px;
+  margin-top: 0;
+  min-height: 560px;
+  border-radius: 0;
   overflow: hidden;
   position: relative;
   display: flex;
   align-items: flex-end;
-  padding: 160px 34px 30px;
+  padding: 132px 34px 20px;
   background:
     linear-gradient(110deg, rgba(1, 49, 28, 0.74), rgba(6, 85, 47, 0.26)),
-    url("/static/assets/perro-portada.jpg") center center / cover no-repeat;
+    url("/static/assets/perro-portada.jpg") center 36% / cover no-repeat;
 }
 
 .landing-v2-hero::after {
@@ -2484,20 +2484,32 @@ body {
   background: linear-gradient(135deg, var(--v2-green-800), var(--v2-green-700));
   color: var(--v2-white);
   font-weight: 800;
-  padding: 11px 20px;
+  padding: 10px 16px;
   border-radius: 14px;
   white-space: nowrap;
 }
 
+.landing-v2-nav-actions {
+  display: flex;
+  gap: 8px;
+  justify-self: end;
+}
+
+.landing-v2-nav-cta.secondary {
+  background: rgba(9, 111, 61, 0.12);
+  color: #0b6d3d;
+  border: 1px solid rgba(9, 111, 61, 0.25);
+}
+
 .landing-v2-hero-card {
-  width: min(980px, 100%);
-  border-radius: 24px;
-  padding: 30px 34px;
+  width: min(720px, 100%);
+  border-radius: 18px;
+  padding: 22px 24px;
   color: var(--v2-white);
   background: linear-gradient(140deg, #098d4a, #056a3a);
   position: relative;
   z-index: 2;
-  box-shadow: 0 20px 40px rgba(9, 58, 33, 0.32);
+  box-shadow: 0 14px 30px rgba(9, 58, 33, 0.28);
 }
 
 .landing-v2-kicker {
@@ -2512,19 +2524,19 @@ body {
 }
 
 .landing-v2-hero-card h1 {
-  font-size: clamp(2rem, 4.2vw, 4rem);
+  font-size: clamp(1.75rem, 3.2vw, 3rem);
   line-height: 1.05;
-  margin: 12px 0 14px;
+  margin: 10px 0 12px;
 }
 
 .landing-v2-hero-card p {
-  max-width: 64ch;
+  max-width: 56ch;
   line-height: 1.6;
   color: rgba(255, 255, 255, 0.9);
 }
 
 .landing-v2-hero-actions {
-  margin-top: 24px;
+  margin-top: 18px;
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
@@ -2719,7 +2731,7 @@ body {
     width: 100%;
   }
 
-  .landing-v2-nav-cta {
+  .landing-v2-nav-actions {
     justify-self: start;
   }
 }
@@ -2732,8 +2744,8 @@ body {
   }
 
   .landing-v2-hero {
-    min-height: 760px;
-    padding: 220px 16px 18px;
+    min-height: 500px;
+    padding: 188px 16px 14px;
     width: 100%;
     border-radius: 0;
     margin-top: 0;
@@ -2761,9 +2773,15 @@ body {
     font-size: 0.86rem;
   }
 
+  .landing-v2-nav-actions {
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
   .landing-v2-hero-card {
     border-radius: 16px;
-    padding: 20px 16px;
+    padding: 16px 14px;
   }
 
   .landing-v2-intro {
