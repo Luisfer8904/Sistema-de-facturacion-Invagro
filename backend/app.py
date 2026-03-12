@@ -44,6 +44,8 @@ from reportlab.platypus import (
 from models import (
     AbonoFactura,
     AjustesNegocio,
+    AvesCliente,
+    AvesPlan,
     Categoria,
     Cliente,
     ChatAudit,
@@ -1529,6 +1531,67 @@ def create_app():
     def normalize_portal_target(raw_value):
         return "aves" if (raw_value or "").strip().lower() == "aves" else "interno"
 
+    def normalize_aves_plan_type(raw_value):
+        value = (raw_value or "").strip().lower()
+        allowed = {"vacunacion", "despique", "desparasitacion"}
+        return value if value in allowed else None
+
+    def aves_plan_type_label(plan_type):
+        labels = {
+            "vacunacion": "Vacunacion",
+            "despique": "Despique",
+            "desparasitacion": "Desparasitacion",
+        }
+        return labels.get(plan_type, "Actividad")
+
+    def build_aves_upcoming_activities(limit=None, days_ahead=None):
+        today = datetime.utcnow().date()
+        try:
+            clientes_aves = AvesCliente.query.filter_by(activo=True).all()
+            planes_aves = AvesPlan.query.filter_by(activo=True).all()
+        except SQLAlchemyError:
+            db.session.rollback()
+            return []
+
+        activities = []
+        for cliente_aves in clientes_aves:
+            if not cliente_aves.fecha_nacimiento:
+                continue
+            for plan_aves in planes_aves:
+                if plan_aves.edad_dias is None or plan_aves.edad_dias < 0:
+                    continue
+                scheduled_date = cliente_aves.fecha_nacimiento + timedelta(
+                    days=int(plan_aves.edad_dias)
+                )
+                if scheduled_date < today:
+                    continue
+                days_left = (scheduled_date - today).days
+                if days_ahead is not None and days_left > days_ahead:
+                    continue
+                activities.append(
+                    {
+                        "cliente_nombre": cliente_aves.nombre,
+                        "cliente_id": cliente_aves.id,
+                        "plan_nombre": plan_aves.nombre,
+                        "tipo": plan_aves.tipo,
+                        "tipo_label": aves_plan_type_label(plan_aves.tipo),
+                        "fecha": scheduled_date,
+                        "fecha_label": scheduled_date.strftime("%d/%m/%Y"),
+                        "dias_restantes": days_left,
+                    }
+                )
+
+        activities.sort(
+            key=lambda item: (
+                item["fecha"],
+                item["tipo_label"],
+                item["cliente_nombre"].lower(),
+            )
+        )
+        if limit is None:
+            return activities
+        return activities[:limit]
+
     @app.route("/login", methods=["GET", "POST"])
     def login():
         portal_target = normalize_portal_target(request.args.get("portal"))
@@ -1641,8 +1704,217 @@ def create_app():
     def aves_dashboard():
         if not session.get("user"):
             return redirect(url_for("login", portal="aves"))
+        try:
+            aves_clientes_count = AvesCliente.query.filter_by(activo=True).count()
+            aves_planes_count = AvesPlan.query.filter_by(activo=True).count()
+        except SQLAlchemyError:
+            db.session.rollback()
+            aves_clientes_count = 0
+            aves_planes_count = 0
 
-        return render_template("aves_dashboard.html", user=session["user"])
+        upcoming_activities = build_aves_upcoming_activities(days_ahead=30)
+        upcoming_week_count = len(
+            [activity for activity in upcoming_activities if activity["dias_restantes"] <= 7]
+        )
+
+        return render_template(
+            "aves_dashboard.html",
+            user=session["user"],
+            aves_clientes_count=aves_clientes_count,
+            aves_planes_count=aves_planes_count,
+            upcoming_week_count=upcoming_week_count,
+            upcoming_activities=upcoming_activities[:8],
+        )
+
+    @app.route("/aves/clientes", methods=["GET", "POST"])
+    def aves_clientes():
+        if not session.get("user"):
+            return redirect(url_for("login", portal="aves"))
+
+        error = None
+        if request.method == "POST":
+            nombre = (request.form.get("nombre") or "").strip()
+            encargado = (request.form.get("encargado") or "").strip() or None
+            telefono = (request.form.get("telefono") or "").strip() or None
+            fecha_nacimiento_raw = (request.form.get("fecha_nacimiento") or "").strip()
+            cantidad_aves_raw = (request.form.get("cantidad_aves") or "").strip()
+            observaciones = (request.form.get("observaciones") or "").strip() or None
+
+            if not nombre or not fecha_nacimiento_raw:
+                error = "Nombre y fecha de nacimiento son obligatorios."
+            else:
+                try:
+                    fecha_nacimiento = datetime.strptime(
+                        fecha_nacimiento_raw, "%Y-%m-%d"
+                    ).date()
+                except ValueError:
+                    error = "Fecha de nacimiento invalida."
+                    fecha_nacimiento = None
+
+            if not error:
+                try:
+                    cantidad_aves = int(cantidad_aves_raw or 0)
+                    if cantidad_aves < 0:
+                        raise ValueError
+                except ValueError:
+                    error = "La cantidad de aves debe ser un numero valido."
+
+            if not error:
+                try:
+                    cliente_aves = AvesCliente(
+                        nombre=nombre,
+                        encargado=encargado,
+                        telefono=telefono,
+                        fecha_nacimiento=fecha_nacimiento,
+                        cantidad_aves=cantidad_aves,
+                        observaciones=observaciones,
+                        activo=True,
+                        fecha_registro=datetime.utcnow(),
+                    )
+                    db.session.add(cliente_aves)
+                    db.session.commit()
+                    return redirect(url_for("aves_clientes"))
+                except SQLAlchemyError:
+                    db.session.rollback()
+                    error = "No se pudo guardar el cliente avicola."
+
+        try:
+            clientes_raw = (
+                AvesCliente.query.filter_by(activo=True)
+                .order_by(AvesCliente.fecha_registro.desc(), AvesCliente.id.desc())
+                .all()
+            )
+            planes_raw = (
+                AvesPlan.query.filter_by(activo=True)
+                .order_by(AvesPlan.tipo.asc(), AvesPlan.edad_dias.asc())
+                .all()
+            )
+        except SQLAlchemyError:
+            db.session.rollback()
+            clientes_raw = []
+            planes_raw = []
+            if not error:
+                error = "No se pudo cargar la informacion de clientes."
+
+        today = datetime.utcnow().date()
+        clientes_view = []
+        for cliente_aves in clientes_raw:
+            upcoming = []
+            for plan_aves in planes_raw:
+                if plan_aves.edad_dias is None or plan_aves.edad_dias < 0:
+                    continue
+                scheduled_date = cliente_aves.fecha_nacimiento + timedelta(
+                    days=int(plan_aves.edad_dias)
+                )
+                if scheduled_date < today:
+                    continue
+                days_left = (scheduled_date - today).days
+                upcoming.append(
+                    {
+                        "plan_nombre": plan_aves.nombre,
+                        "tipo_label": aves_plan_type_label(plan_aves.tipo),
+                        "fecha": scheduled_date,
+                        "fecha_label": scheduled_date.strftime("%d/%m/%Y"),
+                        "dias_restantes": days_left,
+                    }
+                )
+            upcoming.sort(
+                key=lambda item: (
+                    item["fecha"],
+                    item["tipo_label"],
+                )
+            )
+            clientes_view.append(
+                {
+                    "id": cliente_aves.id,
+                    "nombre": cliente_aves.nombre,
+                    "encargado": cliente_aves.encargado or "-",
+                    "telefono": cliente_aves.telefono or "-",
+                    "cantidad_aves": cliente_aves.cantidad_aves or 0,
+                    "fecha_nacimiento_label": cliente_aves.fecha_nacimiento.strftime(
+                        "%d/%m/%Y"
+                    ),
+                    "proximas_actividades": upcoming[:3],
+                }
+            )
+
+        return render_template(
+            "aves_clientes.html",
+            user=session["user"],
+            error=error,
+            clientes=clientes_view,
+            planes_activos_count=len(planes_raw),
+        )
+
+    @app.route("/aves/planes", methods=["GET", "POST"])
+    def aves_planes():
+        if not session.get("user"):
+            return redirect(url_for("login", portal="aves"))
+
+        error = None
+        if request.method == "POST":
+            nombre = (request.form.get("nombre") or "").strip()
+            tipo = normalize_aves_plan_type(request.form.get("tipo"))
+            edad_dias_raw = (request.form.get("edad_dias") or "").strip()
+            descripcion = (request.form.get("descripcion") or "").strip() or None
+
+            if not nombre or not tipo or not edad_dias_raw:
+                error = "Nombre, tipo y edad en dias son obligatorios."
+            else:
+                try:
+                    edad_dias = int(edad_dias_raw)
+                    if edad_dias < 0:
+                        raise ValueError
+                except ValueError:
+                    error = "La edad en dias debe ser un numero positivo."
+
+            if not error:
+                try:
+                    plan_aves = AvesPlan(
+                        nombre=nombre,
+                        tipo=tipo,
+                        edad_dias=edad_dias,
+                        descripcion=descripcion,
+                        activo=True,
+                        fecha_creacion=datetime.utcnow(),
+                    )
+                    db.session.add(plan_aves)
+                    db.session.commit()
+                    return redirect(url_for("aves_planes"))
+                except SQLAlchemyError:
+                    db.session.rollback()
+                    error = "No se pudo guardar el plan."
+
+        try:
+            planes_raw = (
+                AvesPlan.query.filter_by(activo=True)
+                .order_by(AvesPlan.tipo.asc(), AvesPlan.edad_dias.asc(), AvesPlan.id.desc())
+                .all()
+            )
+        except SQLAlchemyError:
+            db.session.rollback()
+            planes_raw = []
+            if not error:
+                error = "No se pudieron cargar los planes."
+
+        planes_view = [
+            {
+                "id": plan_aves.id,
+                "nombre": plan_aves.nombre,
+                "tipo": plan_aves.tipo,
+                "tipo_label": aves_plan_type_label(plan_aves.tipo),
+                "edad_dias": plan_aves.edad_dias,
+                "descripcion": plan_aves.descripcion or "-",
+            }
+            for plan_aves in planes_raw
+        ]
+
+        return render_template(
+            "aves_planes.html",
+            user=session["user"],
+            error=error,
+            planes=planes_view,
+        )
 
     @app.get("/logout")
     def logout():
