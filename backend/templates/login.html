@@ -8,7 +8,13 @@
         <img class="login-mascot" src="/static/assets/mascota.jpeg" alt="Mascota Invagro" />
         <h1>INVAGRO</h1>
         <p class="subtitle">Inversiones Agroindustriales</p>
-        <p class="tagline">Sistema de Facturacion</p>
+        <p class="tagline">
+          {% if portal == "aves" %}
+            Portal Aves
+          {% else %}
+            Sistema de Facturacion
+          {% endif %}
+        </p>
       </div>
 
       {% if error %}
@@ -16,6 +22,7 @@
       {% endif %}
 
       <form class="login-form" method="post" action="/login">
+        <input type="hidden" name="portal" value="{{ portal or 'interno' }}" />
         <label class="field">
           <span>Usuario</span>
           <input

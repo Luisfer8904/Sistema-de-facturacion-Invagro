@@ -1526,14 +1526,21 @@ def create_app():
     def landing():
         return render_template("landing.html")
 
+    def normalize_portal_target(raw_value):
+        return "aves" if (raw_value or "").strip().lower() == "aves" else "interno"
+
     @app.route("/login", methods=["GET", "POST"])
     def login():
+        portal_target = normalize_portal_target(request.args.get("portal"))
         if session.get("user"):
+            if portal_target == "aves":
+                return redirect(url_for("aves_dashboard"))
             return redirect(url_for("dashboard"))
 
         if request.method == "POST":
             username = request.form.get("username", "").strip()
             password = request.form.get("password", "").strip()
+            portal_target = normalize_portal_target(request.form.get("portal"))
             remember_raw = (request.form.get("remember") or "").strip().lower()
             remember = remember_raw in {"on", "true", "1", "yes"}
 
@@ -1541,6 +1548,7 @@ def create_app():
                 return render_template(
                     "login.html",
                     error="Ingresa usuario y contrasena para continuar.",
+                    portal=portal_target,
                 )
 
             try:
@@ -1549,19 +1557,24 @@ def create_app():
                 return render_template(
                     "login.html",
                     error="No se pudo validar el usuario. Intenta nuevamente.",
+                    portal=portal_target,
                 )
 
             if not user or not check_password_hash(user.password, password):
                 return render_template(
                     "login.html",
                     error="Usuario o contrasena incorrectos.",
+                    portal=portal_target,
                 )
 
             session.permanent = remember
             session["user"] = user.username
+            session["portal_target"] = portal_target
+            if portal_target == "aves":
+                return redirect(url_for("aves_dashboard"))
             return redirect(url_for("dashboard"))
 
-        return render_template("login.html")
+        return render_template("login.html", portal=portal_target)
 
     @app.get("/dashboard")
     def dashboard():
@@ -1623,6 +1636,13 @@ def create_app():
             credito_menor_30=credito_menor_30,
             credito_mayor_30=credito_mayor_30,
         )
+
+    @app.get("/dashboard-aves")
+    def aves_dashboard():
+        if not session.get("user"):
+            return redirect(url_for("login", portal="aves"))
+
+        return render_template("aves_dashboard.html", user=session["user"])
 
     @app.get("/logout")
     def logout():

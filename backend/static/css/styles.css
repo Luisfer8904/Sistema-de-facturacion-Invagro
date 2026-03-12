@@ -2514,7 +2514,7 @@ body {
   flex-direction: column;
   justify-content: center;
   min-height: 190px;
-  margin-bottom: -64px;
+  margin-bottom: -92px;
 }
 
 .landing-v2-kicker {
@@ -2794,7 +2794,7 @@ body {
     border-radius: 22px;
     padding: 20px 18px;
     min-height: 170px;
-    margin-bottom: -34px;
+    margin-bottom: -52px;
   }
 
   .landing-v2-intro {
