@@ -2405,14 +2405,14 @@ body {
   margin-top: 18px;
   min-height: 620px;
   border-radius: 0 0 28px 28px;
-  overflow: hidden;
+  overflow: visible;
   position: relative;
   display: flex;
   align-items: flex-end;
   padding: 148px 34px 26px;
   background:
     linear-gradient(110deg, rgba(1, 49, 28, 0.74), rgba(6, 85, 47, 0.26)),
-    url("/static/assets/perro-portada.jpg") center 68% / cover no-repeat;
+    url("/static/assets/perro-portada.jpg") center 68% / 115% no-repeat;
 }
 
 .landing-v2-hero::after {
@@ -2504,7 +2504,7 @@ body {
 .landing-v2-hero-card {
   width: 100%;
   border-radius: 36px;
-  padding: 40px 52px;
+  padding: 28px 44px;
   color: var(--v2-white);
   background: rgba(0, 120, 60, 0.85);
   position: relative;
@@ -2513,7 +2513,8 @@ body {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  min-height: 240px;
+  min-height: 190px;
+  margin-bottom: -64px;
 }
 
 .landing-v2-kicker {
@@ -2572,7 +2573,7 @@ body {
 .landing-v2-intro {
   width: min(1200px, 90vw);
   margin: 0 auto;
-  margin-top: -18px;
+  margin-top: 22px;
 }
 
 .landing-v2-intro-card {
@@ -2755,6 +2756,10 @@ body {
     width: 100%;
     border-radius: 0;
     margin-top: 0;
+    overflow: visible;
+    background:
+      linear-gradient(110deg, rgba(1, 49, 28, 0.74), rgba(6, 85, 47, 0.26)),
+      url("/static/assets/perro-portada.jpg") center 68% / 115% no-repeat;
   }
 
   .landing-v2-mainnav {
@@ -2787,13 +2792,14 @@ body {
 
   .landing-v2-hero-card {
     border-radius: 22px;
-    padding: 28px 22px;
-    min-height: 200px;
+    padding: 20px 18px;
+    min-height: 170px;
+    margin-bottom: -34px;
   }
 
   .landing-v2-intro {
     width: 94vw;
-    margin-top: 0;
+    margin-top: 14px;
   }
 
   .landing-v2-intro-card {
