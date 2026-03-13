@@ -1544,6 +1544,41 @@ def create_app():
         }
         return labels.get(plan_type, "Actividad")
 
+    def build_aves_plan_groups(planes_rows):
+        required_types = ("vacunacion", "despique", "desparasitacion")
+        groups = {}
+        for plan_row in planes_rows:
+            plan_name = (plan_row.plan_nombre or "").strip()
+            if not plan_name:
+                continue
+            group = groups.setdefault(
+                plan_name,
+                {
+                    "name": plan_name,
+                    "types": set(),
+                    "activities_count": 0,
+                },
+            )
+            if plan_row.tipo:
+                group["types"].add(plan_row.tipo)
+            group["activities_count"] += 1
+
+        result = []
+        for plan_name, group in groups.items():
+            missing_types = [plan_type for plan_type in required_types if plan_type not in group["types"]]
+            result.append(
+                {
+                    "name": plan_name,
+                    "is_complete": len(missing_types) == 0,
+                    "missing_types": missing_types,
+                    "missing_labels": [aves_plan_type_label(plan_type) for plan_type in missing_types],
+                    "activities_count": group["activities_count"],
+                }
+            )
+
+        result.sort(key=lambda item: item["name"].lower())
+        return result
+
     def build_aves_upcoming_activities(limit=None, days_ahead=None):
         today = datetime.utcnow().date()
         try:
@@ -1751,17 +1786,16 @@ def create_app():
 
         error = None
         plan_names = []
+        incomplete_plan_groups = []
         try:
-            plan_names = [
-                row[0]
-                for row in db.session.query(AvesPlan.plan_nombre)
-                .filter(AvesPlan.activo.is_(True))
-                .filter(AvesPlan.plan_nombre.isnot(None))
-                .distinct()
-                .order_by(AvesPlan.plan_nombre.asc())
+            all_active_plan_rows = (
+                AvesPlan.query.filter_by(activo=True)
+                .order_by(AvesPlan.plan_nombre.asc(), AvesPlan.edad_dias.asc(), AvesPlan.tipo.asc())
                 .all()
-                if row[0]
-            ]
+            )
+            plan_groups = build_aves_plan_groups(all_active_plan_rows)
+            plan_names = [group["name"] for group in plan_groups if group["is_complete"]]
+            incomplete_plan_groups = [group for group in plan_groups if not group["is_complete"]]
         except SQLAlchemyError:
             db.session.rollback()
             if not error:
@@ -1789,7 +1823,7 @@ def create_app():
 
             if not error:
                 if plan_nombre not in plan_names:
-                    error = "Selecciona un plan valido para el cliente."
+                    error = "Selecciona un plan valido y completo (vacunacion, despique, desparasitacion)."
 
             if not error:
                 try:
@@ -1901,6 +1935,7 @@ def create_app():
             clientes=clientes_view,
             planes_activos_count=len(plan_names),
             planes_nombres=plan_names,
+            planes_incompletos=incomplete_plan_groups,
         )
 
     @app.route("/aves/planes", methods=["GET", "POST"])
@@ -1925,6 +1960,23 @@ def create_app():
                         raise ValueError
                 except ValueError:
                     error = "El dia de actividad debe ser un numero positivo."
+
+            if not error:
+                try:
+                    same_day = (
+                        AvesPlan.query.filter(
+                            AvesPlan.activo.is_(True),
+                            AvesPlan.plan_nombre == plan_nombre,
+                            AvesPlan.edad_dias == edad_dias,
+                        ).first()
+                    )
+                    if same_day:
+                        error = (
+                            f"Ya existe una actividad para el dia {edad_dias} en el plan '{plan_nombre}'."
+                        )
+                except SQLAlchemyError:
+                    db.session.rollback()
+                    error = "No se pudo validar el dia de actividad del plan."
 
             if not error:
                 try:
@@ -1973,12 +2025,14 @@ def create_app():
             }
             for plan_aves in planes_raw
         ]
+        plan_groups = build_aves_plan_groups(planes_raw)
 
         return render_template(
             "aves_planes.html",
             user=session["user"],
             error=error,
             planes=planes_view,
+            plan_groups=plan_groups,
         )
 
     @app.get("/logout")

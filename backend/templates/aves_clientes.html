@@ -53,6 +53,26 @@
           <div class="form-error">{{ error }}</div>
         {% endif %}
 
+        {% if not planes_nombres %}
+          <div class="form-error">
+            No hay planes completos para asignar. Cada plan debe incluir vacunacion, despique y desparasitacion.
+          </div>
+        {% endif %}
+
+        {% if planes_incompletos %}
+          <section class="form-card">
+            <h3>Planes incompletos</h3>
+            <ul class="aves-activity-list">
+              {% for plan in planes_incompletos %}
+                <li>
+                  <strong>{{ plan.name }}</strong> - faltan:
+                  {{ plan.missing_labels|join(", ") }}
+                </li>
+              {% endfor %}
+            </ul>
+          </section>
+        {% endif %}
+
         <section class="form-card">
           <form class="module-form" method="post" action="/aves/clientes">
             <label>

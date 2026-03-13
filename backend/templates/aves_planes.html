@@ -115,6 +115,44 @@
             </div>
           {% endif %}
         </section>
+
+        <section class="module-table">
+          <div class="table-header table-four">
+            <span>Plan</span>
+            <span>Estado</span>
+            <span>Faltantes</span>
+            <span>Actividades</span>
+          </div>
+          {% if plan_groups %}
+            {% for group in plan_groups %}
+              <div class="table-row table-four">
+                <span><strong>{{ group.name }}</strong></span>
+                <span>
+                  {% if group.is_complete %}
+                    <span class="aves-type-badge">Completo</span>
+                  {% else %}
+                    Incompleto
+                  {% endif %}
+                </span>
+                <span>
+                  {% if group.is_complete %}
+                    -
+                  {% else %}
+                    {{ group.missing_labels|join(", ") }}
+                  {% endif %}
+                </span>
+                <span>{{ group.activities_count }}</span>
+              </div>
+            {% endfor %}
+          {% else %}
+            <div class="table-row table-four">
+              <span>-</span>
+              <span>-</span>
+              <span>-</span>
+              <span>-</span>
+            </div>
+          {% endif %}
+        </section>
       </main>
     </div>
   </div>
