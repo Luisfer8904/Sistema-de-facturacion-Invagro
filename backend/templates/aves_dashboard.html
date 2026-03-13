@@ -120,7 +120,7 @@
             {% for item in upcoming_activities %}
               <div class="table-row table-four">
                 <span>{{ item.cliente_nombre }}</span>
-                <span>{{ item.tipo_label }} - {{ item.plan_nombre }}</span>
+                <span>{{ item.plan_nombre }} | Dia {{ item.dia }} | {{ item.tipo_label }} - {{ item.actividad_nombre }}</span>
                 <span>{{ item.fecha_label }}</span>
                 <span>{{ item.dias_restantes }} dias</span>
               </div>

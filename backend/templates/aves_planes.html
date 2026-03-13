@@ -44,8 +44,8 @@
       <main class="content-area">
         <section class="module-header">
           <div>
-            <h1>Definir planes de vacunacion, despique y desparasitacion</h1>
-            <p>Cada plan usa edad en dias para calcular automaticamente la fecha de actividad por cliente.</p>
+            <h1>Programas por dia y actividad</h1>
+            <p>Ejemplo: Plan Recria A | Dia 8 Vacuna de Gumboro | Dia 21 Despique.</p>
           </div>
         </section>
 
@@ -56,8 +56,8 @@
         <section class="form-card">
           <form class="module-form" method="post" action="/aves/planes">
             <label>
-              <span>Nombre del plan</span>
-              <input type="text" name="nombre" required />
+              <span>Nombre del plan/programa</span>
+              <input type="text" name="plan_nombre" placeholder="Ej: Plan Recria A" required />
             </label>
             <label>
               <span>Tipo</span>
@@ -69,8 +69,12 @@
               </select>
             </label>
             <label>
-              <span>Edad objetivo (dias)</span>
-              <input type="number" name="edad_dias" min="0" required />
+              <span>Dia de actividad</span>
+              <input type="number" name="edad_dias" min="0" placeholder="Ej: 8" required />
+            </label>
+            <label>
+              <span>Actividad</span>
+              <input type="text" name="nombre" placeholder="Ej: Vacuna de Gumboro" required />
             </label>
             <label class="span-2">
               <span>Descripcion</span>
@@ -84,23 +88,26 @@
         </section>
 
         <section class="module-table">
-          <div class="table-header table-four">
-            <span>Tipo</span>
+          <div class="table-header table-five">
             <span>Plan</span>
-            <span>Edad (dias)</span>
+            <span>Tipo</span>
+            <span>Dia</span>
+            <span>Actividad</span>
             <span>Descripcion</span>
           </div>
           {% if planes %}
             {% for plan in planes %}
-              <div class="table-row table-four">
+              <div class="table-row table-five">
+                <span><strong>{{ plan.plan_nombre }}</strong></span>
                 <span><span class="aves-type-badge">{{ plan.tipo_label }}</span></span>
-                <span>{{ plan.nombre }}</span>
                 <span>{{ plan.edad_dias }}</span>
+                <span>{{ plan.nombre }}</span>
                 <span>{{ plan.descripcion }}</span>
               </div>
             {% endfor %}
           {% else %}
-            <div class="table-row table-four">
+            <div class="table-row table-five">
+              <span>-</span>
               <span>-</span>
               <span>No hay planes configurados.</span>
               <span>-</span>

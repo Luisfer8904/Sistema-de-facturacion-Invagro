@@ -72,6 +72,15 @@
               <input type="date" name="fecha_nacimiento" required />
             </label>
             <label>
+              <span>Plan asignado</span>
+              <select name="plan_nombre" required>
+                <option value="">Selecciona plan</option>
+                {% for plan_nombre in planes_nombres %}
+                  <option value="{{ plan_nombre }}">{{ plan_nombre }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <label>
               <span>Cantidad de aves</span>
               <input type="number" name="cantidad_aves" min="0" value="0" />
             </label>
@@ -100,9 +109,9 @@
         <section class="module-table">
           <div class="table-header table-four">
             <span>Cliente</span>
-            <span>Nacimiento</span>
-            <span>Aves</span>
+            <span>Plan y datos</span>
             <span>Proximas actividades</span>
+            <span>Contacto</span>
           </div>
           {% if clientes %}
             {% for cliente in clientes %}
@@ -111,14 +120,19 @@
                   <strong>{{ cliente.nombre }}</strong><br />
                   <small>{{ cliente.encargado }}</small>
                 </span>
-                <span>{{ cliente.fecha_nacimiento_label }}</span>
-                <span>{{ cliente.cantidad_aves }}</span>
+                <span>
+                  <strong>{{ cliente.plan_nombre }}</strong><br />
+                  Nac: {{ cliente.fecha_nacimiento_label }}<br />
+                  Aves: {{ cliente.cantidad_aves }}
+                </span>
                 <span>
                   {% if cliente.proximas_actividades %}
                     <ul class="aves-activity-list">
                       {% for actividad in cliente.proximas_actividades %}
                         <li>
-                          <strong>{{ actividad.tipo_label }}</strong> {{ actividad.plan_nombre }} - {{ actividad.fecha_label }} ({{ actividad.dias_restantes }} dias)
+                          Dia {{ actividad.dia }}:
+                          <strong>{{ actividad.tipo_label }}</strong>
+                          {{ actividad.actividad_nombre }} - {{ actividad.fecha_label }} ({{ actividad.dias_restantes }} dias)
                         </li>
                       {% endfor %}
                     </ul>
@@ -126,6 +140,7 @@
                     Sin actividades futuras definidas
                   {% endif %}
                 </span>
+                <span>{{ cliente.telefono }}</span>
               </div>
             {% endfor %}
           {% else %}
@@ -133,7 +148,7 @@
               <span>-</span>
               <span>-</span>
               <span>-</span>
-              <span>No hay clientes registrados.</span>
+              <span>-</span>
             </div>
           {% endif %}
         </section>

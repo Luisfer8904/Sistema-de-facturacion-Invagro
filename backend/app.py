@@ -1553,11 +1553,22 @@ def create_app():
             db.session.rollback()
             return []
 
+        planes_by_name = {}
+        for plan_aves in planes_aves:
+            key = (plan_aves.plan_nombre or "").strip().lower()
+            if not key:
+                continue
+            planes_by_name.setdefault(key, []).append(plan_aves)
+
         activities = []
         for cliente_aves in clientes_aves:
             if not cliente_aves.fecha_nacimiento:
                 continue
-            for plan_aves in planes_aves:
+            client_plan_key = (cliente_aves.plan_nombre or "").strip().lower()
+            selected_plans = planes_by_name.get(client_plan_key, [])
+            if not selected_plans:
+                continue
+            for plan_aves in selected_plans:
                 if plan_aves.edad_dias is None or plan_aves.edad_dias < 0:
                     continue
                 scheduled_date = cliente_aves.fecha_nacimiento + timedelta(
@@ -1572,9 +1583,11 @@ def create_app():
                     {
                         "cliente_nombre": cliente_aves.nombre,
                         "cliente_id": cliente_aves.id,
-                        "plan_nombre": plan_aves.nombre,
+                        "plan_nombre": plan_aves.plan_nombre,
+                        "actividad_nombre": plan_aves.nombre,
                         "tipo": plan_aves.tipo,
                         "tipo_label": aves_plan_type_label(plan_aves.tipo),
+                        "dia": int(plan_aves.edad_dias),
                         "fecha": scheduled_date,
                         "fecha_label": scheduled_date.strftime("%d/%m/%Y"),
                         "dias_restantes": days_left,
@@ -1706,7 +1719,12 @@ def create_app():
             return redirect(url_for("login", portal="aves"))
         try:
             aves_clientes_count = AvesCliente.query.filter_by(activo=True).count()
-            aves_planes_count = AvesPlan.query.filter_by(activo=True).count()
+            aves_planes_count = (
+                db.session.query(func.count(func.distinct(AvesPlan.plan_nombre)))
+                .filter(AvesPlan.activo.is_(True))
+                .scalar()
+                or 0
+            )
         except SQLAlchemyError:
             db.session.rollback()
             aves_clientes_count = 0
@@ -1732,16 +1750,34 @@ def create_app():
             return redirect(url_for("login", portal="aves"))
 
         error = None
+        plan_names = []
+        try:
+            plan_names = [
+                row[0]
+                for row in db.session.query(AvesPlan.plan_nombre)
+                .filter(AvesPlan.activo.is_(True))
+                .filter(AvesPlan.plan_nombre.isnot(None))
+                .distinct()
+                .order_by(AvesPlan.plan_nombre.asc())
+                .all()
+                if row[0]
+            ]
+        except SQLAlchemyError:
+            db.session.rollback()
+            if not error:
+                error = "No se pudieron cargar los planes disponibles."
+
         if request.method == "POST":
             nombre = (request.form.get("nombre") or "").strip()
             encargado = (request.form.get("encargado") or "").strip() or None
             telefono = (request.form.get("telefono") or "").strip() or None
             fecha_nacimiento_raw = (request.form.get("fecha_nacimiento") or "").strip()
+            plan_nombre = (request.form.get("plan_nombre") or "").strip() or None
             cantidad_aves_raw = (request.form.get("cantidad_aves") or "").strip()
             observaciones = (request.form.get("observaciones") or "").strip() or None
 
-            if not nombre or not fecha_nacimiento_raw:
-                error = "Nombre y fecha de nacimiento son obligatorios."
+            if not nombre or not fecha_nacimiento_raw or not plan_nombre:
+                error = "Nombre, fecha de nacimiento y plan son obligatorios."
             else:
                 try:
                     fecha_nacimiento = datetime.strptime(
@@ -1750,6 +1786,10 @@ def create_app():
                 except ValueError:
                     error = "Fecha de nacimiento invalida."
                     fecha_nacimiento = None
+
+            if not error:
+                if plan_nombre not in plan_names:
+                    error = "Selecciona un plan valido para el cliente."
 
             if not error:
                 try:
@@ -1766,6 +1806,7 @@ def create_app():
                         encargado=encargado,
                         telefono=telefono,
                         fecha_nacimiento=fecha_nacimiento,
+                        plan_nombre=plan_nombre,
                         cantidad_aves=cantidad_aves,
                         observaciones=observaciones,
                         activo=True,
@@ -1786,7 +1827,11 @@ def create_app():
             )
             planes_raw = (
                 AvesPlan.query.filter_by(activo=True)
-                .order_by(AvesPlan.tipo.asc(), AvesPlan.edad_dias.asc())
+                .order_by(
+                    AvesPlan.plan_nombre.asc(),
+                    AvesPlan.edad_dias.asc(),
+                    AvesPlan.tipo.asc(),
+                )
                 .all()
             )
         except SQLAlchemyError:
@@ -1797,10 +1842,18 @@ def create_app():
                 error = "No se pudo cargar la informacion de clientes."
 
         today = datetime.utcnow().date()
+        plans_by_name = {}
+        for plan_aves in planes_raw:
+            key = (plan_aves.plan_nombre or "").strip()
+            if not key:
+                continue
+            plans_by_name.setdefault(key, []).append(plan_aves)
+
         clientes_view = []
         for cliente_aves in clientes_raw:
+            selected_plan = (cliente_aves.plan_nombre or "").strip()
             upcoming = []
-            for plan_aves in planes_raw:
+            for plan_aves in plans_by_name.get(selected_plan, []):
                 if plan_aves.edad_dias is None or plan_aves.edad_dias < 0:
                     continue
                 scheduled_date = cliente_aves.fecha_nacimiento + timedelta(
@@ -1811,8 +1864,10 @@ def create_app():
                 days_left = (scheduled_date - today).days
                 upcoming.append(
                     {
-                        "plan_nombre": plan_aves.nombre,
+                        "plan_nombre": plan_aves.plan_nombre,
+                        "actividad_nombre": plan_aves.nombre,
                         "tipo_label": aves_plan_type_label(plan_aves.tipo),
+                        "dia": int(plan_aves.edad_dias),
                         "fecha": scheduled_date,
                         "fecha_label": scheduled_date.strftime("%d/%m/%Y"),
                         "dias_restantes": days_left,
@@ -1831,6 +1886,7 @@ def create_app():
                     "encargado": cliente_aves.encargado or "-",
                     "telefono": cliente_aves.telefono or "-",
                     "cantidad_aves": cliente_aves.cantidad_aves or 0,
+                    "plan_nombre": selected_plan or "-",
                     "fecha_nacimiento_label": cliente_aves.fecha_nacimiento.strftime(
                         "%d/%m/%Y"
                     ),
@@ -1843,7 +1899,8 @@ def create_app():
             user=session["user"],
             error=error,
             clientes=clientes_view,
-            planes_activos_count=len(planes_raw),
+            planes_activos_count=len(plan_names),
+            planes_nombres=plan_names,
         )
 
     @app.route("/aves/planes", methods=["GET", "POST"])
@@ -1853,24 +1910,26 @@ def create_app():
 
         error = None
         if request.method == "POST":
+            plan_nombre = (request.form.get("plan_nombre") or "").strip()
             nombre = (request.form.get("nombre") or "").strip()
             tipo = normalize_aves_plan_type(request.form.get("tipo"))
             edad_dias_raw = (request.form.get("edad_dias") or "").strip()
             descripcion = (request.form.get("descripcion") or "").strip() or None
 
-            if not nombre or not tipo or not edad_dias_raw:
-                error = "Nombre, tipo y edad en dias son obligatorios."
+            if not plan_nombre or not nombre or not tipo or not edad_dias_raw:
+                error = "Plan, actividad, tipo y dia son obligatorios."
             else:
                 try:
                     edad_dias = int(edad_dias_raw)
                     if edad_dias < 0:
                         raise ValueError
                 except ValueError:
-                    error = "La edad en dias debe ser un numero positivo."
+                    error = "El dia de actividad debe ser un numero positivo."
 
             if not error:
                 try:
                     plan_aves = AvesPlan(
+                        plan_nombre=plan_nombre,
                         nombre=nombre,
                         tipo=tipo,
                         edad_dias=edad_dias,
@@ -1888,7 +1947,12 @@ def create_app():
         try:
             planes_raw = (
                 AvesPlan.query.filter_by(activo=True)
-                .order_by(AvesPlan.tipo.asc(), AvesPlan.edad_dias.asc(), AvesPlan.id.desc())
+                .order_by(
+                    AvesPlan.plan_nombre.asc(),
+                    AvesPlan.edad_dias.asc(),
+                    AvesPlan.tipo.asc(),
+                    AvesPlan.id.desc(),
+                )
                 .all()
             )
         except SQLAlchemyError:
@@ -1900,6 +1964,7 @@ def create_app():
         planes_view = [
             {
                 "id": plan_aves.id,
+                "plan_nombre": plan_aves.plan_nombre,
                 "nombre": plan_aves.nombre,
                 "tipo": plan_aves.tipo,
                 "tipo_label": aves_plan_type_label(plan_aves.tipo),

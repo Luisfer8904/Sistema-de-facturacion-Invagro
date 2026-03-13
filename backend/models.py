@@ -260,6 +260,7 @@ class AvesCliente(db.Model):
     encargado = db.Column(db.String(120))
     telefono = db.Column(db.String(30))
     fecha_nacimiento = db.Column(db.Date, nullable=False)
+    plan_nombre = db.Column(db.String(120))
     cantidad_aves = db.Column(db.Integer, default=0)
     observaciones = db.Column(db.Text)
     activo = db.Column(db.Boolean, default=True)
@@ -271,6 +272,7 @@ class AvesPlan(db.Model):
     __table_args__ = {"extend_existing": True}
 
     id = db.Column(db.Integer, primary_key=True)
+    plan_nombre = db.Column(db.String(120), nullable=False)
     nombre = db.Column(db.String(120), nullable=False)
     tipo = db.Column(db.String(30), nullable=False)
     edad_dias = db.Column(db.Integer, nullable=False)
