@@ -31,6 +31,49 @@ class Cliente(db.Model):
     fecha_registro = db.Column(db.DateTime)
 
 
+class AvesUser(db.Model):
+    __tablename__ = "inva_aves_usuarios"
+    __table_args__ = {"extend_existing": True}
+
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(50), unique=True, nullable=False)
+    password = db.Column(db.String(255), nullable=False)
+    nombre_completo = db.Column(db.String(100))
+    activo = db.Column(db.Boolean, default=True)
+    fecha_creacion = db.Column(db.DateTime)
+
+
+class AvesGranjaCliente(db.Model):
+    __tablename__ = "inva_aves_granja_clientes"
+    __table_args__ = {"extend_existing": True}
+
+    id = db.Column(db.Integer, primary_key=True)
+    nombre = db.Column(db.String(120), nullable=False)
+    contacto = db.Column(db.String(120))
+    telefono = db.Column(db.String(30))
+    email = db.Column(db.String(120))
+    direccion = db.Column(db.Text)
+    observaciones = db.Column(db.Text)
+    activo = db.Column(db.Boolean, default=True)
+    fecha_registro = db.Column(db.DateTime)
+
+
+class AvesLote(db.Model):
+    __tablename__ = "inva_aves_clientes"
+    __table_args__ = {"extend_existing": True}
+
+    id = db.Column(db.Integer, primary_key=True)
+    nombre = db.Column(db.String(120), nullable=False)
+    encargado = db.Column(db.String(120))
+    telefono = db.Column(db.String(30))
+    fecha_nacimiento = db.Column(db.Date, nullable=False)
+    plan_nombre = db.Column(db.String(120))
+    cantidad_aves = db.Column(db.Integer, default=0)
+    observaciones = db.Column(db.Text)
+    activo = db.Column(db.Boolean, default=True)
+    fecha_registro = db.Column(db.DateTime)
+
+
 class Producto(db.Model):
     __tablename__ = "inva-productos"
     __table_args__ = {"extend_existing": True}
@@ -249,22 +292,6 @@ class ChatAudit(db.Model):
     elapsed_ms = db.Column(db.Integer)
     rows_returned = db.Column(db.Integer)
     created_at = db.Column(db.DateTime)
-
-
-class AvesCliente(db.Model):
-    __tablename__ = "inva_aves_clientes"
-    __table_args__ = {"extend_existing": True}
-
-    id = db.Column(db.Integer, primary_key=True)
-    nombre = db.Column(db.String(120), nullable=False)
-    encargado = db.Column(db.String(120))
-    telefono = db.Column(db.String(30))
-    fecha_nacimiento = db.Column(db.Date, nullable=False)
-    plan_nombre = db.Column(db.String(120))
-    cantidad_aves = db.Column(db.Integer, default=0)
-    observaciones = db.Column(db.Text)
-    activo = db.Column(db.Boolean, default=True)
-    fecha_registro = db.Column(db.DateTime)
 
 
 class AvesPlan(db.Model):

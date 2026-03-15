@@ -7,10 +7,16 @@
       <div class="login-header">
         <img class="login-mascot" src="/static/assets/mascota.jpeg" alt="Mascota Invagro" />
         <h1>INVAGRO</h1>
-        <p class="subtitle">Inversiones Agroindustriales</p>
+        <p class="subtitle">
+          {% if portal == "aves" %}
+            Invagro Aves
+          {% else %}
+            Inversiones Agroindustriales
+          {% endif %}
+        </p>
         <p class="tagline">
           {% if portal == "aves" %}
-            Portal Aves
+            Portal de Manejo de Aves
           {% else %}
             Sistema de Facturacion
           {% endif %}
@@ -51,12 +57,22 @@
         </label>
 
         <button type="submit" class="primary-button">Iniciar sesion</button>
-        <a class="link" href="/">Ir al inicio</a>
+        {% if portal == "aves" %}
+          <a class="link" href="/aves">Ir al portal aves</a>
+        {% else %}
+          <a class="link" href="/">Ir al inicio</a>
+        {% endif %}
       </form>
 
       <div class="login-footer">
         <img class="login-logo-footer" src="/static/assets/logo.jpg" alt="Invagro" />
-        <p class="product-line">Productos Veterinarios y Shampoo para Perros</p>
+        <p class="product-line">
+          {% if portal == "aves" %}
+            Manejo sanitario, lotes y clientes de granja
+          {% else %}
+            Productos Veterinarios y Shampoo para Perros
+          {% endif %}
+        </p>
         <p class="copyright">© 2024 Invagro. Todos los derechos reservados.</p>
       </div>
     </div>

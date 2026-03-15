@@ -44,8 +44,10 @@ from reportlab.platypus import (
 from models import (
     AbonoFactura,
     AjustesNegocio,
-    AvesCliente,
+    AvesGranjaCliente,
+    AvesLote,
     AvesPlan,
+    AvesUser,
     Categoria,
     Cliente,
     ChatAudit,
@@ -78,6 +80,24 @@ def create_app():
         )
     else:
         app.config["CHAT_DB_URI"] = None
+
+    with app.app_context():
+        db.create_all()
+        try:
+            aves_user = AvesUser.query.filter_by(username="Luis").first()
+            if not aves_user:
+                db.session.add(
+                    AvesUser(
+                        username="Luis",
+                        password=generate_password_hash("Luis82847"),
+                        nombre_completo="Luis",
+                        activo=True,
+                        fecha_creacion=datetime.utcnow(),
+                    )
+                )
+                db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
 
     app.config["CHAT_LLM_API_KEY"] = os.getenv("CHAT_LLM_API_KEY")
     app.config["CHAT_LLM_BASE_URL"] = os.getenv(
@@ -1528,6 +1548,10 @@ def create_app():
     def landing():
         return render_template("landing.html")
 
+    @app.get("/aves")
+    def aves_landing():
+        return render_template("aves_landing.html")
+
     def normalize_portal_target(raw_value):
         return "aves" if (raw_value or "").strip().lower() == "aves" else "interno"
 
@@ -1582,7 +1606,7 @@ def create_app():
     def build_aves_upcoming_activities(limit=None, days_ahead=None):
         today = datetime.utcnow().date()
         try:
-            clientes_aves = AvesCliente.query.filter_by(activo=True).all()
+            lotes_aves = AvesLote.query.filter_by(activo=True).all()
             planes_aves = AvesPlan.query.filter_by(activo=True).all()
         except SQLAlchemyError:
             db.session.rollback()
@@ -1596,17 +1620,17 @@ def create_app():
             planes_by_name.setdefault(key, []).append(plan_aves)
 
         activities = []
-        for cliente_aves in clientes_aves:
-            if not cliente_aves.fecha_nacimiento:
+        for lote_aves in lotes_aves:
+            if not lote_aves.fecha_nacimiento:
                 continue
-            client_plan_key = (cliente_aves.plan_nombre or "").strip().lower()
+            client_plan_key = (lote_aves.plan_nombre or "").strip().lower()
             selected_plans = planes_by_name.get(client_plan_key, [])
             if not selected_plans:
                 continue
             for plan_aves in selected_plans:
                 if plan_aves.edad_dias is None or plan_aves.edad_dias < 0:
                     continue
-                scheduled_date = cliente_aves.fecha_nacimiento + timedelta(
+                scheduled_date = lote_aves.fecha_nacimiento + timedelta(
                     days=int(plan_aves.edad_dias)
                 )
                 if scheduled_date < today:
@@ -1616,9 +1640,9 @@ def create_app():
                     continue
                 activities.append(
                     {
-                        "lote_nombre": cliente_aves.nombre,
-                        "cliente_nombre": cliente_aves.encargado or "-",
-                        "lote_id": cliente_aves.id,
+                        "lote_nombre": lote_aves.nombre,
+                        "cliente_nombre": lote_aves.encargado or "Cliente sin asignar",
+                        "lote_id": lote_aves.id,
                         "plan_nombre": plan_aves.plan_nombre,
                         "actividad_nombre": plan_aves.nombre,
                         "tipo": plan_aves.tipo,
@@ -1664,7 +1688,10 @@ def create_app():
                 )
 
             try:
-                user = User.query.filter_by(username=username, activo=True).first()
+                if portal_target == "aves":
+                    user = AvesUser.query.filter_by(username=username, activo=True).first()
+                else:
+                    user = User.query.filter_by(username=username, activo=True).first()
             except SQLAlchemyError:
                 return render_template(
                     "login.html",
@@ -1754,8 +1781,8 @@ def create_app():
         if not session.get("user"):
             return redirect(url_for("login", portal="aves"))
         try:
-            aves_clientes_count = Cliente.query.count()
-            aves_lotes_count = AvesCliente.query.filter_by(activo=True).count()
+            aves_clientes_count = AvesGranjaCliente.query.filter_by(activo=True).count()
+            aves_lotes_count = AvesLote.query.filter_by(activo=True).count()
             aves_planes_count = (
                 db.session.query(func.count(func.distinct(AvesPlan.plan_nombre)))
                 .filter(AvesPlan.activo.is_(True))
@@ -1791,21 +1818,27 @@ def create_app():
         error = None
         form_values = {
             "nombre": "",
+            "contacto": "",
             "telefono": "",
             "email": "",
             "direccion": "",
+            "observaciones": "",
         }
 
         if request.method == "POST":
             nombre = (request.form.get("nombre") or "").strip()
+            contacto = (request.form.get("contacto") or "").strip() or None
             telefono = (request.form.get("telefono") or "").strip() or None
             email = (request.form.get("email") or "").strip() or None
             direccion = (request.form.get("direccion") or "").strip() or None
+            observaciones = (request.form.get("observaciones") or "").strip() or None
             form_values = {
                 "nombre": nombre,
+                "contacto": contacto or "",
                 "telefono": telefono or "",
                 "email": email or "",
                 "direccion": direccion or "",
+                "observaciones": observaciones or "",
             }
 
             if not nombre:
@@ -1813,11 +1846,14 @@ def create_app():
 
             if not error:
                 try:
-                    cliente = Cliente(
+                    cliente = AvesGranjaCliente(
                         nombre=nombre,
+                        contacto=contacto,
                         telefono=telefono,
                         email=email,
                         direccion=direccion,
+                        observaciones=observaciones,
+                        activo=True,
                         fecha_registro=datetime.utcnow(),
                     )
                     db.session.add(cliente)
@@ -1828,7 +1864,7 @@ def create_app():
                     error = "No se pudo guardar el cliente."
 
         try:
-            clientes_count = Cliente.query.count()
+            clientes_count = AvesGranjaCliente.query.filter_by(activo=True).count()
         except SQLAlchemyError:
             db.session.rollback()
             clientes_count = 0
@@ -1871,7 +1907,9 @@ def create_app():
             plan_names = [group["name"] for group in plan_groups if group["is_complete"]]
             incomplete_plan_groups = [group for group in plan_groups if not group["is_complete"]]
             clientes_options = (
-                Cliente.query.order_by(Cliente.nombre.asc(), Cliente.id.asc()).all()
+                AvesGranjaCliente.query.filter_by(activo=True)
+                .order_by(AvesGranjaCliente.nombre.asc(), AvesGranjaCliente.id.asc())
+                .all()
             )
         except SQLAlchemyError:
             db.session.rollback()
@@ -1931,7 +1969,7 @@ def create_app():
 
             if not error:
                 try:
-                    lote = AvesCliente(
+                    lote = AvesLote(
                         nombre=nombre,
                         encargado=cliente_selected.nombre,
                         telefono=cliente_selected.telefono,
@@ -1951,8 +1989,8 @@ def create_app():
 
         try:
             lotes_raw = (
-                AvesCliente.query.filter_by(activo=True)
-                .order_by(AvesCliente.fecha_registro.desc(), AvesCliente.id.desc())
+                AvesLote.query.filter_by(activo=True)
+                .order_by(AvesLote.fecha_registro.desc(), AvesLote.id.desc())
                 .all()
             )
         except SQLAlchemyError:

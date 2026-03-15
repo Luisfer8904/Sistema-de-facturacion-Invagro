@@ -64,6 +64,10 @@
               <input type="text" name="nombre" value="{{ form_values.nombre }}" required />
             </label>
             <label>
+              <span>Contacto principal</span>
+              <input type="text" name="contacto" value="{{ form_values.contacto }}" />
+            </label>
+            <label>
               <span>Telefono</span>
               <input type="text" name="telefono" value="{{ form_values.telefono }}" />
             </label>
@@ -74,6 +78,10 @@
             <label class="span-2">
               <span>Direccion</span>
               <textarea name="direccion" rows="3">{{ form_values.direccion }}</textarea>
+            </label>
+            <label class="span-2">
+              <span>Observaciones</span>
+              <textarea name="observaciones" rows="3">{{ form_values.observaciones }}</textarea>
             </label>
             <div class="form-actions span-2">
               <button type="submit" class="primary-button">Guardar cliente</button>
