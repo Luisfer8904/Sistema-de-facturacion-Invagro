@@ -89,50 +89,154 @@
         <section class="form-card">
           <div class="module-header">
             <div>
-              <h3>Actividades del plan</h3>
-              <p>Presiona guardar para actualizar una fila o eliminar para desactivar una actividad.</p>
+              <h3>Lectura del plan</h3>
+              <p>Este plan se define por dia de vida. Las fechas reales se calculan al asignarlo a un cliente.</p>
+            </div>
+          </div>
+
+          <div class="aves-plan-overview">
+            <div class="aves-plan-summary-grid">
+              <article class="aves-summary-card">
+                <span class="aves-summary-label">Dias programados</span>
+                <strong>{{ plan_summary.days_count }}</strong>
+                <small>
+                  {% if plan_summary.first_day is not none and plan_summary.last_day is not none %}
+                    Del dia {{ plan_summary.first_day }} al {{ plan_summary.last_day }}
+                  {% else %}
+                    Sin dias configurados
+                  {% endif %}
+                </small>
+              </article>
+              <article class="aves-summary-card">
+                <span class="aves-summary-label">Vacunacion</span>
+                <strong>{{ plan_summary.vacunacion_count }}</strong>
+                <small>Actividades del plan</small>
+              </article>
+              <article class="aves-summary-card">
+                <span class="aves-summary-label">Despique</span>
+                <strong>{{ plan_summary.despique_count }}</strong>
+                <small>Actividades del plan</small>
+              </article>
+              <article class="aves-summary-card">
+                <span class="aves-summary-label">Desparasitacion</span>
+                <strong>{{ plan_summary.desparasitacion_count }}</strong>
+                <small>Actividades del plan</small>
+              </article>
+            </div>
+
+            <form class="aves-preview-form" method="get" action="/aves/planes/editar">
+              <input type="hidden" name="plan" value="{{ plan_nombre }}" />
+              <label>
+                <span>Fecha base para previsualizar</span>
+                <input type="date" name="fecha_base" value="{{ preview_base_value }}" />
+              </label>
+              <p class="aves-preview-hint">
+                Usa una fecha de nacimiento o de inicio para ver como quedaria el calendario del cliente.
+              </p>
+              <div class="form-actions">
+                <button type="submit" class="secondary-button">Ver fechas estimadas</button>
+                <a class="secondary-button" href="/aves/planes/editar?plan={{ plan_nombre|urlencode }}">Limpiar</a>
+              </div>
+            </form>
+          </div>
+        </section>
+
+        <section class="form-card">
+          <div class="module-header">
+            <div>
+              <h3>Cronograma del plan</h3>
+              <p>Ordenado por dia de vida para que luego se proyecte facilmente por cliente.</p>
             </div>
             <div class="header-actions">
               <button type="button" class="primary-button" data-add-open>Agregar actividad</button>
             </div>
           </div>
-          <div class="module-table">
-            <div class="table-header table-activity-edit">
-              <span>Dia</span>
-              <span>Tipo</span>
-              <span>Actividad</span>
-              <span>Descripcion</span>
-              <span>Acciones</span>
+
+          {% if preview_error %}
+            <div class="form-error">{{ preview_error }}</div>
+          {% endif %}
+
+          {% if preview_base_label %}
+            <div class="aves-preview-note">
+              Vista estimada desde <strong>{{ preview_base_label }}</strong>. Estas fechas son referenciales hasta asignar el plan a un cliente.
             </div>
-            {% if activities %}
-              {% for activity in activities %}
-                <form class="table-row table-activity-edit aves-activity-edit-row" method="post" action="/aves/planes/editar">
-                  <input type="hidden" name="plan_original" value="{{ plan_nombre }}" />
-                  <input type="hidden" name="activity_id" value="{{ activity.id }}" />
-                  <input class="aves-table-input" type="number" name="edad_dias" value="{{ activity.dia }}" min="0" required />
-                  <select class="aves-table-select" name="tipo" required>
-                    <option value="vacunacion" {% if activity.tipo == "vacunacion" %}selected{% endif %}>Vacunacion</option>
-                    <option value="despique" {% if activity.tipo == "despique" %}selected{% endif %}>Despique</option>
-                    <option value="desparasitacion" {% if activity.tipo == "desparasitacion" %}selected{% endif %}>Desparasitacion</option>
-                  </select>
-                  <input class="aves-table-input" type="text" name="nombre" value="{{ activity.nombre }}" required />
-                  <input class="aves-table-input" type="text" name="descripcion" value="{{ activity.descripcion }}" />
-                  <div class="table-actions">
-                    <button type="submit" name="action" value="update_activity" class="primary-button small-btn">Guardar</button>
-                    <button type="submit" name="action" value="delete_activity" class="danger-button small-btn" onclick="return confirm('Esta actividad se eliminara del plan. Continuar?');">Eliminar</button>
+          {% endif %}
+
+          {% if activity_day_groups %}
+            <div class="aves-plan-timeline">
+              {% for day_group in activity_day_groups %}
+                <article class="aves-day-block">
+                  <div class="aves-day-marker">
+                    <span class="aves-day-kicker">Dia</span>
+                    <strong>{{ day_group.dia }}</strong>
+                    {% if day_group.preview_date_label %}
+                      <span class="aves-day-date">{{ day_group.preview_date_label }}</span>
+                    {% else %}
+                      <span class="aves-day-date muted">Sin fecha calculada</span>
+                    {% endif %}
                   </div>
-                </form>
+
+                  <div class="aves-day-items">
+                    {% for activity in day_group.items %}
+                      <details class="aves-activity-card">
+                        <summary class="aves-activity-summary">
+                          <div class="aves-activity-summary-main">
+                            <span class="aves-type-badge aves-type-{{ activity.tipo }}">{{ activity.tipo_label }}</span>
+                            <strong>{{ activity.nombre }}</strong>
+                            <p>
+                              {% if activity.descripcion %}
+                                {{ activity.descripcion }}
+                              {% else %}
+                                Sin descripcion adicional.
+                              {% endif %}
+                            </p>
+                          </div>
+                          <span class="aves-activity-expand">Editar</span>
+                        </summary>
+
+                        <form class="aves-activity-editor" method="post" action="/aves/planes/editar">
+                          <input type="hidden" name="plan_original" value="{{ plan_nombre }}" />
+                          <input type="hidden" name="activity_id" value="{{ activity.id }}" />
+
+                          <label>
+                            <span>Dia</span>
+                            <input class="aves-table-input" type="number" name="edad_dias" value="{{ day_group.dia }}" min="0" required />
+                          </label>
+                          <label>
+                            <span>Tipo</span>
+                            <select class="aves-table-select" name="tipo" required>
+                              <option value="vacunacion" {% if activity.tipo == "vacunacion" %}selected{% endif %}>Vacunacion</option>
+                              <option value="despique" {% if activity.tipo == "despique" %}selected{% endif %}>Despique</option>
+                              <option value="desparasitacion" {% if activity.tipo == "desparasitacion" %}selected{% endif %}>Desparasitacion</option>
+                            </select>
+                          </label>
+                          <label>
+                            <span>Actividad</span>
+                            <input class="aves-table-input" type="text" name="nombre" value="{{ activity.nombre }}" required />
+                          </label>
+                          <label>
+                            <span>Descripcion</span>
+                            <input class="aves-table-input" type="text" name="descripcion" value="{{ activity.descripcion }}" />
+                          </label>
+
+                          <div class="form-actions">
+                            <button type="submit" name="action" value="update_activity" class="primary-button small-btn">Guardar cambios</button>
+                            <button type="submit" name="action" value="delete_activity" class="danger-button small-btn" onclick="return confirm('Esta actividad se eliminara del plan. Continuar?');">Eliminar</button>
+                          </div>
+                        </form>
+                      </details>
+                    {% endfor %}
+                  </div>
+                </article>
               {% endfor %}
-            {% else %}
-              <div class="table-row table-activity-edit">
-                <span>-</span>
-                <span>-</span>
-                <span>No hay actividades</span>
-                <span>-</span>
-                <span>-</span>
+            </div>
+          {% else %}
+            <div class="module-table">
+              <div class="table-row">
+                <span>No hay actividades en este plan.</span>
               </div>
-            {% endif %}
-          </div>
+            </div>
+          {% endif %}
         </section>
 
         <div class="modal{% if open_add_activity_modal %} open{% endif %}" data-add-modal>

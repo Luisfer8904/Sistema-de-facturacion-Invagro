@@ -2073,6 +2073,7 @@ def create_app():
             return redirect(url_for("aves_planes"))
 
         error = None
+        preview_error = None
         open_add_activity_modal = False
         add_activity_form = {
             "nombre": "",
@@ -2080,6 +2081,18 @@ def create_app():
             "edad_dias": "",
             "descripcion": "",
         }
+        preview_base_value = (request.args.get("fecha_base") or "").strip()
+        preview_base_date = None
+        preview_base_label = ""
+        if preview_base_value:
+            try:
+                preview_base_date = datetime.strptime(
+                    preview_base_value, "%Y-%m-%d"
+                ).date()
+                preview_base_label = preview_base_date.strftime("%d/%m/%Y")
+            except ValueError:
+                preview_error = "La fecha base no es valida."
+                preview_base_value = ""
 
         if request.method == "POST":
             action = (request.form.get("action") or "").strip()
@@ -2283,25 +2296,58 @@ def create_app():
             return redirect(url_for("aves_planes"))
 
         plan_status = build_aves_plan_groups(plan_rows)[0]
-        activities_view = [
-            {
-                "id": row.id,
-                "dia": int(row.edad_dias),
-                "tipo": row.tipo,
-                "tipo_label": aves_plan_type_label(row.tipo),
-                "nombre": row.nombre,
-                "descripcion": row.descripcion or "",
-            }
-            for row in plan_rows
-        ]
+        type_counts = {
+            "vacunacion": 0,
+            "despique": 0,
+            "desparasitacion": 0,
+        }
+        grouped_by_day = {}
+        for row in plan_rows:
+            dia = int(row.edad_dias)
+            if row.tipo in type_counts:
+                type_counts[row.tipo] += 1
+            day_group = grouped_by_day.setdefault(
+                dia,
+                {
+                    "dia": dia,
+                    "preview_date_label": "",
+                    "items": [],
+                },
+            )
+            if preview_base_date:
+                preview_date = preview_base_date + timedelta(days=dia)
+                day_group["preview_date_label"] = preview_date.strftime("%d/%m/%Y")
+            day_group["items"].append(
+                {
+                    "id": row.id,
+                    "tipo": row.tipo,
+                    "tipo_label": aves_plan_type_label(row.tipo),
+                    "nombre": row.nombre,
+                    "descripcion": row.descripcion or "",
+                }
+            )
+
+        activity_day_groups = [grouped_by_day[dia] for dia in sorted(grouped_by_day)]
+        plan_summary = {
+            "days_count": len(activity_day_groups),
+            "first_day": activity_day_groups[0]["dia"] if activity_day_groups else None,
+            "last_day": activity_day_groups[-1]["dia"] if activity_day_groups else None,
+            "vacunacion_count": type_counts["vacunacion"],
+            "despique_count": type_counts["despique"],
+            "desparasitacion_count": type_counts["desparasitacion"],
+        }
 
         return render_template(
             "aves_plan_editar.html",
             user=session["user"],
             error=error,
+            preview_error=preview_error,
             plan_nombre=plan_nombre_original,
             plan_status=plan_status,
-            activities=activities_view,
+            activity_day_groups=activity_day_groups,
+            plan_summary=plan_summary,
+            preview_base_value=preview_base_value,
+            preview_base_label=preview_base_label,
             open_add_activity_modal=open_add_activity_modal,
             add_activity_form=add_activity_form,
         )
