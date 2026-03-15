@@ -1550,7 +1550,7 @@ def create_app():
 
     @app.get("/aves")
     def aves_landing():
-        return render_template("aves_landing.html")
+        return redirect(url_for("login", portal="aves"))
 
     def normalize_portal_target(raw_value):
         return "aves" if (raw_value or "").strip().lower() == "aves" else "interno"
