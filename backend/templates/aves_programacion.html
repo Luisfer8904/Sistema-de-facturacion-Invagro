@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% block title %}Programacion de Galpones | Invagro{% endblock %}
+{% block body_class %}page dashboard-page{% endblock %}
+{% block content %}
+  <div class="dashboard-container">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <img class="sidebar-logo" src="/static/assets/logo.jpg" alt="Invagro" />
+        <h3>Invagro Aves</h3>
+      </div>
+      <nav class="sidebar-nav">
+        <a class="nav-item" href="/dashboard-aves">
+          <svg class="nav-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10.5L12 3l9 7.5M5.25 10.5V20.25h5.25V15h3v5.25h5.25V10.5"/></svg>
+          <span class="nav-text">Dashboard aves</span>
+        </a>
+        <a class="nav-item" href="/aves/clientes">
+          <svg class="nav-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M17.982 18.725A7.488 7.488 0 0 0 12 15.75a7.488 7.488 0 0 0-5.982 2.975m11.963 0a9 9 0 1 0-11.963 0m11.963 0A8.966 8.966 0 0 1 12 21a8.966 8.966 0 0 1-5.982-2.275M15 9.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/></svg>
+          <span class="nav-text">Registro clientes</span>
+        </a>
+        <a class="nav-item active" href="/aves/programacion">
+          <svg class="nav-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 6.75h7.5M8.25 12h7.5m-7.5 5.25h4.5M6 3.75h12A2.25 2.25 0 0 1 20.25 6v12A2.25 2.25 0 0 1 18 20.25H6A2.25 2.25 0 0 1 3.75 18V6A2.25 2.25 0 0 1 6 3.75z"/></svg>
+          <span class="nav-text">Programacion</span>
+        </a>
+        <a class="nav-item" href="/aves/planes">
+          <svg class="nav-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75m5.25 2.25a8.25 8.25 0 1 1-16.5 0 8.25 8.25 0 0 1 16.5 0Z"/></svg>
+          <span class="nav-text">Planes sanitarios</span>
+        </a>
+        <a class="nav-item" href="/logout">
+          <svg class="nav-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6A2.25 2.25 0 0 0 5.25 5.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15"/><path stroke-linecap="round" stroke-linejoin="round" d="M18 12H9m0 0 3-3m-3 3 3 3"/></svg>
+          <span class="nav-text">Cerrar sesion</span>
+        </a>
+      </nav>
+      <div class="sidebar-footer">
+        <img class="sidebar-mascot" src="/static/assets/mascota.jpeg" alt="Mascota" />
+      </div>
+    </aside>
+
+    <div class="main-content">
+      <div class="topbar">
+        <div class="topbar-left">
+          <h2>Programacion de Galpones</h2>
+        </div>
+        <div class="topbar-right">
+          <span class="user-pill">Sesion: {{ user }}</span>
+        </div>
+      </div>
+
+      <main class="content-area aves-plan-board">
+        <section class="module-header">
+          <div>
+            <h1>Galpones programados</h1>
+            <p>Consulta las actividades proyectadas segun el plan asignado y la fecha de nacimiento del lote.</p>
+          </div>
+          <div class="header-actions">
+            <a class="primary-button" href="/aves/clientes">Registrar cliente</a>
+          </div>
+        </section>
+
+        <section class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-label">Galpones con agenda</div>
+            <div class="stat-value">{{ total_galpones }}</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Actividades hoy</div>
+            <div class="stat-value">{{ actividades_hoy }}</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Proximos 7 dias</div>
+            <div class="stat-value">{{ actividades_semana }}</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Total en ventana</div>
+            <div class="stat-value">{{ total_actividades }}</div>
+          </div>
+        </section>
+
+        <section class="form-card">
+          <div class="module-header">
+            <div>
+              <h3>Ventana de programacion</h3>
+              <p>Filtra los galpones segun el horizonte de dias que quieres revisar.</p>
+            </div>
+            <form class="aves-inline-search" method="get" action="/aves/programacion">
+              <select name="dias">
+                <option value="7" {% if days_ahead == 7 %}selected{% endif %}>7 dias</option>
+                <option value="15" {% if days_ahead == 15 %}selected{% endif %}>15 dias</option>
+                <option value="30" {% if days_ahead == 30 %}selected{% endif %}>30 dias</option>
+                <option value="60" {% if days_ahead == 60 %}selected{% endif %}>60 dias</option>
+              </select>
+              <button type="submit" class="secondary-button">Actualizar</button>
+            </form>
+          </div>
+        </section>
+
+        {% if galpones_programados %}
+          <section class="aves-plan-timeline">
+            {% for galpon in galpones_programados %}
+              <article class="form-card">
+                <div class="module-header">
+                  <div>
+                    <h3>{{ galpon.cliente_nombre }}</h3>
+                    <p>{{ galpon.plan_nombre }} | Proxima fecha: {{ galpon.proxima_fecha }} | Faltan {{ galpon.proximidad_label }}</p>
+                  </div>
+                </div>
+
+                <div class="module-table">
+                  <div class="table-header table-four">
+                    <span>Fecha</span>
+                    <span>Dia</span>
+                    <span>Tipo</span>
+                    <span>Actividad</span>
+                  </div>
+                  {% for actividad in galpon.actividades %}
+                    <div class="table-row table-four">
+                      <span>{{ actividad.fecha_label }}</span>
+                      <span>Dia {{ actividad.dia }} ({{ actividad.dias_restantes }} dias)</span>
+                      <span>{{ actividad.tipo_label }}</span>
+                      <span>{{ actividad.actividad_nombre }}</span>
+                    </div>
+                  {% endfor %}
+                </div>
+              </article>
+            {% endfor %}
+          </section>
+        {% else %}
+          <section class="form-card">
+            <h3>No hay galpones programados</h3>
+            <p>Registra clientes con un plan completo para que aqui aparezca su calendario.</p>
+          </section>
+        {% endif %}
+      </main>
+    </div>
+  </div>
+{% endblock %}

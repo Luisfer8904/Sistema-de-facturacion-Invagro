@@ -1859,60 +1859,14 @@ def create_app():
                 .order_by(AvesCliente.fecha_registro.desc(), AvesCliente.id.desc())
                 .all()
             )
-            planes_raw = (
-                AvesPlan.query.filter_by(activo=True)
-                .order_by(
-                    AvesPlan.plan_nombre.asc(),
-                    AvesPlan.edad_dias.asc(),
-                    AvesPlan.tipo.asc(),
-                )
-                .all()
-            )
         except SQLAlchemyError:
             db.session.rollback()
             clientes_raw = []
-            planes_raw = []
             if not error:
                 error = "No se pudo cargar la informacion de clientes."
 
-        today = datetime.utcnow().date()
-        plans_by_name = {}
-        for plan_aves in planes_raw:
-            key = (plan_aves.plan_nombre or "").strip()
-            if not key:
-                continue
-            plans_by_name.setdefault(key, []).append(plan_aves)
-
         clientes_view = []
         for cliente_aves in clientes_raw:
-            selected_plan = (cliente_aves.plan_nombre or "").strip()
-            upcoming = []
-            for plan_aves in plans_by_name.get(selected_plan, []):
-                if plan_aves.edad_dias is None or plan_aves.edad_dias < 0:
-                    continue
-                scheduled_date = cliente_aves.fecha_nacimiento + timedelta(
-                    days=int(plan_aves.edad_dias)
-                )
-                if scheduled_date < today:
-                    continue
-                days_left = (scheduled_date - today).days
-                upcoming.append(
-                    {
-                        "plan_nombre": plan_aves.plan_nombre,
-                        "actividad_nombre": plan_aves.nombre,
-                        "tipo_label": aves_plan_type_label(plan_aves.tipo),
-                        "dia": int(plan_aves.edad_dias),
-                        "fecha": scheduled_date,
-                        "fecha_label": scheduled_date.strftime("%d/%m/%Y"),
-                        "dias_restantes": days_left,
-                    }
-                )
-            upcoming.sort(
-                key=lambda item: (
-                    item["fecha"],
-                    item["tipo_label"],
-                )
-            )
             clientes_view.append(
                 {
                     "id": cliente_aves.id,
@@ -1920,11 +1874,11 @@ def create_app():
                     "encargado": cliente_aves.encargado or "-",
                     "telefono": cliente_aves.telefono or "-",
                     "cantidad_aves": cliente_aves.cantidad_aves or 0,
-                    "plan_nombre": selected_plan or "-",
+                    "plan_nombre": (cliente_aves.plan_nombre or "").strip() or "-",
                     "fecha_nacimiento_label": cliente_aves.fecha_nacimiento.strftime(
                         "%d/%m/%Y"
                     ),
-                    "proximas_actividades": upcoming[:3],
+                    "observaciones": cliente_aves.observaciones or "-",
                 }
             )
 
@@ -1936,6 +1890,55 @@ def create_app():
             planes_activos_count=len(plan_names),
             planes_nombres=plan_names,
             planes_incompletos=incomplete_plan_groups,
+        )
+
+    @app.route("/aves/programacion", methods=["GET"])
+    def aves_programacion():
+        if not session.get("user"):
+            return redirect(url_for("login", portal="aves"))
+
+        days_ahead_raw = (request.args.get("dias") or "30").strip()
+        try:
+            days_ahead = int(days_ahead_raw)
+        except ValueError:
+            days_ahead = 30
+        if days_ahead not in (7, 15, 30, 60):
+            days_ahead = 30
+
+        upcoming_activities = build_aves_upcoming_activities(days_ahead=days_ahead)
+        grouped_by_cliente = {}
+        for item in upcoming_activities:
+            client_group = grouped_by_cliente.setdefault(
+                item["cliente_id"],
+                {
+                    "cliente_id": item["cliente_id"],
+                    "cliente_nombre": item["cliente_nombre"],
+                    "plan_nombre": item["plan_nombre"],
+                    "proxima_fecha": item["fecha_label"],
+                    "proximidad_label": f"{item['dias_restantes']} dias",
+                    "actividades": [],
+                },
+            )
+            client_group["actividades"].append(item)
+
+        galpones_programados = list(grouped_by_cliente.values())
+        total_galpones = len(galpones_programados)
+        actividades_hoy = len(
+            [item for item in upcoming_activities if item["dias_restantes"] == 0]
+        )
+        actividades_semana = len(
+            [item for item in upcoming_activities if item["dias_restantes"] <= 7]
+        )
+
+        return render_template(
+            "aves_programacion.html",
+            user=session["user"],
+            days_ahead=days_ahead,
+            galpones_programados=galpones_programados,
+            total_galpones=total_galpones,
+            actividades_hoy=actividades_hoy,
+            actividades_semana=actividades_semana,
+            total_actividades=len(upcoming_activities),
         )
 
     @app.route("/aves/planes", methods=["GET"])
@@ -2073,7 +2076,6 @@ def create_app():
             return redirect(url_for("aves_planes"))
 
         error = None
-        preview_error = None
         open_add_activity_modal = False
         add_activity_form = {
             "nombre": "",
@@ -2081,18 +2083,6 @@ def create_app():
             "edad_dias": "",
             "descripcion": "",
         }
-        preview_base_value = (request.args.get("fecha_base") or "").strip()
-        preview_base_date = None
-        preview_base_label = ""
-        if preview_base_value:
-            try:
-                preview_base_date = datetime.strptime(
-                    preview_base_value, "%Y-%m-%d"
-                ).date()
-                preview_base_label = preview_base_date.strftime("%d/%m/%Y")
-            except ValueError:
-                preview_error = "La fecha base no es valida."
-                preview_base_value = ""
 
         if request.method == "POST":
             action = (request.form.get("action") or "").strip()
@@ -2310,13 +2300,9 @@ def create_app():
                 dia,
                 {
                     "dia": dia,
-                    "preview_date_label": "",
                     "items": [],
                 },
             )
-            if preview_base_date:
-                preview_date = preview_base_date + timedelta(days=dia)
-                day_group["preview_date_label"] = preview_date.strftime("%d/%m/%Y")
             day_group["items"].append(
                 {
                     "id": row.id,
@@ -2341,13 +2327,10 @@ def create_app():
             "aves_plan_editar.html",
             user=session["user"],
             error=error,
-            preview_error=preview_error,
             plan_nombre=plan_nombre_original,
             plan_status=plan_status,
             activity_day_groups=activity_day_groups,
             plan_summary=plan_summary,
-            preview_base_value=preview_base_value,
-            preview_base_label=preview_base_label,
             open_add_activity_modal=open_add_activity_modal,
             add_activity_form=add_activity_form,
         )

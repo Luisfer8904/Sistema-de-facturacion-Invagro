@@ -778,7 +778,22 @@ body {
   color: #2c3e50;
 }
 
+.aves-inline-search select {
+  min-width: 160px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 2px solid #e0e0e0;
+  background: #ffffff;
+  color: #2c3e50;
+}
+
 .aves-inline-search input:focus {
+  outline: none;
+  border-color: #2c7a3f;
+  box-shadow: 0 0 0 3px rgba(44, 122, 63, 0.1);
+}
+
+.aves-inline-search select:focus {
   outline: none;
   border-color: #2c7a3f;
   box-shadow: 0 0 0 3px rgba(44, 122, 63, 0.1);

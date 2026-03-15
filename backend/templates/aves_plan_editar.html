@@ -15,7 +15,11 @@
         </a>
         <a class="nav-item" href="/aves/clientes">
           <svg class="nav-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M17.982 18.725A7.488 7.488 0 0 0 12 15.75a7.488 7.488 0 0 0-5.982 2.975m11.963 0a9 9 0 1 0-11.963 0m11.963 0A8.966 8.966 0 0 1 12 21a8.966 8.966 0 0 1-5.982-2.275M15 9.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/></svg>
-          <span class="nav-text">Clientes aves</span>
+          <span class="nav-text">Registro clientes</span>
+        </a>
+        <a class="nav-item" href="/aves/programacion">
+          <svg class="nav-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 6.75h7.5M8.25 12h7.5m-7.5 5.25h4.5M6 3.75h12A2.25 2.25 0 0 1 20.25 6v12A2.25 2.25 0 0 1 18 20.25H6A2.25 2.25 0 0 1 3.75 18V6A2.25 2.25 0 0 1 6 3.75z"/></svg>
+          <span class="nav-text">Programacion</span>
         </a>
         <a class="nav-item active" href="/aves/planes">
           <svg class="nav-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75m5.25 2.25a8.25 8.25 0 1 1-16.5 0 8.25 8.25 0 0 1 16.5 0Z"/></svg>
@@ -90,54 +94,37 @@
           <div class="module-header">
             <div>
               <h3>Lectura del plan</h3>
-              <p>Este plan se define por dia de vida. Las fechas reales se calculan al asignarlo a un cliente.</p>
+              <p>Este plan se define por dia de vida y luego se aplica a cada cliente o galpon registrado.</p>
             </div>
           </div>
 
-          <div class="aves-plan-overview">
-            <div class="aves-plan-summary-grid">
-              <article class="aves-summary-card">
-                <span class="aves-summary-label">Dias programados</span>
-                <strong>{{ plan_summary.days_count }}</strong>
-                <small>
-                  {% if plan_summary.first_day is not none and plan_summary.last_day is not none %}
-                    Del dia {{ plan_summary.first_day }} al {{ plan_summary.last_day }}
-                  {% else %}
-                    Sin dias configurados
-                  {% endif %}
-                </small>
-              </article>
-              <article class="aves-summary-card">
-                <span class="aves-summary-label">Vacunacion</span>
-                <strong>{{ plan_summary.vacunacion_count }}</strong>
-                <small>Actividades del plan</small>
-              </article>
-              <article class="aves-summary-card">
-                <span class="aves-summary-label">Despique</span>
-                <strong>{{ plan_summary.despique_count }}</strong>
-                <small>Actividades del plan</small>
-              </article>
-              <article class="aves-summary-card">
-                <span class="aves-summary-label">Desparasitacion</span>
-                <strong>{{ plan_summary.desparasitacion_count }}</strong>
-                <small>Actividades del plan</small>
-              </article>
-            </div>
-
-            <form class="aves-preview-form" method="get" action="/aves/planes/editar">
-              <input type="hidden" name="plan" value="{{ plan_nombre }}" />
-              <label>
-                <span>Fecha base para previsualizar</span>
-                <input type="date" name="fecha_base" value="{{ preview_base_value }}" />
-              </label>
-              <p class="aves-preview-hint">
-                Usa una fecha de nacimiento o de inicio para ver como quedaria el calendario del cliente.
-              </p>
-              <div class="form-actions">
-                <button type="submit" class="secondary-button">Ver fechas estimadas</button>
-                <a class="secondary-button" href="/aves/planes/editar?plan={{ plan_nombre|urlencode }}">Limpiar</a>
-              </div>
-            </form>
+          <div class="aves-plan-summary-grid">
+            <article class="aves-summary-card">
+              <span class="aves-summary-label">Dias programados</span>
+              <strong>{{ plan_summary.days_count }}</strong>
+              <small>
+                {% if plan_summary.first_day is not none and plan_summary.last_day is not none %}
+                  Del dia {{ plan_summary.first_day }} al {{ plan_summary.last_day }}
+                {% else %}
+                  Sin dias configurados
+                {% endif %}
+              </small>
+            </article>
+            <article class="aves-summary-card">
+              <span class="aves-summary-label">Vacunacion</span>
+              <strong>{{ plan_summary.vacunacion_count }}</strong>
+              <small>Actividades del plan</small>
+            </article>
+            <article class="aves-summary-card">
+              <span class="aves-summary-label">Despique</span>
+              <strong>{{ plan_summary.despique_count }}</strong>
+              <small>Actividades del plan</small>
+            </article>
+            <article class="aves-summary-card">
+              <span class="aves-summary-label">Desparasitacion</span>
+              <strong>{{ plan_summary.desparasitacion_count }}</strong>
+              <small>Actividades del plan</small>
+            </article>
           </div>
         </section>
 
@@ -152,16 +139,6 @@
             </div>
           </div>
 
-          {% if preview_error %}
-            <div class="form-error">{{ preview_error }}</div>
-          {% endif %}
-
-          {% if preview_base_label %}
-            <div class="aves-preview-note">
-              Vista estimada desde <strong>{{ preview_base_label }}</strong>. Estas fechas son referenciales hasta asignar el plan a un cliente.
-            </div>
-          {% endif %}
-
           {% if activity_day_groups %}
             <div class="aves-plan-timeline">
               {% for day_group in activity_day_groups %}
@@ -169,11 +146,7 @@
                   <div class="aves-day-marker">
                     <span class="aves-day-kicker">Dia</span>
                     <strong>{{ day_group.dia }}</strong>
-                    {% if day_group.preview_date_label %}
-                      <span class="aves-day-date">{{ day_group.preview_date_label }}</span>
-                    {% else %}
-                      <span class="aves-day-date muted">Sin fecha calculada</span>
-                    {% endif %}
+                    <span class="aves-day-date muted">Edad del lote</span>
                   </div>
 
                   <div class="aves-day-items">
