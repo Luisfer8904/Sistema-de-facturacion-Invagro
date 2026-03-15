@@ -48,25 +48,13 @@
       <main class="content-area">
         <section class="module-header">
           <div>
-            <h1>Asignacion de lotes</h1>
-            <p>Asigna cada lote a un cliente y a un plan de manejo para activar su calendario sanitario.</p>
+            <h1>Registro y control de lotes</h1>
+            <p>Crea el lote primero. La asignacion de cliente y programa de manejo puede hacerse despues desde cada tarjeta.</p>
           </div>
         </section>
 
         {% if error %}
           <div class="form-error">{{ error }}</div>
-        {% endif %}
-
-        {% if not clientes %}
-          <div class="form-error">
-            No hay clientes creados. Registra primero el cliente para poder asignar un lote.
-          </div>
-        {% endif %}
-
-        {% if not planes_nombres %}
-          <div class="form-error">
-            No hay planes completos para asignar. Cada plan debe incluir vacunacion, despique y desparasitacion.
-          </div>
         {% endif %}
 
         {% if planes_incompletos %}
@@ -84,15 +72,22 @@
         {% endif %}
 
         <section class="form-card">
+          <div class="module-header">
+            <div>
+              <h3>Crear lote</h3>
+              <p>Registra la edad base del lote y completa la asignacion cuando ya tengas cliente y plan definidos.</p>
+            </div>
+          </div>
           <form class="module-form" method="post" action="/aves/lotes">
+            <input type="hidden" name="action" value="create_lote" />
             <label>
               <span>Lote / Galpon</span>
               <input type="text" name="nombre" value="{{ form_values.nombre }}" required />
             </label>
             <label>
               <span>Cliente asignado</span>
-              <select name="cliente_id" required>
-                <option value="">Selecciona cliente</option>
+              <select name="cliente_id">
+                <option value="">Sin asignar por ahora</option>
                 {% for cliente in clientes %}
                   <option value="{{ cliente.id }}" {% if form_values.cliente_id|int == cliente.id %}selected{% endif %}>{{ cliente.nombre }}</option>
                 {% endfor %}
@@ -104,8 +99,8 @@
             </label>
             <label>
               <span>Plan de manejo</span>
-              <select name="plan_nombre" required>
-                <option value="">Selecciona plan</option>
+              <select name="plan_nombre">
+                <option value="">Sin asignar por ahora</option>
                 {% for plan_nombre in planes_nombres %}
                   <option value="{{ plan_nombre }}" {% if form_values.plan_nombre == plan_nombre %}selected{% endif %}>{{ plan_nombre }}</option>
                 {% endfor %}
@@ -141,37 +136,112 @@
           </div>
         </section>
 
-        <section class="module-table">
-          <div class="table-header table-four">
-            <span>Lote</span>
-            <span>Cliente y plan</span>
-            <span>Nacimiento y aves</span>
-            <span>Notas</span>
+        <section class="form-card">
+          <div class="module-header">
+            <div>
+              <h3>Lotes registrados</h3>
+              <p>Cada lote tiene su propia tarjeta para completar asignaciones y datos sanitarios.</p>
+            </div>
           </div>
+
           {% if lotes %}
-            {% for lote in lotes %}
-              <div class="table-row table-four">
-                <span>
-                  <strong>{{ lote.nombre }}</strong><br />
-                  <small>{{ lote.telefono }}</small>
-                </span>
-                <span>
-                  <strong>{{ lote.cliente_nombre }}</strong><br />
-                  {{ lote.plan_nombre }}
-                </span>
-                <span>
-                  Nac: {{ lote.fecha_nacimiento_label }}<br />
-                  Aves: {{ lote.cantidad_aves }}
-                </span>
-                <span>{{ lote.observaciones }}</span>
-              </div>
-            {% endfor %}
+            <div class="aves-plan-timeline">
+              {% for lote in lotes %}
+                <article class="aves-lote-card">
+                  <div class="aves-lote-card-top">
+                    <div class="aves-lote-chip">
+                      <span class="aves-day-kicker">Lote</span>
+                      <strong>{{ lote.nombre }}</strong>
+                      <span class="aves-day-date">Nac: {{ lote.fecha_nacimiento_label }}</span>
+                    </div>
+
+                    <div class="aves-lote-summary">
+                      <div class="aves-plan-summary-grid aves-lote-summary-grid">
+                        <article class="aves-summary-card">
+                          <span class="aves-summary-label">Cliente</span>
+                          <strong>{{ lote.cliente_nombre }}</strong>
+                          <small>{% if lote.is_assigned_client %}Asignado{% else %}Pendiente de asignar{% endif %}</small>
+                        </article>
+                        <article class="aves-summary-card">
+                          <span class="aves-summary-label">Programa</span>
+                          <strong>{{ lote.plan_nombre }}</strong>
+                          <small>{% if lote.is_assigned_plan %}Activo{% else %}Pendiente de asignar{% endif %}</small>
+                        </article>
+                        <article class="aves-summary-card">
+                          <span class="aves-summary-label">Cantidad</span>
+                          <strong>{{ lote.cantidad_aves }}</strong>
+                          <small>Aves registradas</small>
+                        </article>
+                        <article class="aves-summary-card">
+                          <span class="aves-summary-label">Telefono</span>
+                          <strong>{{ lote.telefono }}</strong>
+                          <small>Contacto actual</small>
+                        </article>
+                      </div>
+                    </div>
+                  </div>
+
+                  <details class="aves-activity-card">
+                    <summary class="aves-activity-summary">
+                      <div class="aves-activity-summary-main">
+                        <strong>Asignar cliente y programa de manejo</strong>
+                        <p>{{ lote.observaciones }}</p>
+                      </div>
+                      <span class="aves-activity-expand">Editar</span>
+                    </summary>
+
+                    <form class="aves-activity-editor aves-lote-editor" method="post" action="/aves/lotes">
+                      <input type="hidden" name="action" value="update_lote" />
+                      <input type="hidden" name="lote_id" value="{{ lote.id }}" />
+
+                      <label>
+                        <span>Lote / Galpon</span>
+                        <input class="aves-table-input" type="text" name="nombre" value="{{ lote.nombre }}" required />
+                      </label>
+                      <label>
+                        <span>Cliente asignado</span>
+                        <select class="aves-table-select" name="cliente_id">
+                          <option value="">Sin asignar</option>
+                          {% for cliente in clientes %}
+                            <option value="{{ cliente.id }}" {% if lote.cliente_nombre == cliente.nombre %}selected{% endif %}>{{ cliente.nombre }}</option>
+                          {% endfor %}
+                        </select>
+                      </label>
+                      <label>
+                        <span>Fecha nacimiento</span>
+                        <input class="aves-table-input" type="date" name="fecha_nacimiento" value="{{ lote.fecha_nacimiento_value }}" required />
+                      </label>
+                      <label>
+                        <span>Programa de manejo</span>
+                        <select class="aves-table-select" name="plan_nombre">
+                          <option value="">Sin asignar</option>
+                          {% for plan_nombre in planes_nombres %}
+                            <option value="{{ plan_nombre }}" {% if lote.plan_nombre == plan_nombre %}selected{% endif %}>{{ plan_nombre }}</option>
+                          {% endfor %}
+                        </select>
+                      </label>
+                      <label>
+                        <span>Cantidad de aves</span>
+                        <input class="aves-table-input" type="number" name="cantidad_aves" min="0" value="{{ lote.cantidad_aves }}" />
+                      </label>
+                      <label class="span-2">
+                        <span>Observaciones</span>
+                        <input class="aves-table-input" type="text" name="observaciones" value="{% if lote.observaciones != '-' %}{{ lote.observaciones }}{% endif %}" />
+                      </label>
+
+                      <div class="form-actions">
+                        <button type="submit" class="primary-button small-btn">Guardar cambios</button>
+                      </div>
+                    </form>
+                  </details>
+                </article>
+              {% endfor %}
+            </div>
           {% else %}
-            <div class="table-row table-four">
-              <span>-</span>
-              <span>No hay lotes</span>
-              <span>-</span>
-              <span>-</span>
+            <div class="module-table">
+              <div class="table-row">
+                <span>No hay lotes registrados.</span>
+              </div>
             </div>
           {% endif %}
         </section>

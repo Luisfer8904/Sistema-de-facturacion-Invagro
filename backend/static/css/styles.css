@@ -1055,6 +1055,46 @@ body {
   padding-top: 4px;
 }
 
+.aves-lote-card {
+  display: grid;
+  gap: 16px;
+  padding: 8px 0;
+}
+
+.aves-lote-card-top {
+  display: grid;
+  grid-template-columns: 190px minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.aves-lote-chip {
+  background: linear-gradient(180deg, #1f5d3a, #2c7a3f);
+  color: #ffffff;
+  border-radius: 22px;
+  padding: 20px 18px;
+  display: grid;
+  gap: 8px;
+  box-shadow: 0 12px 24px rgba(44, 122, 63, 0.2);
+}
+
+.aves-lote-chip strong {
+  font-size: 1.9rem;
+  line-height: 1.05;
+}
+
+.aves-lote-summary {
+  min-width: 0;
+}
+
+.aves-lote-summary-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.aves-lote-editor {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .aves-type-vacunacion {
   background: rgba(29, 78, 216, 0.12);
   color: #1d4ed8;
@@ -2193,7 +2233,8 @@ body {
   }
 
   .aves-plan-overview,
-  .aves-day-block {
+  .aves-day-block,
+  .aves-lote-card-top {
     grid-template-columns: 1fr;
   }
 
@@ -2205,7 +2246,8 @@ body {
     grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   }
 
-  .aves-activity-editor {
+  .aves-activity-editor,
+  .aves-lote-editor {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -2237,7 +2279,8 @@ body {
     align-self: flex-start;
   }
 
-  .aves-activity-editor {
+  .aves-activity-editor,
+  .aves-lote-editor {
     grid-template-columns: 1fr;
   }
 }

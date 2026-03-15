@@ -1916,6 +1916,7 @@ def create_app():
             error = "No se pudieron cargar clientes o planes."
 
         if request.method == "POST":
+            action = (request.form.get("action") or "create_lote").strip()
             nombre = (request.form.get("nombre") or "").strip()
             cliente_id_raw = (request.form.get("cliente_id") or "").strip()
             fecha_nacimiento_raw = (request.form.get("fecha_nacimiento") or "").strip()
@@ -1936,8 +1937,8 @@ def create_app():
             except ValueError:
                 cliente_id = 0
 
-            if not nombre or cliente_id <= 0 or not fecha_nacimiento_raw or not plan_nombre:
-                error = "Lote, cliente, fecha de nacimiento y plan de manejo son obligatorios."
+            if not nombre or not fecha_nacimiento_raw:
+                error = "Lote y fecha de nacimiento son obligatorios."
             else:
                 try:
                     fecha_nacimiento = datetime.strptime(
@@ -1948,7 +1949,7 @@ def create_app():
                     fecha_nacimiento = None
 
             cliente_selected = None
-            if not error:
+            if not error and cliente_id > 0:
                 cliente_selected = next(
                     (cliente for cliente in clientes_options if cliente.id == cliente_id),
                     None,
@@ -1956,7 +1957,7 @@ def create_app():
                 if not cliente_selected:
                     error = "Selecciona un cliente valido."
 
-            if not error and plan_nombre not in plan_names:
+            if not error and plan_nombre and plan_nombre not in plan_names:
                 error = "Selecciona un plan de manejo valido y completo."
 
             if not error:
@@ -1969,20 +1970,46 @@ def create_app():
 
             if not error:
                 try:
-                    lote = AvesLote(
-                        nombre=nombre,
-                        encargado=cliente_selected.nombre,
-                        telefono=cliente_selected.telefono,
-                        fecha_nacimiento=fecha_nacimiento,
-                        plan_nombre=plan_nombre,
-                        cantidad_aves=cantidad_aves,
-                        observaciones=observaciones,
-                        activo=True,
-                        fecha_registro=datetime.utcnow(),
-                    )
-                    db.session.add(lote)
+                    if action == "update_lote":
+                        lote_id_raw = (request.form.get("lote_id") or "").strip()
+                        try:
+                            lote_id = int(lote_id_raw)
+                        except ValueError:
+                            lote_id = 0
+                        lote = (
+                            AvesLote.query.filter_by(id=lote_id, activo=True).first()
+                            if lote_id > 0
+                            else None
+                        )
+                        if not lote:
+                            error = "No se encontro el lote seleccionado."
+                        else:
+                            lote.nombre = nombre
+                            lote.encargado = cliente_selected.nombre if cliente_selected else None
+                            lote.telefono = cliente_selected.telefono if cliente_selected else None
+                            lote.fecha_nacimiento = fecha_nacimiento
+                            lote.plan_nombre = plan_nombre or None
+                            lote.cantidad_aves = cantidad_aves
+                            lote.observaciones = observaciones
+                    else:
+                        lote = AvesLote(
+                            nombre=nombre,
+                            encargado=cliente_selected.nombre if cliente_selected else None,
+                            telefono=cliente_selected.telefono if cliente_selected else None,
+                            fecha_nacimiento=fecha_nacimiento,
+                            plan_nombre=plan_nombre or None,
+                            cantidad_aves=cantidad_aves,
+                            observaciones=observaciones,
+                            activo=True,
+                            fecha_registro=datetime.utcnow(),
+                        )
+                        db.session.add(lote)
+                    if error:
+                        raise ValueError(error)
                     db.session.commit()
                     return redirect(url_for("aves_lotes"))
+                except ValueError:
+                    db.session.rollback()
                 except SQLAlchemyError:
                     db.session.rollback()
                     error = "No se pudo guardar el lote."
@@ -2004,9 +2031,12 @@ def create_app():
                 "id": lote.id,
                 "nombre": lote.nombre,
                 "cliente_nombre": lote.encargado or "-",
+                "is_assigned_client": bool(lote.encargado),
                 "telefono": lote.telefono or "-",
                 "cantidad_aves": lote.cantidad_aves or 0,
                 "plan_nombre": (lote.plan_nombre or "").strip() or "-",
+                "is_assigned_plan": bool((lote.plan_nombre or "").strip()),
+                "fecha_nacimiento_value": lote.fecha_nacimiento.strftime("%Y-%m-%d"),
                 "fecha_nacimiento_label": lote.fecha_nacimiento.strftime("%d/%m/%Y"),
                 "observaciones": lote.observaciones or "-",
             }
