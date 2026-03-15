@@ -1938,64 +1938,12 @@ def create_app():
             planes_incompletos=incomplete_plan_groups,
         )
 
-    @app.route("/aves/planes", methods=["GET", "POST"])
+    @app.route("/aves/planes", methods=["GET"])
     def aves_planes():
         if not session.get("user"):
             return redirect(url_for("login", portal="aves"))
 
         error = None
-        if request.method == "POST":
-            plan_nombre = (request.form.get("plan_nombre") or "").strip()
-            nombre = (request.form.get("nombre") or "").strip()
-            tipo = normalize_aves_plan_type(request.form.get("tipo"))
-            edad_dias_raw = (request.form.get("edad_dias") or "").strip()
-            descripcion = (request.form.get("descripcion") or "").strip() or None
-
-            if not plan_nombre or not nombre or not tipo or not edad_dias_raw:
-                error = "Plan, actividad, tipo y dia son obligatorios."
-            else:
-                try:
-                    edad_dias = int(edad_dias_raw)
-                    if edad_dias < 0:
-                        raise ValueError
-                except ValueError:
-                    error = "El dia de actividad debe ser un numero positivo."
-
-            if not error:
-                try:
-                    same_day = (
-                        AvesPlan.query.filter(
-                            AvesPlan.activo.is_(True),
-                            AvesPlan.plan_nombre == plan_nombre,
-                            AvesPlan.edad_dias == edad_dias,
-                        ).first()
-                    )
-                    if same_day:
-                        error = (
-                            f"Ya existe una actividad para el dia {edad_dias} en el plan '{plan_nombre}'."
-                        )
-                except SQLAlchemyError:
-                    db.session.rollback()
-                    error = "No se pudo validar el dia de actividad del plan."
-
-            if not error:
-                try:
-                    plan_aves = AvesPlan(
-                        plan_nombre=plan_nombre,
-                        nombre=nombre,
-                        tipo=tipo,
-                        edad_dias=edad_dias,
-                        descripcion=descripcion,
-                        activo=True,
-                        fecha_creacion=datetime.utcnow(),
-                    )
-                    db.session.add(plan_aves)
-                    db.session.commit()
-                    return redirect(url_for("aves_planes"))
-                except SQLAlchemyError:
-                    db.session.rollback()
-                    error = "No se pudo guardar el plan."
-
         try:
             planes_raw = (
                 AvesPlan.query.filter_by(activo=True)
@@ -2027,6 +1975,88 @@ def create_app():
             error=error,
             plan_groups=plan_groups,
             search_query=search_query,
+        )
+
+    @app.route("/aves/planes/nuevo", methods=["GET", "POST"])
+    def aves_plan_nuevo():
+        if not session.get("user"):
+            return redirect(url_for("login", portal="aves"))
+
+        error = None
+        form_values = {
+            "plan_nombre": "",
+            "nombre": "",
+            "tipo": "",
+            "edad_dias": "",
+            "descripcion": "",
+        }
+
+        if request.method == "POST":
+            plan_nombre = (request.form.get("plan_nombre") or "").strip()
+            nombre = (request.form.get("nombre") or "").strip()
+            tipo = normalize_aves_plan_type(request.form.get("tipo"))
+            edad_dias_raw = (request.form.get("edad_dias") or "").strip()
+            descripcion = (request.form.get("descripcion") or "").strip() or None
+
+            form_values = {
+                "plan_nombre": plan_nombre,
+                "nombre": nombre,
+                "tipo": (request.form.get("tipo") or "").strip().lower(),
+                "edad_dias": edad_dias_raw,
+                "descripcion": request.form.get("descripcion") or "",
+            }
+
+            if not plan_nombre or not nombre or not tipo or not edad_dias_raw:
+                error = "Plan, actividad, tipo y dia son obligatorios."
+            else:
+                try:
+                    edad_dias = int(edad_dias_raw)
+                    if edad_dias < 0:
+                        raise ValueError
+                except ValueError:
+                    error = "El dia de actividad debe ser un numero positivo."
+
+            if not error:
+                try:
+                    same_day = (
+                        AvesPlan.query.filter(
+                            AvesPlan.activo.is_(True),
+                            AvesPlan.plan_nombre == plan_nombre,
+                            AvesPlan.edad_dias == edad_dias,
+                        ).first()
+                    )
+                    if same_day:
+                        error = (
+                            f"Ya existe una actividad para el dia {edad_dias} en el plan '{plan_nombre}'."
+                        )
+                except SQLAlchemyError:
+                    db.session.rollback()
+                    error = "No se pudo validar el dia de actividad del plan."
+
+            if not error:
+                try:
+                    db.session.add(
+                        AvesPlan(
+                            plan_nombre=plan_nombre,
+                            nombre=nombre,
+                            tipo=tipo,
+                            edad_dias=edad_dias,
+                            descripcion=descripcion,
+                            activo=True,
+                            fecha_creacion=datetime.utcnow(),
+                        )
+                    )
+                    db.session.commit()
+                    return redirect(url_for("aves_plan_editar", plan=plan_nombre))
+                except SQLAlchemyError:
+                    db.session.rollback()
+                    error = "No se pudo guardar el plan."
+
+        return render_template(
+            "aves_plan_nuevo.html",
+            user=session["user"],
+            error=error,
+            form_values=form_values,
         )
 
     @app.route("/aves/planes/editar", methods=["GET", "POST"])

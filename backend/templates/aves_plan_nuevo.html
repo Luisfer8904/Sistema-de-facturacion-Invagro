@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Planes Sanitarios | Invagro{% endblock %}
+{% block title %}Nuevo Plan Sanitario | Invagro{% endblock %}
 {% block body_class %}page dashboard-page{% endblock %}
 {% block content %}
   <div class="dashboard-container">
@@ -34,21 +34,21 @@
     <div class="main-content">
       <div class="topbar">
         <div class="topbar-left">
-          <h2>Planes Sanitarios</h2>
+          <h2>Nuevo Plan Sanitario</h2>
         </div>
         <div class="topbar-right">
           <span class="user-pill">Sesion: {{ user }}</span>
         </div>
       </div>
 
-      <main class="content-area aves-plan-board">
+      <main class="content-area">
         <section class="module-header">
           <div>
-            <h1>Programas sanitarios por plan</h1>
-            <p>Consulta planes activos y administra sus actividades desde editar.</p>
+            <h1>Crear plan (primera actividad)</h1>
+            <p>Despues de guardar podras agregar mas actividades desde la pantalla de editar.</p>
           </div>
           <div class="header-actions">
-            <a class="primary-button" href="/aves/planes/nuevo">Nuevo plan</a>
+            <a class="secondary-button" href="/aves/planes">Volver a planes</a>
           </div>
         </section>
 
@@ -57,59 +57,37 @@
         {% endif %}
 
         <section class="form-card">
-          <div class="module-header">
-            <div>
-              <h3>Planes actuales</h3>
-              <p>Cada plan agrupa varias actividades en distintos dias.</p>
+          <form class="module-form" method="post" action="/aves/planes/nuevo">
+            <label>
+              <span>Nombre del plan</span>
+              <input type="text" name="plan_nombre" value="{{ form_values.plan_nombre }}" placeholder="Ej: Plan Recria A" required />
+            </label>
+            <label>
+              <span>Dia</span>
+              <input type="number" name="edad_dias" min="0" value="{{ form_values.edad_dias }}" placeholder="Ej: 8" required />
+            </label>
+            <label>
+              <span>Tipo</span>
+              <select name="tipo" required>
+                <option value="">Selecciona</option>
+                <option value="vacunacion" {% if form_values.tipo == "vacunacion" %}selected{% endif %}>Vacunacion</option>
+                <option value="despique" {% if form_values.tipo == "despique" %}selected{% endif %}>Despique</option>
+                <option value="desparasitacion" {% if form_values.tipo == "desparasitacion" %}selected{% endif %}>Desparasitacion</option>
+              </select>
+            </label>
+            <label>
+              <span>Actividad</span>
+              <input type="text" name="nombre" value="{{ form_values.nombre }}" placeholder="Ej: Vacuna de Gumboro" required />
+            </label>
+            <label class="span-2">
+              <span>Descripcion</span>
+              <textarea name="descripcion" rows="2">{{ form_values.descripcion }}</textarea>
+            </label>
+            <div class="form-actions span-2">
+              <button type="submit" class="primary-button">Guardar y editar plan</button>
+              <a class="secondary-button" href="/aves/planes">Cancelar</a>
             </div>
-            <form method="get" action="/aves/planes" class="aves-inline-search">
-              <input type="text" name="q" value="{{ search_query or '' }}" placeholder="Buscar plan..." />
-              <button type="submit" class="secondary-button">Buscar</button>
-            </form>
-          </div>
-
-          <div class="module-table">
-            <div class="table-header table-five">
-              <span>Plan</span>
-              <span>Estado</span>
-              <span>Faltantes</span>
-              <span>Total actividades</span>
-              <span>Acciones</span>
-            </div>
-            {% if plan_groups %}
-              {% for group in plan_groups %}
-                <div class="table-row table-five">
-                  <span><strong>{{ group.name }}</strong></span>
-                  <span>
-                    {% if group.is_complete %}
-                      <span class="aves-type-badge">Completo</span>
-                    {% else %}
-                      <span class="aves-type-badge warn">Incompleto</span>
-                    {% endif %}
-                  </span>
-                  <span>
-                    {% if group.is_complete %}
-                      -
-                    {% else %}
-                      {{ group.missing_labels|join(", ") }}
-                    {% endif %}
-                  </span>
-                  <span>{{ group.activities_count }}</span>
-                  <span class="table-actions">
-                    <a class="module-link" href="/aves/planes/editar?plan={{ group.name|urlencode }}">Editar</a>
-                  </span>
-                </div>
-              {% endfor %}
-            {% else %}
-              <div class="table-row table-five">
-                <span>-</span>
-                <span>-</span>
-                <span>No hay planes</span>
-                <span>-</span>
-                <span>-</span>
-              </div>
-            {% endif %}
-          </div>
+          </form>
         </section>
       </main>
     </div>
