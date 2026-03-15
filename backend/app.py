@@ -2013,26 +2013,251 @@ def create_app():
             if not error:
                 error = "No se pudieron cargar los planes."
 
-        planes_view = [
-            {
-                "id": plan_aves.id,
-                "plan_nombre": plan_aves.plan_nombre,
-                "nombre": plan_aves.nombre,
-                "tipo": plan_aves.tipo,
-                "tipo_label": aves_plan_type_label(plan_aves.tipo),
-                "edad_dias": plan_aves.edad_dias,
-                "descripcion": plan_aves.descripcion or "-",
-            }
-            for plan_aves in planes_raw
-        ]
         plan_groups = build_aves_plan_groups(planes_raw)
+        search_query = (request.args.get("q") or "").strip()
+        if search_query:
+            search_key = search_query.lower()
+            plan_groups = [
+                group for group in plan_groups if search_key in group["name"].lower()
+            ]
 
         return render_template(
             "aves_planes.html",
             user=session["user"],
             error=error,
-            planes=planes_view,
             plan_groups=plan_groups,
+            search_query=search_query,
+        )
+
+    @app.route("/aves/planes/editar", methods=["GET", "POST"])
+    def aves_plan_editar():
+        if not session.get("user"):
+            return redirect(url_for("login", portal="aves"))
+
+        plan_nombre_original = (
+            request.args.get("plan")
+            or request.form.get("plan_original")
+            or ""
+        ).strip()
+        if not plan_nombre_original:
+            return redirect(url_for("aves_planes"))
+
+        error = None
+
+        if request.method == "POST":
+            action = (request.form.get("action") or "").strip()
+
+            if action == "rename_plan":
+                nuevo_nombre = (request.form.get("plan_nombre_nuevo") or "").strip()
+                if not nuevo_nombre:
+                    error = "El nombre del plan no puede estar vacio."
+                elif nuevo_nombre != plan_nombre_original:
+                    try:
+                        name_taken = (
+                            AvesPlan.query.filter(
+                                AvesPlan.activo.is_(True),
+                                AvesPlan.plan_nombre == nuevo_nombre,
+                            ).first()
+                        )
+                        if name_taken:
+                            error = "Ya existe un plan con ese nombre."
+                        else:
+                            AvesPlan.query.filter(
+                                AvesPlan.activo.is_(True),
+                                AvesPlan.plan_nombre == plan_nombre_original,
+                            ).update({"plan_nombre": nuevo_nombre})
+                            db.session.commit()
+                            return redirect(url_for("aves_plan_editar", plan=nuevo_nombre))
+                    except SQLAlchemyError:
+                        db.session.rollback()
+                        error = "No se pudo actualizar el nombre del plan."
+
+            elif action == "add_activity":
+                nombre = (request.form.get("nombre") or "").strip()
+                tipo = normalize_aves_plan_type(request.form.get("tipo"))
+                edad_dias_raw = (request.form.get("edad_dias") or "").strip()
+                descripcion = (request.form.get("descripcion") or "").strip() or None
+
+                if not nombre or not tipo or not edad_dias_raw:
+                    error = "Actividad, tipo y dia son obligatorios."
+                else:
+                    try:
+                        edad_dias = int(edad_dias_raw)
+                        if edad_dias < 0:
+                            raise ValueError
+                    except ValueError:
+                        error = "El dia debe ser un numero positivo."
+
+                if not error:
+                    try:
+                        same_day = (
+                            AvesPlan.query.filter(
+                                AvesPlan.activo.is_(True),
+                                AvesPlan.plan_nombre == plan_nombre_original,
+                                AvesPlan.edad_dias == edad_dias,
+                            ).first()
+                        )
+                        if same_day:
+                            error = (
+                                f"Ya existe una actividad para el dia {edad_dias} en este plan."
+                            )
+                    except SQLAlchemyError:
+                        db.session.rollback()
+                        error = "No se pudo validar el dia de la actividad."
+
+                if not error:
+                    try:
+                        db.session.add(
+                            AvesPlan(
+                                plan_nombre=plan_nombre_original,
+                                nombre=nombre,
+                                tipo=tipo,
+                                edad_dias=edad_dias,
+                                descripcion=descripcion,
+                                activo=True,
+                                fecha_creacion=datetime.utcnow(),
+                            )
+                        )
+                        db.session.commit()
+                        return redirect(
+                            url_for("aves_plan_editar", plan=plan_nombre_original)
+                        )
+                    except SQLAlchemyError:
+                        db.session.rollback()
+                        error = "No se pudo agregar la actividad."
+
+            elif action == "update_activity":
+                activity_id_raw = (request.form.get("activity_id") or "").strip()
+                nombre = (request.form.get("nombre") or "").strip()
+                tipo = normalize_aves_plan_type(request.form.get("tipo"))
+                edad_dias_raw = (request.form.get("edad_dias") or "").strip()
+                descripcion = (request.form.get("descripcion") or "").strip() or None
+
+                try:
+                    activity_id = int(activity_id_raw)
+                except ValueError:
+                    activity_id = 0
+
+                if activity_id <= 0 or not nombre or not tipo or not edad_dias_raw:
+                    error = "Completa correctamente los datos de la actividad."
+                else:
+                    try:
+                        edad_dias = int(edad_dias_raw)
+                        if edad_dias < 0:
+                            raise ValueError
+                    except ValueError:
+                        error = "El dia debe ser un numero positivo."
+
+                if not error:
+                    try:
+                        activity_row = (
+                            AvesPlan.query.filter(
+                                AvesPlan.id == activity_id,
+                                AvesPlan.activo.is_(True),
+                                AvesPlan.plan_nombre == plan_nombre_original,
+                            ).first()
+                        )
+                        if not activity_row:
+                            error = "Actividad no encontrada."
+                    except SQLAlchemyError:
+                        db.session.rollback()
+                        error = "No se pudo cargar la actividad."
+
+                if not error:
+                    try:
+                        same_day_other = (
+                            AvesPlan.query.filter(
+                                AvesPlan.activo.is_(True),
+                                AvesPlan.plan_nombre == plan_nombre_original,
+                                AvesPlan.edad_dias == edad_dias,
+                                AvesPlan.id != activity_id,
+                            ).first()
+                        )
+                        if same_day_other:
+                            error = (
+                                f"Ya existe otra actividad para el dia {edad_dias} en este plan."
+                            )
+                    except SQLAlchemyError:
+                        db.session.rollback()
+                        error = "No se pudo validar el dia de la actividad."
+
+                if not error:
+                    try:
+                        activity_row.nombre = nombre
+                        activity_row.tipo = tipo
+                        activity_row.edad_dias = edad_dias
+                        activity_row.descripcion = descripcion
+                        db.session.commit()
+                        return redirect(
+                            url_for("aves_plan_editar", plan=plan_nombre_original)
+                        )
+                    except SQLAlchemyError:
+                        db.session.rollback()
+                        error = "No se pudo actualizar la actividad."
+
+            elif action == "delete_activity":
+                activity_id_raw = (request.form.get("activity_id") or "").strip()
+                try:
+                    activity_id = int(activity_id_raw)
+                except ValueError:
+                    activity_id = 0
+
+                if activity_id > 0:
+                    try:
+                        activity_row = (
+                            AvesPlan.query.filter(
+                                AvesPlan.id == activity_id,
+                                AvesPlan.activo.is_(True),
+                                AvesPlan.plan_nombre == plan_nombre_original,
+                            ).first()
+                        )
+                        if activity_row:
+                            activity_row.activo = False
+                            db.session.commit()
+                    except SQLAlchemyError:
+                        db.session.rollback()
+                        error = "No se pudo eliminar la actividad."
+
+                return redirect(url_for("aves_plan_editar", plan=plan_nombre_original))
+
+        try:
+            plan_rows = (
+                AvesPlan.query.filter(
+                    AvesPlan.activo.is_(True),
+                    AvesPlan.plan_nombre == plan_nombre_original,
+                )
+                .order_by(AvesPlan.edad_dias.asc(), AvesPlan.id.asc())
+                .all()
+            )
+        except SQLAlchemyError:
+            db.session.rollback()
+            plan_rows = []
+            if not error:
+                error = "No se pudo cargar el plan solicitado."
+
+        if not plan_rows:
+            return redirect(url_for("aves_planes"))
+
+        plan_status = build_aves_plan_groups(plan_rows)[0]
+        activities_view = [
+            {
+                "id": row.id,
+                "dia": int(row.edad_dias),
+                "tipo": row.tipo,
+                "tipo_label": aves_plan_type_label(row.tipo),
+                "nombre": row.nombre,
+                "descripcion": row.descripcion or "",
+            }
+            for row in plan_rows
+        ]
+
+        return render_template(
+            "aves_plan_editar.html",
+            user=session["user"],
+            error=error,
+            plan_nombre=plan_nombre_original,
+            plan_status=plan_status,
+            activities=activities_view,
         )
 
     @app.get("/logout")

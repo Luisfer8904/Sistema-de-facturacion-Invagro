@@ -752,6 +752,197 @@ body {
   font-size: 0.8rem;
 }
 
+.aves-type-badge.warn {
+  background: rgba(245, 158, 11, 0.24);
+  color: #ffd58a;
+}
+
+.aves-plan-board {
+  display: grid;
+  gap: 22px;
+}
+
+.aves-dark-hero {
+  background: linear-gradient(130deg, #101c34 0%, #1b2d52 60%, #243a63 100%);
+  border: 1px solid rgba(130, 176, 255, 0.18);
+  border-radius: 18px;
+  padding: 26px 28px;
+  color: #ecf3ff;
+  box-shadow: 0 14px 32px rgba(9, 18, 34, 0.35);
+}
+
+.aves-dark-hero h1 {
+  margin: 0 0 8px;
+}
+
+.aves-dark-hero p {
+  margin: 0;
+  color: #b8c5e0;
+}
+
+.aves-dark-card {
+  background: linear-gradient(180deg, #132341 0%, #111f39 100%);
+  border: 1px solid rgba(130, 176, 255, 0.16);
+  border-radius: 16px;
+  padding: 22px;
+  box-shadow: 0 16px 30px rgba(9, 18, 34, 0.28);
+  color: #dce7fb;
+}
+
+.aves-dark-card .module-header {
+  margin-bottom: 16px;
+}
+
+.aves-dark-card .module-header h3 {
+  margin: 0 0 4px;
+  color: #f4f8ff;
+}
+
+.aves-dark-card .module-header p {
+  margin: 0;
+  color: #a8bbdb;
+}
+
+.aves-dark-card .module-form label {
+  color: #d9e6ff;
+}
+
+.aves-dark-card .module-form input,
+.aves-dark-card .module-form select,
+.aves-dark-card .module-form textarea {
+  background: #0c1830;
+  border-color: #27416b;
+  color: #e7f0ff;
+}
+
+.aves-dark-card .module-form input:focus,
+.aves-dark-card .module-form select:focus,
+.aves-dark-card .module-form textarea:focus {
+  border-color: #40d66d;
+  box-shadow: 0 0 0 3px rgba(64, 214, 109, 0.18);
+}
+
+.aves-dark-card .secondary-button {
+  background: #1d2f51;
+  color: #e7f0ff;
+}
+
+.aves-dark-card .secondary-button:hover {
+  background: #223a63;
+}
+
+.aves-inline-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.aves-inline-search input {
+  min-width: 240px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 2px solid #27416b;
+  background: #0c1830;
+  color: #e7f0ff;
+}
+
+.aves-inline-search input:focus {
+  outline: none;
+  border-color: #40d66d;
+  box-shadow: 0 0 0 3px rgba(64, 214, 109, 0.18);
+}
+
+.aves-dark-table {
+  background: #0f1c34;
+  border: 1px solid #27416b;
+  box-shadow: none;
+}
+
+.aves-dark-table .table-header {
+  background: #0b1428;
+  color: #dff3ff;
+  text-transform: uppercase;
+  font-size: 0.78rem;
+  letter-spacing: 0.05em;
+}
+
+.aves-dark-table .table-row {
+  border-top: 1px solid #223759;
+  color: #e4edfc;
+  align-items: center;
+  gap: 12px;
+}
+
+.aves-dark-table .table-row:hover {
+  background: rgba(46, 76, 130, 0.22);
+}
+
+.aves-dark-table .module-link {
+  border-radius: 10px;
+  background: linear-gradient(135deg, #20b64f 0%, #37d16b 100%);
+  color: #071324;
+}
+
+.table-activity-edit {
+  grid-template-columns: 0.5fr 1fr 1.5fr 2fr 1.35fr;
+}
+
+.aves-activity-edit-row {
+  margin: 0;
+}
+
+.aves-activity-edit-row input,
+.aves-activity-edit-row select {
+  width: 100%;
+  min-width: 0;
+}
+
+.aves-table-input,
+.aves-table-select {
+  padding: 9px 10px;
+  border-radius: 8px;
+  border: 1px solid #2f4f81;
+  background: #101e39;
+  color: #e7f0ff;
+  font-size: 0.9rem;
+}
+
+.aves-table-input:focus,
+.aves-table-select:focus {
+  outline: none;
+  border-color: #40d66d;
+  box-shadow: 0 0 0 2px rgba(64, 214, 109, 0.16);
+}
+
+.small-btn {
+  padding: 8px 12px;
+  font-size: 0.8rem;
+}
+
+.module-form-compact {
+  max-width: 680px;
+}
+
+.aves-plan-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.aves-metric-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 5px 12px;
+  background: rgba(126, 165, 227, 0.2);
+  color: #d9e8ff;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
 .module-form {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
