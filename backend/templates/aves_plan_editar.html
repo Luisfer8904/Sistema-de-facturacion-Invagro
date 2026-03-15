@@ -42,10 +42,12 @@
       </div>
 
       <main class="content-area aves-plan-board">
-        <section class="aves-dark-hero">
-          <h1>Editar Plan: {{ plan_nombre }}</h1>
-          <p>Modifica el nombre del plan y administra sus actividades por dia.</p>
-          <div class="hero-actions">
+        <section class="module-header">
+          <div>
+            <h1>Editar Plan: {{ plan_nombre }}</h1>
+            <p>Gestiona nombre y actividades del plan sanitario.</p>
+          </div>
+          <div class="header-actions">
             <a class="secondary-button" href="/aves/planes">Volver a lista</a>
           </div>
         </section>
@@ -54,7 +56,7 @@
           <div class="form-error">{{ error }}</div>
         {% endif %}
 
-        <section class="aves-dark-card">
+        <section class="form-card">
           <div class="module-header">
             <div>
               <h3>Configuracion del plan</h3>
@@ -84,7 +86,7 @@
           </form>
         </section>
 
-        <section class="aves-dark-card">
+        <section class="form-card">
           <div class="module-header">
             <div>
               <h3>Agregar actividad</h3>
@@ -121,14 +123,14 @@
           </form>
         </section>
 
-        <section class="aves-dark-card">
+        <section class="form-card">
           <div class="module-header">
             <div>
               <h3>Actividades del plan</h3>
               <p>Presiona guardar para actualizar una fila o eliminar para desactivar una actividad.</p>
             </div>
           </div>
-          <div class="module-table aves-dark-table">
+          <div class="module-table">
             <div class="table-header table-activity-edit">
               <span>Dia</span>
               <span>Tipo</span>

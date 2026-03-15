@@ -42,16 +42,18 @@
       </div>
 
       <main class="content-area aves-plan-board">
-        <section class="aves-dark-hero">
-          <h1>Lista de Planes Sanitarios</h1>
-          <p>Crea planes y luego usa Editar para mantener actividades por dia.</p>
+        <section class="module-header">
+          <div>
+            <h1>Programas sanitarios por plan</h1>
+            <p>Crea el plan con una primera actividad y luego usa Editar para agregar las demas actividades por dia.</p>
+          </div>
         </section>
 
         {% if error %}
           <div class="form-error">{{ error }}</div>
         {% endif %}
 
-        <section class="aves-dark-card">
+        <section class="form-card">
           <div class="module-header">
             <div>
               <h3>Nuevo Plan (primera actividad)</h3>
@@ -86,14 +88,16 @@
             </label>
             <div class="form-actions span-2">
               <button type="submit" class="primary-button">Agregar plan</button>
+              <a class="secondary-button" href="/aves/clientes">Ver clientes</a>
             </div>
           </form>
         </section>
 
-        <section class="aves-dark-card">
+        <section class="form-card">
           <div class="module-header">
             <div>
               <h3>Lista de planes</h3>
+              <p>Cada plan agrupa varias actividades en distintos dias.</p>
             </div>
             <form method="get" action="/aves/planes" class="aves-inline-search">
               <input type="text" name="q" value="{{ search_query or '' }}" placeholder="Buscar plan..." />
@@ -101,7 +105,7 @@
             </form>
           </div>
 
-          <div class="module-table aves-dark-table">
+          <div class="module-table">
             <div class="table-header table-five">
               <span>Plan</span>
               <span>Estado</span>
