@@ -1616,8 +1616,9 @@ def create_app():
                     continue
                 activities.append(
                     {
-                        "cliente_nombre": cliente_aves.nombre,
-                        "cliente_id": cliente_aves.id,
+                        "lote_nombre": cliente_aves.nombre,
+                        "cliente_nombre": cliente_aves.encargado or "-",
+                        "lote_id": cliente_aves.id,
                         "plan_nombre": plan_aves.plan_nombre,
                         "actividad_nombre": plan_aves.nombre,
                         "tipo": plan_aves.tipo,
@@ -1753,7 +1754,8 @@ def create_app():
         if not session.get("user"):
             return redirect(url_for("login", portal="aves"))
         try:
-            aves_clientes_count = AvesCliente.query.filter_by(activo=True).count()
+            aves_clientes_count = Cliente.query.count()
+            aves_lotes_count = AvesCliente.query.filter_by(activo=True).count()
             aves_planes_count = (
                 db.session.query(func.count(func.distinct(AvesPlan.plan_nombre)))
                 .filter(AvesPlan.activo.is_(True))
@@ -1763,6 +1765,7 @@ def create_app():
         except SQLAlchemyError:
             db.session.rollback()
             aves_clientes_count = 0
+            aves_lotes_count = 0
             aves_planes_count = 0
 
         upcoming_activities = build_aves_upcoming_activities(days_ahead=30)
@@ -1774,6 +1777,7 @@ def create_app():
             "aves_dashboard.html",
             user=session["user"],
             aves_clientes_count=aves_clientes_count,
+            aves_lotes_count=aves_lotes_count,
             aves_planes_count=aves_planes_count,
             upcoming_week_count=upcoming_week_count,
             upcoming_activities=upcoming_activities[:8],
@@ -1785,8 +1789,78 @@ def create_app():
             return redirect(url_for("login", portal="aves"))
 
         error = None
+        form_values = {
+            "nombre": "",
+            "telefono": "",
+            "email": "",
+            "direccion": "",
+        }
+
+        if request.method == "POST":
+            nombre = (request.form.get("nombre") or "").strip()
+            telefono = (request.form.get("telefono") or "").strip() or None
+            email = (request.form.get("email") or "").strip() or None
+            direccion = (request.form.get("direccion") or "").strip() or None
+            form_values = {
+                "nombre": nombre,
+                "telefono": telefono or "",
+                "email": email or "",
+                "direccion": direccion or "",
+            }
+
+            if not nombre:
+                error = "El nombre del cliente es obligatorio."
+
+            if not error:
+                try:
+                    cliente = Cliente(
+                        nombre=nombre,
+                        telefono=telefono,
+                        email=email,
+                        direccion=direccion,
+                        fecha_registro=datetime.utcnow(),
+                    )
+                    db.session.add(cliente)
+                    db.session.commit()
+                    return redirect(url_for("aves_clientes"))
+                except SQLAlchemyError:
+                    db.session.rollback()
+                    error = "No se pudo guardar el cliente."
+
+        try:
+            clientes_count = Cliente.query.count()
+        except SQLAlchemyError:
+            db.session.rollback()
+            clientes_count = 0
+            if not error:
+                error = "No se pudo cargar la informacion de clientes."
+
+        return render_template(
+            "aves_clientes.html",
+            user=session["user"],
+            error=error,
+            clientes_count=clientes_count,
+            form_values=form_values,
+        )
+
+    @app.route("/aves/lotes", methods=["GET", "POST"])
+    def aves_lotes():
+        if not session.get("user"):
+            return redirect(url_for("login", portal="aves"))
+
+        error = None
+        form_values = {
+            "nombre": "",
+            "cliente_id": "",
+            "fecha_nacimiento": "",
+            "plan_nombre": "",
+            "cantidad_aves": "0",
+            "observaciones": "",
+        }
         plan_names = []
         incomplete_plan_groups = []
+        clientes_options = []
+
         try:
             all_active_plan_rows = (
                 AvesPlan.query.filter_by(activo=True)
@@ -1796,22 +1870,36 @@ def create_app():
             plan_groups = build_aves_plan_groups(all_active_plan_rows)
             plan_names = [group["name"] for group in plan_groups if group["is_complete"]]
             incomplete_plan_groups = [group for group in plan_groups if not group["is_complete"]]
+            clientes_options = (
+                Cliente.query.order_by(Cliente.nombre.asc(), Cliente.id.asc()).all()
+            )
         except SQLAlchemyError:
             db.session.rollback()
-            if not error:
-                error = "No se pudieron cargar los planes disponibles."
+            error = "No se pudieron cargar clientes o planes."
 
         if request.method == "POST":
             nombre = (request.form.get("nombre") or "").strip()
-            encargado = (request.form.get("encargado") or "").strip() or None
-            telefono = (request.form.get("telefono") or "").strip() or None
+            cliente_id_raw = (request.form.get("cliente_id") or "").strip()
             fecha_nacimiento_raw = (request.form.get("fecha_nacimiento") or "").strip()
-            plan_nombre = (request.form.get("plan_nombre") or "").strip() or None
+            plan_nombre = (request.form.get("plan_nombre") or "").strip()
             cantidad_aves_raw = (request.form.get("cantidad_aves") or "").strip()
             observaciones = (request.form.get("observaciones") or "").strip() or None
+            form_values = {
+                "nombre": nombre,
+                "cliente_id": cliente_id_raw,
+                "fecha_nacimiento": fecha_nacimiento_raw,
+                "plan_nombre": plan_nombre,
+                "cantidad_aves": cantidad_aves_raw or "0",
+                "observaciones": request.form.get("observaciones") or "",
+            }
 
-            if not nombre or not fecha_nacimiento_raw or not plan_nombre:
-                error = "Nombre, fecha de nacimiento y plan son obligatorios."
+            try:
+                cliente_id = int(cliente_id_raw)
+            except ValueError:
+                cliente_id = 0
+
+            if not nombre or cliente_id <= 0 or not fecha_nacimiento_raw or not plan_nombre:
+                error = "Lote, cliente, fecha de nacimiento y plan de manejo son obligatorios."
             else:
                 try:
                     fecha_nacimiento = datetime.strptime(
@@ -1821,9 +1909,17 @@ def create_app():
                     error = "Fecha de nacimiento invalida."
                     fecha_nacimiento = None
 
+            cliente_selected = None
             if not error:
-                if plan_nombre not in plan_names:
-                    error = "Selecciona un plan valido y completo (vacunacion, despique, desparasitacion)."
+                cliente_selected = next(
+                    (cliente for cliente in clientes_options if cliente.id == cliente_id),
+                    None,
+                )
+                if not cliente_selected:
+                    error = "Selecciona un cliente valido."
+
+            if not error and plan_nombre not in plan_names:
+                error = "Selecciona un plan de manejo valido y completo."
 
             if not error:
                 try:
@@ -1835,10 +1931,10 @@ def create_app():
 
             if not error:
                 try:
-                    cliente_aves = AvesCliente(
+                    lote = AvesCliente(
                         nombre=nombre,
-                        encargado=encargado,
-                        telefono=telefono,
+                        encargado=cliente_selected.nombre,
+                        telefono=cliente_selected.telefono,
                         fecha_nacimiento=fecha_nacimiento,
                         plan_nombre=plan_nombre,
                         cantidad_aves=cantidad_aves,
@@ -1846,100 +1942,54 @@ def create_app():
                         activo=True,
                         fecha_registro=datetime.utcnow(),
                     )
-                    db.session.add(cliente_aves)
+                    db.session.add(lote)
                     db.session.commit()
-                    return redirect(url_for("aves_clientes"))
+                    return redirect(url_for("aves_lotes"))
                 except SQLAlchemyError:
                     db.session.rollback()
-                    error = "No se pudo guardar el cliente avicola."
+                    error = "No se pudo guardar el lote."
 
         try:
-            clientes_raw = (
+            lotes_raw = (
                 AvesCliente.query.filter_by(activo=True)
                 .order_by(AvesCliente.fecha_registro.desc(), AvesCliente.id.desc())
                 .all()
             )
         except SQLAlchemyError:
             db.session.rollback()
-            clientes_raw = []
+            lotes_raw = []
             if not error:
-                error = "No se pudo cargar la informacion de clientes."
+                error = "No se pudo cargar la informacion de lotes."
 
-        clientes_view = []
-        for cliente_aves in clientes_raw:
-            clientes_view.append(
-                {
-                    "id": cliente_aves.id,
-                    "nombre": cliente_aves.nombre,
-                    "encargado": cliente_aves.encargado or "-",
-                    "telefono": cliente_aves.telefono or "-",
-                    "cantidad_aves": cliente_aves.cantidad_aves or 0,
-                    "plan_nombre": (cliente_aves.plan_nombre or "").strip() or "-",
-                    "fecha_nacimiento_label": cliente_aves.fecha_nacimiento.strftime(
-                        "%d/%m/%Y"
-                    ),
-                    "observaciones": cliente_aves.observaciones or "-",
-                }
-            )
+        lotes_view = [
+            {
+                "id": lote.id,
+                "nombre": lote.nombre,
+                "cliente_nombre": lote.encargado or "-",
+                "telefono": lote.telefono or "-",
+                "cantidad_aves": lote.cantidad_aves or 0,
+                "plan_nombre": (lote.plan_nombre or "").strip() or "-",
+                "fecha_nacimiento_label": lote.fecha_nacimiento.strftime("%d/%m/%Y"),
+                "observaciones": lote.observaciones or "-",
+            }
+            for lote in lotes_raw
+        ]
 
         return render_template(
-            "aves_clientes.html",
+            "aves_lotes.html",
             user=session["user"],
             error=error,
-            clientes=clientes_view,
-            planes_activos_count=len(plan_names),
+            form_values=form_values,
+            lotes=lotes_view,
+            lotes_count=len(lotes_view),
+            clientes=clientes_options,
             planes_nombres=plan_names,
             planes_incompletos=incomplete_plan_groups,
         )
 
     @app.route("/aves/programacion", methods=["GET"])
     def aves_programacion():
-        if not session.get("user"):
-            return redirect(url_for("login", portal="aves"))
-
-        days_ahead_raw = (request.args.get("dias") or "30").strip()
-        try:
-            days_ahead = int(days_ahead_raw)
-        except ValueError:
-            days_ahead = 30
-        if days_ahead not in (7, 15, 30, 60):
-            days_ahead = 30
-
-        upcoming_activities = build_aves_upcoming_activities(days_ahead=days_ahead)
-        grouped_by_cliente = {}
-        for item in upcoming_activities:
-            client_group = grouped_by_cliente.setdefault(
-                item["cliente_id"],
-                {
-                    "cliente_id": item["cliente_id"],
-                    "cliente_nombre": item["cliente_nombre"],
-                    "plan_nombre": item["plan_nombre"],
-                    "proxima_fecha": item["fecha_label"],
-                    "proximidad_label": f"{item['dias_restantes']} dias",
-                    "actividades": [],
-                },
-            )
-            client_group["actividades"].append(item)
-
-        galpones_programados = list(grouped_by_cliente.values())
-        total_galpones = len(galpones_programados)
-        actividades_hoy = len(
-            [item for item in upcoming_activities if item["dias_restantes"] == 0]
-        )
-        actividades_semana = len(
-            [item for item in upcoming_activities if item["dias_restantes"] <= 7]
-        )
-
-        return render_template(
-            "aves_programacion.html",
-            user=session["user"],
-            days_ahead=days_ahead,
-            galpones_programados=galpones_programados,
-            total_galpones=total_galpones,
-            actividades_hoy=actividades_hoy,
-            actividades_semana=actividades_semana,
-            total_actividades=len(upcoming_activities),
-        )
+        return redirect(url_for("aves_lotes"))
 
     @app.route("/aves/planes", methods=["GET"])
     def aves_planes():
