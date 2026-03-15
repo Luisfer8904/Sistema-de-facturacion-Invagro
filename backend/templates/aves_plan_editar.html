@@ -89,45 +89,11 @@
         <section class="form-card">
           <div class="module-header">
             <div>
-              <h3>Agregar actividad</h3>
-              <p>Cada dia solo puede tener una actividad por plan.</p>
-            </div>
-          </div>
-          <form class="module-form" method="post" action="/aves/planes/editar">
-            <input type="hidden" name="action" value="add_activity" />
-            <input type="hidden" name="plan_original" value="{{ plan_nombre }}" />
-            <label>
-              <span>Dia</span>
-              <input type="number" name="edad_dias" min="0" placeholder="Ej: 8" required />
-            </label>
-            <label>
-              <span>Tipo</span>
-              <select name="tipo" required>
-                <option value="">Selecciona</option>
-                <option value="vacunacion">Vacunacion</option>
-                <option value="despique">Despique</option>
-                <option value="desparasitacion">Desparasitacion</option>
-              </select>
-            </label>
-            <label>
-              <span>Actividad</span>
-              <input type="text" name="nombre" placeholder="Ej: Vacuna de Gumboro" required />
-            </label>
-            <label>
-              <span>Descripcion</span>
-              <input type="text" name="descripcion" placeholder="Opcional" />
-            </label>
-            <div class="form-actions span-2">
-              <button type="submit" class="primary-button">Agregar actividad</button>
-            </div>
-          </form>
-        </section>
-
-        <section class="form-card">
-          <div class="module-header">
-            <div>
               <h3>Actividades del plan</h3>
               <p>Presiona guardar para actualizar una fila o eliminar para desactivar una actividad.</p>
+            </div>
+            <div class="header-actions">
+              <button type="button" class="primary-button" data-add-open>Agregar actividad</button>
             </div>
           </div>
           <div class="module-table">
@@ -168,7 +134,62 @@
             {% endif %}
           </div>
         </section>
+
+        <div class="modal{% if open_add_activity_modal %} open{% endif %}" data-add-modal>
+          <div class="modal-card">
+            <div class="modal-header">
+              <h3>Agregar actividad al plan</h3>
+              <button class="modal-close" type="button" data-add-close>×</button>
+            </div>
+            <form class="module-form" method="post" action="/aves/planes/editar">
+              <input type="hidden" name="action" value="add_activity" />
+              <input type="hidden" name="plan_original" value="{{ plan_nombre }}" />
+              <label>
+                <span>Dia</span>
+                <input type="number" name="edad_dias" min="0" value="{{ add_activity_form.edad_dias }}" placeholder="Ej: 8" required />
+              </label>
+              <label>
+                <span>Tipo</span>
+                <select name="tipo" required>
+                  <option value="">Selecciona</option>
+                  <option value="vacunacion" {% if add_activity_form.tipo == "vacunacion" %}selected{% endif %}>Vacunacion</option>
+                  <option value="despique" {% if add_activity_form.tipo == "despique" %}selected{% endif %}>Despique</option>
+                  <option value="desparasitacion" {% if add_activity_form.tipo == "desparasitacion" %}selected{% endif %}>Desparasitacion</option>
+                </select>
+              </label>
+              <label>
+                <span>Actividad</span>
+                <input type="text" name="nombre" value="{{ add_activity_form.nombre }}" placeholder="Ej: Vacuna de Gumboro" required />
+              </label>
+              <label>
+                <span>Descripcion</span>
+                <input type="text" name="descripcion" value="{{ add_activity_form.descripcion }}" placeholder="Opcional" />
+              </label>
+              <div class="form-actions span-2">
+                <button type="submit" class="primary-button">Guardar actividad</button>
+                <button type="button" class="secondary-button" data-add-close>Cancelar</button>
+              </div>
+            </form>
+          </div>
+        </div>
       </main>
     </div>
   </div>
+  <script>
+    const addModal = document.querySelector("[data-add-modal]");
+    const addOpenButton = document.querySelector("[data-add-open]");
+    const addCloseButtons = document.querySelectorAll("[data-add-close]");
+
+    if (addModal && addOpenButton) {
+      addOpenButton.addEventListener("click", () => addModal.classList.add("open"));
+      addCloseButtons.forEach((button) => {
+        button.addEventListener("click", () => addModal.classList.remove("open"));
+      });
+      addModal.addEventListener("click", (event) => {
+        if (event.target === addModal) {
+          addModal.classList.remove("open");
+        }
+      });
+    }
+  </script>
 {% endblock %}

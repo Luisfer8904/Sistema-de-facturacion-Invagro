@@ -2073,6 +2073,13 @@ def create_app():
             return redirect(url_for("aves_planes"))
 
         error = None
+        open_add_activity_modal = False
+        add_activity_form = {
+            "nombre": "",
+            "tipo": "",
+            "edad_dias": "",
+            "descripcion": "",
+        }
 
         if request.method == "POST":
             action = (request.form.get("action") or "").strip()
@@ -2107,6 +2114,13 @@ def create_app():
                 tipo = normalize_aves_plan_type(request.form.get("tipo"))
                 edad_dias_raw = (request.form.get("edad_dias") or "").strip()
                 descripcion = (request.form.get("descripcion") or "").strip() or None
+                open_add_activity_modal = True
+                add_activity_form = {
+                    "nombre": nombre,
+                    "tipo": (request.form.get("tipo") or "").strip().lower(),
+                    "edad_dias": edad_dias_raw,
+                    "descripcion": request.form.get("descripcion") or "",
+                }
 
                 if not nombre or not tipo or not edad_dias_raw:
                     error = "Actividad, tipo y dia son obligatorios."
@@ -2288,6 +2302,8 @@ def create_app():
             plan_nombre=plan_nombre_original,
             plan_status=plan_status,
             activities=activities_view,
+            open_add_activity_modal=open_add_activity_modal,
+            add_activity_form=add_activity_form,
         )
 
     @app.get("/logout")
