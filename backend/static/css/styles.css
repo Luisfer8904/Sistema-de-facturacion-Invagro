@@ -1162,6 +1162,13 @@ body {
   text-decoration: underline;
 }
 
+.aves-detail-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: -4px 0 20px;
+}
+
 .aves-state-pill {
   display: inline-flex;
   align-items: center;
@@ -1314,6 +1321,11 @@ body {
 @media (max-width: 720px) {
   .aves-complete-editor {
     grid-template-columns: 1fr;
+  }
+
+  .aves-detail-actions {
+    flex-direction: column;
+    align-items: stretch;
   }
 
   .aves-completed-date {
