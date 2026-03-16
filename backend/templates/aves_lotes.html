@@ -187,24 +187,6 @@
                 <input type="date" name="fecha_nacimiento" value="{{ form_values.fecha_nacimiento }}" required />
               </label>
               <label>
-                <span>Cliente asignado</span>
-                <select name="cliente_id">
-                  <option value="">Sin asignar por ahora</option>
-                  {% for cliente in clientes %}
-                    <option value="{{ cliente.id }}" {% if form_values.cliente_id|int == cliente.id %}selected{% endif %}>{{ cliente.nombre }}</option>
-                  {% endfor %}
-                </select>
-              </label>
-              <label>
-                <span>Plan de manejo</span>
-                <select name="plan_nombre">
-                  <option value="">Sin asignar por ahora</option>
-                  {% for plan_nombre in planes_nombres %}
-                    <option value="{{ plan_nombre }}" {% if form_values.plan_nombre == plan_nombre %}selected{% endif %}>{{ plan_nombre }}</option>
-                  {% endfor %}
-                </select>
-              </label>
-              <label>
                 <span>Cantidad de aves</span>
                 <input type="number" name="cantidad_aves" min="0" value="{{ form_values.cantidad_aves }}" />
               </label>
@@ -212,6 +194,9 @@
                 <span>Observaciones</span>
                 <textarea name="observaciones" rows="3">{{ form_values.observaciones }}</textarea>
               </label>
+              <div class="span-2 aves-preview-note">
+                El cliente y el programa de manejo se asignan despues desde la tarjeta del lote.
+              </div>
               <div class="form-actions span-2">
                 <button type="submit" class="primary-button">Guardar lote</button>
                 <button type="button" class="secondary-button" data-create-lote-close>Cancelar</button>

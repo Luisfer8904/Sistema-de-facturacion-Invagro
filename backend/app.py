@@ -1951,7 +1951,7 @@ def create_app():
                     fecha_nacimiento = None
 
             cliente_selected = None
-            if not error and cliente_id > 0:
+            if not error and action == "update_lote" and cliente_id > 0:
                 cliente_selected = next(
                     (cliente for cliente in clientes_options if cliente.id == cliente_id),
                     None,
@@ -1959,7 +1959,7 @@ def create_app():
                 if not cliente_selected:
                     error = "Selecciona un cliente valido."
 
-            if not error and plan_nombre and plan_nombre not in plan_names:
+            if not error and action == "update_lote" and plan_nombre and plan_nombre not in plan_names:
                 error = "Selecciona un plan de manejo valido y completo."
 
             if not error:
@@ -1996,10 +1996,10 @@ def create_app():
                     else:
                         lote = AvesLote(
                             nombre=nombre,
-                            encargado=cliente_selected.nombre if cliente_selected else None,
-                            telefono=cliente_selected.telefono if cliente_selected else None,
+                            encargado=None,
+                            telefono=None,
                             fecha_nacimiento=fecha_nacimiento,
-                            plan_nombre=plan_nombre or None,
+                            plan_nombre=None,
                             cantidad_aves=cantidad_aves,
                             observaciones=observaciones,
                             activo=True,
@@ -2012,9 +2012,9 @@ def create_app():
                     return redirect(url_for("aves_lotes"))
                 except ValueError:
                     db.session.rollback()
-                except SQLAlchemyError:
+                except SQLAlchemyError as exc:
                     db.session.rollback()
-                    error = "No se pudo guardar el lote."
+                    error = f"No se pudo guardar el lote. {exc}"
 
         try:
             lotes_raw = (
