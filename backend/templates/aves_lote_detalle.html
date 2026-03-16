@@ -61,7 +61,6 @@
 
         {% if not lote.is_closed %}
           <section class="aves-detail-actions">
-            <button type="button" class="secondary-button" data-lote-modal-open="edit">Editar lote</button>
             <button type="button" class="secondary-button" data-lote-modal-open="custom">Plan personalizado</button>
             <button type="button" class="danger-button" data-lote-modal-open="close">Cerrar lote</button>
           </section>
@@ -104,38 +103,32 @@
           </div>
         </section>
 
-        <section class="form-card">
-          <div class="module-header">
-            <div>
-              <h3>Resumen del lote</h3>
-              <p>La edicion de cliente, programa, plan personalizado y cierre se maneja desde los botones superiores.</p>
+        {% if lote.is_closed %}
+          <section class="form-card">
+            <div class="module-header">
+              <div>
+                <h3>Cierre del lote</h3>
+                <p>Informacion de cierre registrada para este lote.</p>
+              </div>
             </div>
-          </div>
 
-          {% if lote.is_closed %}
             <div class="aves-closed-note">
               <strong>Cierre registrado el {{ lote.closed_label }}</strong>
               <p>Motivo: {{ lote.closed_reason }}</p>
               <small>{% if lote.closed_comments %}{{ lote.closed_comments }}{% else %}Sin comentario adicional de cierre.{% endif %}</small>
             </div>
-          {% else %}
-            <div class="aves-closed-note">
-              <strong>Acciones disponibles arriba</strong>
-              <p>Usa los botones superiores para editar informacion del lote, crear un plan personalizado o cerrarlo cuando termine.</p>
-              <small>El comentario actual del lote: {% if lote.observaciones %}{{ lote.observaciones }}{% else %}Sin comentarios generales.{% endif %}</small>
-            </div>
-          {% endif %}
-        </section>
+          </section>
+        {% endif %}
 
-        <section class="form-card">
-          <div class="module-header">
-            <div>
-              <h3>Plan personalizado del lote</h3>
-              <p>Si agregas actividades aqui, este lote usa su propio cronograma y deja de depender del plan base.</p>
+        {% if custom_plan_activities %}
+          <section class="form-card">
+            <div class="module-header">
+              <div>
+                <h3>Plan personalizado del lote</h3>
+                <p>Estas actividades propias sustituyen el cronograma base para este lote.</p>
+              </div>
             </div>
-          </div>
 
-          {% if custom_plan_activities %}
             <div class="aves-custom-plan-list">
               {% for activity in custom_plan_activities %}
                 <article class="aves-custom-plan-card">
@@ -154,20 +147,8 @@
                 </article>
               {% endfor %}
             </div>
-          {% else %}
-            <div class="module-table">
-              <div class="table-row">
-                <span>Este lote aun no tiene actividades personalizadas.</span>
-              </div>
-            </div>
-          {% endif %}
-
-          {% if not lote.is_closed %}
-            <div class="form-actions">
-              <button type="button" class="secondary-button" data-lote-modal-open="custom">Agregar actividad personalizada</button>
-            </div>
-          {% endif %}
-        </section>
+          </section>
+        {% endif %}
 
         <section class="form-card">
           <div class="module-header">
@@ -274,56 +255,6 @@
         </section>
 
         {% if not lote.is_closed %}
-          <div class="modal" data-lote-modal="edit">
-            <div class="modal-card report-modal-card">
-              <div class="modal-header">
-                <h3>Editar lote</h3>
-                <button class="modal-close" type="button" data-lote-modal-close>×</button>
-              </div>
-              <form class="module-form" method="post" action="/aves/lotes/{{ lote.id }}">
-                <input type="hidden" name="action" value="update_lote" />
-                <label>
-                  <span>Lote / Galpon</span>
-                  <input type="text" name="nombre" value="{{ lote.nombre }}" required />
-                </label>
-                <label>
-                  <span>Fecha nacimiento pollitas</span>
-                  <input type="date" name="fecha_nacimiento" value="{{ lote.fecha_nacimiento_value }}" required />
-                </label>
-                <label>
-                  <span>Cliente asignado</span>
-                  <select name="cliente_id">
-                    <option value="">Sin asignar</option>
-                    {% for cliente in clientes %}
-                      <option value="{{ cliente.id }}" {% if lote.cliente_nombre == cliente.nombre %}selected{% endif %}>{{ cliente.nombre }}</option>
-                    {% endfor %}
-                  </select>
-                </label>
-                <label>
-                  <span>Programa de manejo base</span>
-                  <select name="plan_nombre">
-                    <option value="">Sin asignar</option>
-                    {% for plan_nombre in planes_nombres %}
-                      <option value="{{ plan_nombre }}" {% if lote.plan_source != "personalizado" and lote.plan_nombre == plan_nombre %}selected{% endif %}>{{ plan_nombre }}</option>
-                    {% endfor %}
-                  </select>
-                </label>
-                <label>
-                  <span>Cantidad de aves</span>
-                  <input type="number" name="cantidad_aves" min="0" value="{{ lote.cantidad_aves }}" />
-                </label>
-                <label class="span-2">
-                  <span>Comentarios del lote</span>
-                  <textarea name="observaciones" rows="4">{{ lote.observaciones }}</textarea>
-                </label>
-                <div class="form-actions span-2">
-                  <button type="submit" class="primary-button">Guardar lote</button>
-                  <button type="button" class="secondary-button" data-lote-modal-close>Cancelar</button>
-                </div>
-              </form>
-            </div>
-          </div>
-
           <div class="modal" data-lote-modal="custom">
             <div class="modal-card report-modal-card">
               <div class="modal-header">
