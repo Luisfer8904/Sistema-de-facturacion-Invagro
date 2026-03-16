@@ -74,6 +74,22 @@ class AvesLote(db.Model):
     fecha_registro = db.Column(db.DateTime)
 
 
+class AvesLoteActividad(db.Model):
+    __tablename__ = "inva_aves_lote_actividades"
+    __table_args__ = {"extend_existing": True}
+
+    id = db.Column(db.Integer, primary_key=True)
+    lote_id = db.Column(db.Integer, nullable=False, index=True)
+    plan_id = db.Column(db.Integer)
+    actividad_nombre = db.Column(db.String(120), nullable=False)
+    tipo = db.Column(db.String(30), nullable=False)
+    edad_dias = db.Column(db.Integer, nullable=False)
+    fecha_programada = db.Column(db.Date, nullable=False)
+    fecha_realizacion = db.Column(db.Date, nullable=False)
+    comentarios = db.Column(db.Text)
+    fecha_registro = db.Column(db.DateTime)
+
+
 class Producto(db.Model):
     __tablename__ = "inva-productos"
     __table_args__ = {"extend_existing": True}

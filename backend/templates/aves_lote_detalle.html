@@ -1,0 +1,244 @@
+{% extends "base.html" %}
+{% block title %}Detalle Lote | Invagro{% endblock %}
+{% block body_class %}page dashboard-page{% endblock %}
+{% block content %}
+  <div class="dashboard-container">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <img class="sidebar-logo" src="/static/assets/logo.jpg" alt="Invagro" />
+        <h3>Invagro Aves</h3>
+      </div>
+      <nav class="sidebar-nav">
+        <a class="nav-item" href="/dashboard-aves">
+          <svg class="nav-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10.5L12 3l9 7.5M5.25 10.5V20.25h5.25V15h3v5.25h5.25V10.5"/></svg>
+          <span class="nav-text">Dashboard aves</span>
+        </a>
+        <a class="nav-item" href="/aves/clientes">
+          <svg class="nav-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M17.982 18.725A7.488 7.488 0 0 0 12 15.75a7.488 7.488 0 0 0-5.982 2.975m11.963 0a9 9 0 1 0-11.963 0m11.963 0A8.966 8.966 0 0 1 12 21a8.966 8.966 0 0 1-5.982-2.275M15 9.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/></svg>
+          <span class="nav-text">Clientes</span>
+        </a>
+        <a class="nav-item active" href="/aves/lotes">
+          <svg class="nav-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 6.75h7.5M8.25 12h7.5m-7.5 5.25h4.5M6 3.75h12A2.25 2.25 0 0 1 20.25 6v12A2.25 2.25 0 0 1 18 20.25H6A2.25 2.25 0 0 1 3.75 18V6A2.25 2.25 0 0 1 6 3.75z"/></svg>
+          <span class="nav-text">Lotes</span>
+        </a>
+        <a class="nav-item" href="/aves/planes">
+          <svg class="nav-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75m5.25 2.25a8.25 8.25 0 1 1-16.5 0 8.25 8.25 0 0 1 16.5 0Z"/></svg>
+          <span class="nav-text">Planes sanitarios</span>
+        </a>
+        <a class="nav-item" href="/logout">
+          <svg class="nav-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6A2.25 2.25 0 0 0 5.25 5.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15"/><path stroke-linecap="round" stroke-linejoin="round" d="M18 12H9m0 0 3-3m-3 3 3 3"/></svg>
+          <span class="nav-text">Cerrar sesion</span>
+        </a>
+      </nav>
+      <div class="sidebar-footer">
+        <img class="sidebar-mascot" src="/static/assets/mascota.jpeg" alt="Mascota" />
+      </div>
+    </aside>
+
+    <div class="main-content">
+      <div class="topbar">
+        <div class="topbar-left">
+          <h2>Detalle del lote</h2>
+        </div>
+        <div class="topbar-right">
+          <span class="user-pill">Sesion: {{ user }}</span>
+        </div>
+      </div>
+
+      <main class="content-area">
+        <section class="module-header">
+          <div>
+            <a class="back-link" href="/aves/lotes">Volver a lotes</a>
+            <h1>{{ lote.nombre }}</h1>
+            <p>Revisa actividades futuras, registra las realizadas y deja comentarios operativos del lote.</p>
+          </div>
+        </section>
+
+        {% if error %}
+          <div class="form-error">{{ error }}</div>
+        {% endif %}
+
+        <section class="form-card">
+          <div class="aves-lote-detail-grid">
+            <div class="aves-lote-chip">
+              <span class="aves-day-kicker">Lote</span>
+              <strong>{{ lote.nombre }}</strong>
+              <span class="aves-day-date">Nac: {{ lote.fecha_nacimiento_label }}</span>
+            </div>
+
+            <div class="aves-plan-summary-grid aves-lote-detail-summary">
+              <article class="aves-summary-card">
+                <span class="aves-summary-label">Cliente</span>
+                <strong>{{ lote.cliente_nombre }}</strong>
+                <small>{{ lote.telefono }}</small>
+              </article>
+              <article class="aves-summary-card">
+                <span class="aves-summary-label">Programa</span>
+                <strong>{{ lote.plan_nombre }}</strong>
+                <small>Plan activo del lote</small>
+              </article>
+              <article class="aves-summary-card">
+                <span class="aves-summary-label">Cantidad</span>
+                <strong>{{ lote.cantidad_aves }}</strong>
+                <small>Aves registradas</small>
+              </article>
+              <article class="aves-summary-card">
+                <span class="aves-summary-label">Siguiente actividad</span>
+                <strong>{{ lote.next_activity_label }}</strong>
+                <small>{{ lote.next_activity_date }} · {{ lote.next_activity_status }}</small>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <section class="form-card">
+          <div class="module-header">
+            <div>
+              <h3>Configuracion del lote</h3>
+              <p>Aqui asignas cliente, programa de manejo y comentarios generales del lote.</p>
+            </div>
+          </div>
+
+          <form class="module-form" method="post" action="/aves/lotes/{{ lote.id }}">
+            <input type="hidden" name="action" value="update_lote" />
+            <label>
+              <span>Lote / Galpon</span>
+              <input type="text" name="nombre" value="{{ lote.nombre }}" required />
+            </label>
+            <label>
+              <span>Fecha nacimiento pollitas</span>
+              <input type="date" name="fecha_nacimiento" value="{{ lote.fecha_nacimiento_value }}" required />
+            </label>
+            <label>
+              <span>Cliente asignado</span>
+              <select name="cliente_id">
+                <option value="">Sin asignar</option>
+                {% for cliente in clientes %}
+                  <option value="{{ cliente.id }}" {% if lote.cliente_nombre == cliente.nombre %}selected{% endif %}>{{ cliente.nombre }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <label>
+              <span>Programa de manejo</span>
+              <select name="plan_nombre">
+                <option value="">Sin asignar</option>
+                {% for plan_nombre in planes_nombres %}
+                  <option value="{{ plan_nombre }}" {% if lote.plan_nombre == plan_nombre %}selected{% endif %}>{{ plan_nombre }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <label>
+              <span>Cantidad de aves</span>
+              <input type="number" name="cantidad_aves" min="0" value="{{ lote.cantidad_aves }}" />
+            </label>
+            <label class="span-2">
+              <span>Comentarios del lote</span>
+              <textarea name="observaciones" rows="4">{{ lote.observaciones }}</textarea>
+            </label>
+            <div class="form-actions span-2">
+              <button type="submit" class="primary-button">Guardar lote</button>
+            </div>
+          </form>
+        </section>
+
+        <section class="form-card">
+          <div class="module-header">
+            <div>
+              <h3>Actividades futuras y pendientes</h3>
+              <p>Marca como realizada cualquier actividad del programa cuando ya se haya ejecutado.</p>
+            </div>
+          </div>
+
+          {% if pending_activities %}
+            <div class="aves-plan-timeline">
+              {% for activity in pending_activities %}
+                <div class="aves-day-block">
+                  <div class="aves-day-marker">
+                    <span class="aves-day-kicker">Dia</span>
+                    <strong>{{ activity.dia }}</strong>
+                    <span class="aves-day-date">{{ activity.fecha_programada_label }}</span>
+                  </div>
+                  <details class="aves-activity-card">
+                    <summary class="aves-activity-summary">
+                      <div class="aves-activity-summary-main">
+                        <span class="aves-metric-pill {{ activity.tipo_class }}">{{ activity.tipo_label }}</span>
+                        <strong>{{ activity.actividad_nombre }}</strong>
+                        <p>{{ activity.descripcion }}</p>
+                      </div>
+                      <span class="aves-activity-expand">{{ activity.status_label }}</span>
+                    </summary>
+
+                    <form class="aves-activity-editor aves-complete-editor" method="post" action="/aves/lotes/{{ lote.id }}">
+                      <input type="hidden" name="action" value="complete_activity" />
+                      <input type="hidden" name="plan_id" value="{{ activity.plan_id }}" />
+                      <input type="hidden" name="fecha_programada" value="{{ activity.fecha_programada.strftime('%Y-%m-%d') }}" />
+
+                      <label>
+                        <span>Actividad</span>
+                        <input class="aves-table-input" type="text" value="{{ activity.actividad_nombre }}" readonly />
+                      </label>
+                      <label>
+                        <span>Fecha programada</span>
+                        <input class="aves-table-input" type="text" value="{{ activity.fecha_programada_label }}" readonly />
+                      </label>
+                      <label>
+                        <span>Fecha realizada</span>
+                        <input class="aves-table-input" type="date" name="fecha_realizacion" value="{{ activity.fecha_programada.strftime('%Y-%m-%d') }}" required />
+                      </label>
+                      <label class="span-4">
+                        <span>Comentario de la actividad</span>
+                        <textarea name="comentarios" rows="3">{{ activity.comentarios }}</textarea>
+                      </label>
+                      <div class="form-actions">
+                        <button type="submit" class="primary-button small-btn">Marcar realizada</button>
+                      </div>
+                    </form>
+                  </details>
+                </div>
+              {% endfor %}
+            </div>
+          {% else %}
+            <div class="module-table">
+              <div class="table-row">
+                <span>No hay actividades pendientes para este lote.</span>
+              </div>
+            </div>
+          {% endif %}
+        </section>
+
+        <section class="form-card">
+          <div class="module-header">
+            <div>
+              <h3>Actividades realizadas</h3>
+              <p>Historial de tareas ya completadas en este lote.</p>
+            </div>
+          </div>
+
+          {% if completed_activities %}
+            <div class="aves-completed-list">
+              {% for activity in completed_activities %}
+                <article class="aves-completed-card">
+                  <div class="aves-completed-head">
+                    <div>
+                      <span class="aves-metric-pill {{ activity.tipo_class }}">{{ activity.tipo_label }}</span>
+                      <strong>{{ activity.actividad_nombre }}</strong>
+                    </div>
+                    <span class="aves-completed-date">Realizada: {{ activity.realizada_label }}</span>
+                  </div>
+                  <p>Programada para {{ activity.fecha_programada_label }} en el dia {{ activity.dia }}.</p>
+                  <small>{% if activity.comentarios %}{{ activity.comentarios }}{% else %}Sin comentario adicional.{% endif %}</small>
+                </article>
+              {% endfor %}
+            </div>
+          {% else %}
+            <div class="module-table">
+              <div class="table-row">
+                <span>Todavia no hay actividades realizadas.</span>
+              </div>
+            </div>
+          {% endif %}
+        </section>
+      </main>
+    </div>
+  </div>
+{% endblock %}

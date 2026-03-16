@@ -45,6 +45,7 @@ from models import (
     AbonoFactura,
     AjustesNegocio,
     AvesGranjaCliente,
+    AvesLoteActividad,
     AvesLote,
     AvesPlan,
     AvesUser,
@@ -1603,11 +1604,73 @@ def create_app():
         result.sort(key=lambda item: item["name"].lower())
         return result
 
+    def build_aves_lote_activity_lookup(rows):
+        lookup = {}
+        for row in rows:
+            lookup[(row.lote_id, row.plan_id, row.fecha_programada)] = row
+        return lookup
+
+    def build_aves_lote_schedule(lote, plan_rows, activity_lookup=None, today=None):
+        if not lote.fecha_nacimiento:
+            return []
+
+        activity_lookup = activity_lookup or {}
+        today = today or datetime.utcnow().date()
+        schedule = []
+        for plan_row in plan_rows:
+            if plan_row.edad_dias is None or plan_row.edad_dias < 0:
+                continue
+            scheduled_date = lote.fecha_nacimiento + timedelta(days=int(plan_row.edad_dias))
+            activity_row = activity_lookup.get((lote.id, plan_row.id, scheduled_date))
+            is_completed = activity_row is not None
+            days_delta = (scheduled_date - today).days
+            if days_delta < 0:
+                status = "atrasada"
+                status_label = f"Atrasada {abs(days_delta)} dias"
+            elif days_delta == 0:
+                status = "hoy"
+                status_label = "Corresponde hoy"
+            else:
+                status = "proxima"
+                status_label = f"Faltan {days_delta} dias"
+            schedule.append(
+                {
+                    "plan_id": plan_row.id,
+                    "actividad_nombre": plan_row.nombre,
+                    "tipo": plan_row.tipo,
+                    "tipo_label": aves_plan_type_label(plan_row.tipo),
+                    "tipo_class": f"aves-type-{plan_row.tipo or 'actividad'}",
+                    "descripcion": (plan_row.descripcion or "").strip()
+                    or "Sin descripcion adicional.",
+                    "dia": int(plan_row.edad_dias),
+                    "fecha_programada": scheduled_date,
+                    "fecha_programada_label": scheduled_date.strftime("%d/%m/%Y"),
+                    "is_completed": is_completed,
+                    "status": status,
+                    "status_label": status_label,
+                    "realizada_label": (
+                        activity_row.fecha_realizacion.strftime("%d/%m/%Y")
+                        if activity_row and activity_row.fecha_realizacion
+                        else None
+                    ),
+                    "fecha_realizacion": (
+                        activity_row.fecha_realizacion if activity_row else None
+                    ),
+                    "comentarios": (
+                        (activity_row.comentarios or "").strip() if activity_row else ""
+                    ),
+                }
+            )
+
+        schedule.sort(key=lambda item: (item["fecha_programada"], item["tipo_label"]))
+        return schedule
+
     def build_aves_upcoming_activities(limit=None, days_ahead=None):
         today = datetime.utcnow().date()
         try:
             lotes_aves = AvesLote.query.filter_by(activo=True).all()
             planes_aves = AvesPlan.query.filter_by(activo=True).all()
+            completed_rows = AvesLoteActividad.query.all()
         except SQLAlchemyError:
             db.session.rollback()
             return []
@@ -1619,6 +1682,7 @@ def create_app():
                 continue
             planes_by_name.setdefault(key, []).append(plan_aves)
 
+        completed_lookup = build_aves_lote_activity_lookup(completed_rows)
         activities = []
         for lote_aves in lotes_aves:
             if not lote_aves.fecha_nacimiento:
@@ -1627,15 +1691,16 @@ def create_app():
             selected_plans = planes_by_name.get(client_plan_key, [])
             if not selected_plans:
                 continue
-            for plan_aves in selected_plans:
-                if plan_aves.edad_dias is None or plan_aves.edad_dias < 0:
+            schedule = build_aves_lote_schedule(
+                lote_aves,
+                selected_plans,
+                activity_lookup=completed_lookup,
+                today=today,
+            )
+            for activity in schedule:
+                if activity["is_completed"] or activity["fecha_programada"] < today:
                     continue
-                scheduled_date = lote_aves.fecha_nacimiento + timedelta(
-                    days=int(plan_aves.edad_dias)
-                )
-                if scheduled_date < today:
-                    continue
-                days_left = (scheduled_date - today).days
+                days_left = (activity["fecha_programada"] - today).days
                 if days_ahead is not None and days_left > days_ahead:
                     continue
                 activities.append(
@@ -1643,13 +1708,13 @@ def create_app():
                         "lote_nombre": lote_aves.nombre,
                         "cliente_nombre": lote_aves.encargado or "Cliente sin asignar",
                         "lote_id": lote_aves.id,
-                        "plan_nombre": plan_aves.plan_nombre,
-                        "actividad_nombre": plan_aves.nombre,
-                        "tipo": plan_aves.tipo,
-                        "tipo_label": aves_plan_type_label(plan_aves.tipo),
-                        "dia": int(plan_aves.edad_dias),
-                        "fecha": scheduled_date,
-                        "fecha_label": scheduled_date.strftime("%d/%m/%Y"),
+                        "plan_nombre": lote_aves.plan_nombre,
+                        "actividad_nombre": activity["actividad_nombre"],
+                        "tipo": activity["tipo"],
+                        "tipo_label": activity["tipo_label"],
+                        "dia": activity["dia"],
+                        "fecha": activity["fecha_programada"],
+                        "fecha_label": activity["fecha_programada_label"],
                         "dias_restantes": days_left,
                     }
                 )
@@ -1888,56 +1953,23 @@ def create_app():
         open_create_lote_modal = False
         form_values = {
             "nombre": "",
-            "cliente_id": "",
             "fecha_nacimiento": "",
-            "plan_nombre": "",
             "cantidad_aves": "0",
             "observaciones": "",
         }
-        plan_names = []
-        incomplete_plan_groups = []
-        clientes_options = []
-
-        try:
-            all_active_plan_rows = (
-                AvesPlan.query.filter_by(activo=True)
-                .order_by(AvesPlan.plan_nombre.asc(), AvesPlan.edad_dias.asc(), AvesPlan.tipo.asc())
-                .all()
-            )
-            plan_groups = build_aves_plan_groups(all_active_plan_rows)
-            plan_names = [group["name"] for group in plan_groups if group["is_complete"]]
-            incomplete_plan_groups = [group for group in plan_groups if not group["is_complete"]]
-            clientes_options = (
-                AvesGranjaCliente.query.filter_by(activo=True)
-                .order_by(AvesGranjaCliente.nombre.asc(), AvesGranjaCliente.id.asc())
-                .all()
-            )
-        except SQLAlchemyError:
-            db.session.rollback()
-            error = "No se pudieron cargar clientes o planes."
 
         if request.method == "POST":
-            action = (request.form.get("action") or "create_lote").strip()
-            open_create_lote_modal = action == "create_lote"
+            open_create_lote_modal = True
             nombre = (request.form.get("nombre") or "").strip()
-            cliente_id_raw = (request.form.get("cliente_id") or "").strip()
             fecha_nacimiento_raw = (request.form.get("fecha_nacimiento") or "").strip()
-            plan_nombre = (request.form.get("plan_nombre") or "").strip()
             cantidad_aves_raw = (request.form.get("cantidad_aves") or "").strip()
             observaciones = (request.form.get("observaciones") or "").strip() or None
             form_values = {
                 "nombre": nombre,
-                "cliente_id": cliente_id_raw,
                 "fecha_nacimiento": fecha_nacimiento_raw,
-                "plan_nombre": plan_nombre,
                 "cantidad_aves": cantidad_aves_raw or "0",
                 "observaciones": request.form.get("observaciones") or "",
             }
-
-            try:
-                cliente_id = int(cliente_id_raw)
-            except ValueError:
-                cliente_id = 0
 
             if not nombre or not fecha_nacimiento_raw:
                 error = "Lote y fecha de nacimiento son obligatorios."
@@ -1950,18 +1982,6 @@ def create_app():
                     error = "Fecha de nacimiento invalida."
                     fecha_nacimiento = None
 
-            cliente_selected = None
-            if not error and action == "update_lote" and cliente_id > 0:
-                cliente_selected = next(
-                    (cliente for cliente in clientes_options if cliente.id == cliente_id),
-                    None,
-                )
-                if not cliente_selected:
-                    error = "Selecciona un cliente valido."
-
-            if not error and action == "update_lote" and plan_nombre and plan_nombre not in plan_names:
-                error = "Selecciona un plan de manejo valido y completo."
-
             if not error:
                 try:
                     cantidad_aves = int(cantidad_aves_raw or 0)
@@ -1972,40 +1992,18 @@ def create_app():
 
             if not error:
                 try:
-                    if action == "update_lote":
-                        lote_id_raw = (request.form.get("lote_id") or "").strip()
-                        try:
-                            lote_id = int(lote_id_raw)
-                        except ValueError:
-                            lote_id = 0
-                        lote = (
-                            AvesLote.query.filter_by(id=lote_id, activo=True).first()
-                            if lote_id > 0
-                            else None
-                        )
-                        if not lote:
-                            error = "No se encontro el lote seleccionado."
-                        else:
-                            lote.nombre = nombre
-                            lote.encargado = cliente_selected.nombre if cliente_selected else None
-                            lote.telefono = cliente_selected.telefono if cliente_selected else None
-                            lote.fecha_nacimiento = fecha_nacimiento
-                            lote.plan_nombre = plan_nombre or None
-                            lote.cantidad_aves = cantidad_aves
-                            lote.observaciones = observaciones
-                    else:
-                        lote = AvesLote(
-                            nombre=nombre,
-                            encargado=None,
-                            telefono=None,
-                            fecha_nacimiento=fecha_nacimiento,
-                            plan_nombre=None,
-                            cantidad_aves=cantidad_aves,
-                            observaciones=observaciones,
-                            activo=True,
-                            fecha_registro=datetime.utcnow(),
-                        )
-                        db.session.add(lote)
+                    lote = AvesLote(
+                        nombre=nombre,
+                        encargado=None,
+                        telefono=None,
+                        fecha_nacimiento=fecha_nacimiento,
+                        plan_nombre=None,
+                        cantidad_aves=cantidad_aves,
+                        observaciones=observaciones,
+                        activo=True,
+                        fecha_registro=datetime.utcnow(),
+                    )
+                    db.session.add(lote)
                     if error:
                         raise ValueError(error)
                     db.session.commit()
@@ -2017,33 +2015,76 @@ def create_app():
                     error = f"No se pudo guardar el lote. {exc}"
 
         try:
+            all_active_plan_rows = (
+                AvesPlan.query.filter_by(activo=True)
+                .order_by(AvesPlan.plan_nombre.asc(), AvesPlan.edad_dias.asc(), AvesPlan.tipo.asc())
+                .all()
+            )
             lotes_raw = (
                 AvesLote.query.filter_by(activo=True)
                 .order_by(AvesLote.fecha_registro.desc(), AvesLote.id.desc())
                 .all()
             )
+            completed_rows = AvesLoteActividad.query.all()
         except SQLAlchemyError:
             db.session.rollback()
+            all_active_plan_rows = []
             lotes_raw = []
+            completed_rows = []
             if not error:
                 error = "No se pudo cargar la informacion de lotes."
 
-        lotes_view = [
-            {
-                "id": lote.id,
-                "nombre": lote.nombre,
-                "cliente_nombre": lote.encargado or "-",
-                "is_assigned_client": bool(lote.encargado),
-                "telefono": lote.telefono or "-",
-                "cantidad_aves": lote.cantidad_aves or 0,
-                "plan_nombre": (lote.plan_nombre or "").strip() or "-",
-                "is_assigned_plan": bool((lote.plan_nombre or "").strip()),
-                "fecha_nacimiento_value": lote.fecha_nacimiento.strftime("%Y-%m-%d"),
-                "fecha_nacimiento_label": lote.fecha_nacimiento.strftime("%d/%m/%Y"),
-                "observaciones": lote.observaciones or "-",
-            }
-            for lote in lotes_raw
-        ]
+        plans_by_name = {}
+        for plan_row in all_active_plan_rows:
+            plan_key = (plan_row.plan_nombre or "").strip().lower()
+            if not plan_key:
+                continue
+            plans_by_name.setdefault(plan_key, []).append(plan_row)
+
+        completed_lookup = build_aves_lote_activity_lookup(completed_rows)
+        lotes_view = []
+        for lote in lotes_raw:
+            plan_key = (lote.plan_nombre or "").strip().lower()
+            has_plan = bool(plan_key)
+            schedule = build_aves_lote_schedule(
+                lote,
+                plans_by_name.get(plan_key, []),
+                activity_lookup=completed_lookup,
+            )
+            next_activity = next(
+                (activity for activity in schedule if not activity["is_completed"]),
+                None,
+            )
+            lotes_view.append(
+                {
+                    "id": lote.id,
+                    "nombre": lote.nombre,
+                    "cliente_nombre": lote.encargado or "Sin cliente asignado",
+                    "plan_nombre": (lote.plan_nombre or "").strip() or "Sin programa",
+                    "cantidad_aves": lote.cantidad_aves or 0,
+                    "fecha_nacimiento_label": lote.fecha_nacimiento.strftime("%d/%m/%Y"),
+                    "next_activity": next_activity,
+                    "next_activity_label": (
+                        next_activity["actividad_nombre"]
+                        if next_activity
+                        else ("Sin actividades pendientes" if has_plan else "Sin programa asignado")
+                    ),
+                    "next_activity_date": (
+                        next_activity["fecha_programada_label"]
+                        if next_activity
+                        else ("-" if has_plan else "Pendiente")
+                    ),
+                    "next_activity_status": (
+                        next_activity["status_label"]
+                        if next_activity
+                        else (
+                            "Todo el plan esta al dia"
+                            if has_plan
+                            else "Asigna un programa para generar actividades"
+                        )
+                    ),
+                }
+            )
 
         return render_template(
             "aves_lotes.html",
@@ -2053,9 +2094,226 @@ def create_app():
             form_values=form_values,
             lotes=lotes_view,
             lotes_count=len(lotes_view),
+        )
+
+    @app.route("/aves/lotes/<int:lote_id>", methods=["GET", "POST"])
+    def aves_lote_detalle(lote_id):
+        if not session.get("user"):
+            return redirect(url_for("login", portal="aves"))
+
+        error = None
+        try:
+            lote = AvesLote.query.filter_by(id=lote_id, activo=True).first()
+            clientes_options = (
+                AvesGranjaCliente.query.filter_by(activo=True)
+                .order_by(AvesGranjaCliente.nombre.asc(), AvesGranjaCliente.id.asc())
+                .all()
+            )
+            all_active_plan_rows = (
+                AvesPlan.query.filter_by(activo=True)
+                .order_by(AvesPlan.plan_nombre.asc(), AvesPlan.edad_dias.asc(), AvesPlan.tipo.asc())
+                .all()
+            )
+            completed_rows = (
+                AvesLoteActividad.query.filter_by(lote_id=lote_id)
+                .order_by(AvesLoteActividad.fecha_realizacion.desc(), AvesLoteActividad.id.desc())
+                .all()
+            )
+        except SQLAlchemyError:
+            db.session.rollback()
+            lote = None
+            clientes_options = []
+            all_active_plan_rows = []
+            completed_rows = []
+            error = "No se pudo cargar la informacion del lote."
+
+        if not lote:
+            return redirect(url_for("aves_lotes"))
+
+        plan_groups = build_aves_plan_groups(all_active_plan_rows)
+        plan_names = [group["name"] for group in plan_groups if group["is_complete"]]
+        clients_by_id = {cliente.id: cliente for cliente in clientes_options}
+        plans_by_id = {plan_row.id: plan_row for plan_row in all_active_plan_rows}
+        plans_by_name = {}
+        for plan_row in all_active_plan_rows:
+            plan_key = (plan_row.plan_nombre or "").strip().lower()
+            if not plan_key:
+                continue
+            plans_by_name.setdefault(plan_key, []).append(plan_row)
+
+        if request.method == "POST":
+            action = (request.form.get("action") or "").strip()
+            if action == "update_lote":
+                nombre = (request.form.get("nombre") or "").strip()
+                fecha_nacimiento_raw = (request.form.get("fecha_nacimiento") or "").strip()
+                cliente_id_raw = (request.form.get("cliente_id") or "").strip()
+                plan_nombre = (request.form.get("plan_nombre") or "").strip()
+                cantidad_aves_raw = (request.form.get("cantidad_aves") or "").strip()
+                observaciones = (request.form.get("observaciones") or "").strip() or None
+
+                if not nombre or not fecha_nacimiento_raw:
+                    error = "Lote y fecha de nacimiento son obligatorios."
+                else:
+                    try:
+                        fecha_nacimiento = datetime.strptime(
+                            fecha_nacimiento_raw, "%Y-%m-%d"
+                        ).date()
+                    except ValueError:
+                        error = "Fecha de nacimiento invalida."
+                        fecha_nacimiento = None
+
+                try:
+                    cantidad_aves = int(cantidad_aves_raw or 0)
+                    if cantidad_aves < 0:
+                        raise ValueError
+                except ValueError:
+                    error = "La cantidad de aves debe ser un numero valido."
+                    cantidad_aves = 0
+
+                try:
+                    cliente_id = int(cliente_id_raw) if cliente_id_raw else 0
+                except ValueError:
+                    cliente_id = 0
+
+                cliente_selected = clients_by_id.get(cliente_id) if cliente_id else None
+                if not error and cliente_id and not cliente_selected:
+                    error = "Selecciona un cliente valido."
+
+                if not error and plan_nombre and plan_nombre not in plan_names:
+                    error = "Selecciona un programa valido y completo."
+
+                if not error:
+                    try:
+                        lote.nombre = nombre
+                        lote.encargado = cliente_selected.nombre if cliente_selected else None
+                        lote.telefono = cliente_selected.telefono if cliente_selected else None
+                        lote.fecha_nacimiento = fecha_nacimiento
+                        lote.plan_nombre = plan_nombre or None
+                        lote.cantidad_aves = cantidad_aves
+                        lote.observaciones = observaciones
+                        db.session.commit()
+                        return redirect(url_for("aves_lote_detalle", lote_id=lote.id))
+                    except SQLAlchemyError as exc:
+                        db.session.rollback()
+                        error = f"No se pudo guardar el lote. {exc}"
+
+            if action == "complete_activity":
+                plan_id_raw = (request.form.get("plan_id") or "").strip()
+                fecha_programada_raw = (request.form.get("fecha_programada") or "").strip()
+                fecha_realizacion_raw = (request.form.get("fecha_realizacion") or "").strip()
+                comentarios = (request.form.get("comentarios") or "").strip() or None
+
+                try:
+                    plan_id = int(plan_id_raw)
+                except ValueError:
+                    plan_id = 0
+
+                plan_row = plans_by_id.get(plan_id)
+                if not plan_row:
+                    error = "No se encontro la actividad del plan."
+
+                try:
+                    fecha_programada = datetime.strptime(
+                        fecha_programada_raw, "%Y-%m-%d"
+                    ).date()
+                except ValueError:
+                    error = "La fecha programada es invalida."
+                    fecha_programada = None
+
+                if not error:
+                    try:
+                        fecha_realizacion = datetime.strptime(
+                            fecha_realizacion_raw, "%Y-%m-%d"
+                        ).date()
+                    except ValueError:
+                        error = "La fecha de realizacion es invalida."
+                        fecha_realizacion = None
+
+                if not error:
+                    try:
+                        activity_row = AvesLoteActividad.query.filter_by(
+                            lote_id=lote.id,
+                            plan_id=plan_row.id,
+                            fecha_programada=fecha_programada,
+                        ).first()
+                        if not activity_row:
+                            activity_row = AvesLoteActividad(
+                                lote_id=lote.id,
+                                plan_id=plan_row.id,
+                                actividad_nombre=plan_row.nombre,
+                                tipo=plan_row.tipo,
+                                edad_dias=int(plan_row.edad_dias),
+                                fecha_programada=fecha_programada,
+                                fecha_realizacion=fecha_realizacion,
+                                comentarios=comentarios,
+                                fecha_registro=datetime.utcnow(),
+                            )
+                            db.session.add(activity_row)
+                        else:
+                            activity_row.fecha_realizacion = fecha_realizacion
+                            activity_row.comentarios = comentarios
+                        db.session.commit()
+                        return redirect(url_for("aves_lote_detalle", lote_id=lote.id))
+                    except SQLAlchemyError as exc:
+                        db.session.rollback()
+                        error = f"No se pudo registrar la actividad. {exc}"
+
+        completed_lookup = build_aves_lote_activity_lookup(completed_rows)
+        selected_plan_rows = plans_by_name.get((lote.plan_nombre or "").strip().lower(), [])
+        schedule = build_aves_lote_schedule(
+            lote,
+            selected_plan_rows,
+            activity_lookup=completed_lookup,
+        )
+        pending_activities = [activity for activity in schedule if not activity["is_completed"]]
+        completed_activities = sorted(
+            [activity for activity in schedule if activity["is_completed"]],
+            key=lambda item: (item["fecha_realizacion"], item["fecha_programada"]),
+            reverse=True,
+        )
+        next_activity = pending_activities[0] if pending_activities else None
+        has_plan = bool((lote.plan_nombre or "").strip())
+
+        lote_view = {
+            "id": lote.id,
+            "nombre": lote.nombre,
+            "cliente_nombre": lote.encargado or "Sin cliente asignado",
+            "telefono": lote.telefono or "-",
+            "plan_nombre": (lote.plan_nombre or "").strip() or "Sin programa asignado",
+            "cantidad_aves": lote.cantidad_aves or 0,
+            "fecha_nacimiento_value": lote.fecha_nacimiento.strftime("%Y-%m-%d"),
+            "fecha_nacimiento_label": lote.fecha_nacimiento.strftime("%d/%m/%Y"),
+            "observaciones": lote.observaciones or "",
+            "next_activity_label": (
+                next_activity["actividad_nombre"]
+                if next_activity
+                else ("Sin actividades pendientes" if has_plan else "Sin programa asignado")
+            ),
+            "next_activity_date": (
+                next_activity["fecha_programada_label"]
+                if next_activity
+                else ("-" if has_plan else "Pendiente")
+            ),
+            "next_activity_status": (
+                next_activity["status_label"]
+                if next_activity
+                else (
+                    "Todo el plan esta al dia"
+                    if has_plan
+                    else "Asigna un programa para generar actividades"
+                )
+            ),
+        }
+
+        return render_template(
+            "aves_lote_detalle.html",
+            user=session["user"],
+            error=error,
+            lote=lote_view,
             clientes=clientes_options,
             planes_nombres=plan_names,
-            planes_incompletos=incomplete_plan_groups,
+            pending_activities=pending_activities,
+            completed_activities=completed_activities,
         )
 
     @app.route("/aves/programacion", methods=["GET"])

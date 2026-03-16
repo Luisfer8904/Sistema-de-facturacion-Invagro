@@ -35,3 +35,18 @@ CREATE TABLE IF NOT EXISTS `inva_aves_lotes` (
   `fecha_registro` DATETIME NULL,
   PRIMARY KEY (`id`)
 );
+
+CREATE TABLE IF NOT EXISTS `inva_aves_lote_actividades` (
+  `id` INT NOT NULL AUTO_INCREMENT,
+  `lote_id` INT NOT NULL,
+  `plan_id` INT NULL,
+  `actividad_nombre` VARCHAR(120) NOT NULL,
+  `tipo` VARCHAR(30) NOT NULL,
+  `edad_dias` INT NOT NULL,
+  `fecha_programada` DATE NOT NULL,
+  `fecha_realizacion` DATE NOT NULL,
+  `comentarios` TEXT NULL,
+  `fecha_registro` DATETIME NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_inva_aves_lote_actividades_lote_id` (`lote_id`)
+);

@@ -49,7 +49,7 @@
         <section class="module-header">
           <div>
             <h1>Registro y control de lotes</h1>
-            <p>Crea el lote primero. La asignacion de cliente y programa de manejo puede hacerse despues desde cada tarjeta.</p>
+            <p>Desde aqui solo ves los lotes creados y la proxima actividad pendiente de cada uno.</p>
           </div>
           <div class="header-actions">
             <button type="button" class="primary-button" data-create-lote-open>Crear lote</button>
@@ -64,100 +64,42 @@
           <div class="module-header">
             <div>
               <h3>Lotes registrados</h3>
-              <p>Cada lote tiene su propia tarjeta para completar asignaciones y datos sanitarios.</p>
+              <p>Abre la tarjeta del lote para asignar cliente, programa y registrar actividades hechas.</p>
             </div>
           </div>
 
           {% if lotes %}
-            <div class="aves-plan-timeline">
+            <div class="aves-lotes-grid">
               {% for lote in lotes %}
-                <article class="aves-lote-card">
-                  <div class="aves-lote-card-top">
-                    <div class="aves-lote-chip">
+                <article class="aves-lote-mini-card">
+                  <div class="aves-lote-mini-head">
+                    <div class="aves-lote-mini-title">
                       <span class="aves-day-kicker">Lote</span>
                       <strong>{{ lote.nombre }}</strong>
-                      <span class="aves-day-date">Nac: {{ lote.fecha_nacimiento_label }}</span>
+                      <small>Nac: {{ lote.fecha_nacimiento_label }}</small>
                     </div>
+                    <span class="aves-compact-count">{{ lote.cantidad_aves }} aves</span>
+                  </div>
 
-                    <div class="aves-lote-summary">
-                      <div class="aves-plan-summary-grid aves-lote-summary-grid">
-                        <article class="aves-summary-card">
-                          <span class="aves-summary-label">Cliente</span>
-                          <strong>{{ lote.cliente_nombre }}</strong>
-                          <small>{% if lote.is_assigned_client %}Asignado{% else %}Pendiente de asignar{% endif %}</small>
-                        </article>
-                        <article class="aves-summary-card">
-                          <span class="aves-summary-label">Programa</span>
-                          <strong>{{ lote.plan_nombre }}</strong>
-                          <small>{% if lote.is_assigned_plan %}Activo{% else %}Pendiente de asignar{% endif %}</small>
-                        </article>
-                        <article class="aves-summary-card">
-                          <span class="aves-summary-label">Cantidad</span>
-                          <strong>{{ lote.cantidad_aves }}</strong>
-                          <small>Aves registradas</small>
-                        </article>
-                        <article class="aves-summary-card">
-                          <span class="aves-summary-label">Telefono</span>
-                          <strong>{{ lote.telefono }}</strong>
-                          <small>Contacto actual</small>
-                        </article>
-                      </div>
+                  <div class="aves-lote-mini-body">
+                    <div>
+                      <span class="aves-summary-label">Cliente</span>
+                      <p>{{ lote.cliente_nombre }}</p>
+                    </div>
+                    <div>
+                      <span class="aves-summary-label">Programa</span>
+                      <p>{{ lote.plan_nombre }}</p>
+                    </div>
+                    <div class="aves-next-activity">
+                      <span class="aves-summary-label">Siguiente actividad</span>
+                      <strong>{{ lote.next_activity_label }}</strong>
+                      <small>{{ lote.next_activity_date }} · {{ lote.next_activity_status }}</small>
                     </div>
                   </div>
 
-                  <details class="aves-activity-card">
-                    <summary class="aves-activity-summary">
-                      <div class="aves-activity-summary-main">
-                        <strong>Asignar cliente y programa de manejo</strong>
-                        <p>{{ lote.observaciones }}</p>
-                      </div>
-                      <span class="aves-activity-expand">Editar</span>
-                    </summary>
-
-                    <form class="aves-activity-editor aves-lote-editor" method="post" action="/aves/lotes">
-                      <input type="hidden" name="action" value="update_lote" />
-                      <input type="hidden" name="lote_id" value="{{ lote.id }}" />
-
-                      <label>
-                        <span>Lote / Galpon</span>
-                        <input class="aves-table-input" type="text" name="nombre" value="{{ lote.nombre }}" required />
-                      </label>
-                      <label>
-                        <span>Cliente asignado</span>
-                        <select class="aves-table-select" name="cliente_id">
-                          <option value="">Sin asignar</option>
-                          {% for cliente in clientes %}
-                            <option value="{{ cliente.id }}" {% if lote.cliente_nombre == cliente.nombre %}selected{% endif %}>{{ cliente.nombre }}</option>
-                          {% endfor %}
-                        </select>
-                      </label>
-                      <label>
-                        <span>Fecha nacimiento</span>
-                        <input class="aves-table-input" type="date" name="fecha_nacimiento" value="{{ lote.fecha_nacimiento_value }}" required />
-                      </label>
-                      <label>
-                        <span>Programa de manejo</span>
-                        <select class="aves-table-select" name="plan_nombre">
-                          <option value="">Sin asignar</option>
-                          {% for plan_nombre in planes_nombres %}
-                            <option value="{{ plan_nombre }}" {% if lote.plan_nombre == plan_nombre %}selected{% endif %}>{{ plan_nombre }}</option>
-                          {% endfor %}
-                        </select>
-                      </label>
-                      <label>
-                        <span>Cantidad de aves</span>
-                        <input class="aves-table-input" type="number" name="cantidad_aves" min="0" value="{{ lote.cantidad_aves }}" />
-                      </label>
-                      <label class="span-2">
-                        <span>Observaciones</span>
-                        <input class="aves-table-input" type="text" name="observaciones" value="{% if lote.observaciones != '-' %}{{ lote.observaciones }}{% endif %}" />
-                      </label>
-
-                      <div class="form-actions">
-                        <button type="submit" class="primary-button small-btn">Guardar cambios</button>
-                      </div>
-                    </form>
-                  </details>
+                  <div class="form-actions">
+                    <a class="primary-button small-btn" href="/aves/lotes/{{ lote.id }}">Abrir lote</a>
+                  </div>
                 </article>
               {% endfor %}
             </div>
@@ -177,7 +119,6 @@
               <button class="modal-close" type="button" data-create-lote-close>×</button>
             </div>
             <form class="module-form" method="post" action="/aves/lotes">
-              <input type="hidden" name="action" value="create_lote" />
               <label>
                 <span>Lote / Galpon</span>
                 <input type="text" name="nombre" value="{{ form_values.nombre }}" required />
@@ -195,7 +136,7 @@
                 <textarea name="observaciones" rows="3">{{ form_values.observaciones }}</textarea>
               </label>
               <div class="span-2 aves-preview-note">
-                El cliente y el programa de manejo se asignan despues desde la tarjeta del lote.
+                El cliente, el programa y las actividades hechas se registran dentro del lote.
               </div>
               <div class="form-actions span-2">
                 <button type="submit" class="primary-button">Guardar lote</button>
