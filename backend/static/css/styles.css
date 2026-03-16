@@ -1097,79 +1097,82 @@ body {
 
 .aves-lotes-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
 }
 
 .aves-lote-mini-card {
   border: 1px solid #e5ece8;
-  border-radius: 18px;
+  border-radius: 16px;
   background: #ffffff;
   box-shadow: 0 8px 18px rgba(12, 32, 28, 0.06);
-  padding: 18px;
+  padding: 15px;
   display: grid;
-  gap: 16px;
+  gap: 12px;
 }
 
 .aves-lote-mini-head {
   display: flex;
   align-items: start;
   justify-content: space-between;
-  gap: 12px;
+  gap: 10px;
 }
 
 .aves-lote-mini-title {
   display: grid;
-  gap: 6px;
+  gap: 4px;
 }
 
 .aves-lote-mini-title strong {
-  font-size: 1.45rem;
+  font-size: 1.15rem;
   line-height: 1.05;
   color: #203b2b;
 }
 
 .aves-lote-mini-title small {
   color: #617365;
+  font-size: 0.82rem;
 }
 
 .aves-compact-count {
   display: inline-flex;
   align-items: center;
   border-radius: 999px;
-  padding: 7px 12px;
+  padding: 6px 10px;
   background: rgba(44, 122, 63, 0.12);
   color: #2c7a3f;
   font-weight: 700;
-  font-size: 0.82rem;
+  font-size: 0.76rem;
 }
 
 .aves-lote-mini-body {
   display: grid;
-  gap: 12px;
+  gap: 10px;
 }
 
 .aves-lote-mini-body p {
-  margin: 4px 0 0;
+  margin: 3px 0 0;
   color: #243647;
+  font-size: 0.92rem;
 }
 
 .aves-next-activity {
-  padding: 14px 16px;
-  border-radius: 16px;
+  padding: 12px 13px;
+  border-radius: 14px;
   background: linear-gradient(180deg, #f7fbf8, #eef5f0);
   border: 1px solid rgba(44, 122, 63, 0.12);
   display: grid;
-  gap: 6px;
+  gap: 4px;
 }
 
 .aves-next-activity strong {
   color: #203b2b;
-  font-size: 1.05rem;
+  font-size: 0.96rem;
 }
 
 .aves-next-activity small {
   color: #617365;
+  font-size: 0.8rem;
 }
 
 .back-link {
