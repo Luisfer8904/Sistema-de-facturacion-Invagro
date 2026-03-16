@@ -59,7 +59,7 @@ class AvesGranjaCliente(db.Model):
 
 
 class AvesLote(db.Model):
-    __tablename__ = "inva_aves_clientes"
+    __tablename__ = "inva_aves_lotes"
     __table_args__ = {"extend_existing": True}
 
     id = db.Column(db.Integer, primary_key=True)

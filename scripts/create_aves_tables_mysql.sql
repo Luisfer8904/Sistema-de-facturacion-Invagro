@@ -21,3 +21,17 @@ CREATE TABLE IF NOT EXISTS `inva_aves_granja_clientes` (
   `fecha_registro` DATETIME NULL,
   PRIMARY KEY (`id`)
 );
+
+CREATE TABLE IF NOT EXISTS `inva_aves_lotes` (
+  `id` INT NOT NULL AUTO_INCREMENT,
+  `nombre` VARCHAR(120) NOT NULL,
+  `encargado` VARCHAR(120) NULL,
+  `telefono` VARCHAR(30) NULL,
+  `fecha_nacimiento` DATE NOT NULL,
+  `plan_nombre` VARCHAR(120) NULL,
+  `cantidad_aves` INT DEFAULT 0,
+  `observaciones` TEXT NULL,
+  `activo` TINYINT(1) DEFAULT 1,
+  `fecha_registro` DATETIME NULL,
+  PRIMARY KEY (`id`)
+);
