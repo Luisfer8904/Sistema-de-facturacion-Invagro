@@ -1096,53 +1096,36 @@ body {
 }
 
 .aves-lotes-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
 }
 
-.aves-lote-mini-card {
-  border: 1px solid #e5ece8;
-  border-radius: 16px;
-  background: #ffffff;
-  box-shadow: 0 8px 18px rgba(12, 32, 28, 0.06);
-  padding: 15px;
-  display: grid;
-  gap: 12px;
+.aves-lote-tool-card {
+  text-decoration: none;
+  color: inherit;
+  min-height: 250px;
+  justify-content: start;
 }
 
-.aves-lote-mini-head {
-  display: flex;
-  align-items: start;
-  justify-content: space-between;
-  gap: 10px;
+.aves-lote-tool-card:hover {
+  color: inherit;
 }
 
 .aves-lote-mini-title {
   display: grid;
-  gap: 4px;
+  gap: 6px;
 }
 
-.aves-lote-mini-title strong {
-  font-size: 1.15rem;
-  line-height: 1.05;
+.aves-lote-mini-title h3 {
+  margin: 0;
+  font-size: 1.35rem;
+  line-height: 1.1;
   color: #203b2b;
 }
 
-.aves-lote-mini-title small {
+.aves-lote-meta {
+  margin: 0;
   color: #617365;
-  font-size: 0.82rem;
-}
-
-.aves-compact-count {
-  display: inline-flex;
-  align-items: center;
-  border-radius: 999px;
-  padding: 6px 10px;
-  background: rgba(44, 122, 63, 0.12);
-  color: #2c7a3f;
-  font-weight: 700;
-  font-size: 0.76rem;
+  font-size: 0.86rem;
 }
 
 .aves-lote-mini-body {
@@ -1151,28 +1134,14 @@ body {
 }
 
 .aves-lote-mini-body p {
-  margin: 3px 0 0;
+  margin: 0;
   color: #243647;
   font-size: 0.92rem;
 }
 
-.aves-next-activity {
-  padding: 12px 13px;
-  border-radius: 14px;
-  background: linear-gradient(180deg, #f7fbf8, #eef5f0);
-  border: 1px solid rgba(44, 122, 63, 0.12);
-  display: grid;
-  gap: 4px;
-}
-
-.aves-next-activity strong {
-  color: #203b2b;
-  font-size: 0.96rem;
-}
-
-.aves-next-activity small {
+.aves-lote-next-detail {
   color: #617365;
-  font-size: 0.8rem;
+  font-size: 0.84rem;
 }
 
 .back-link {
@@ -1273,11 +1242,6 @@ body {
     grid-template-columns: 1fr;
   }
 
-  .aves-lote-mini-head {
-    flex-direction: column;
-  }
-
-  .aves-compact-count,
   .aves-completed-date {
     white-space: normal;
   }

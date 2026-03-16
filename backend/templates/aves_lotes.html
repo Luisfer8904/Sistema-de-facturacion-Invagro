@@ -69,38 +69,30 @@
           </div>
 
           {% if lotes %}
-            <div class="aves-lotes-grid">
+            <div class="report-tools aves-lotes-grid">
               {% for lote in lotes %}
-                <article class="aves-lote-mini-card">
-                  <div class="aves-lote-mini-head">
-                    <div class="aves-lote-mini-title">
-                      <span class="aves-day-kicker">Lote</span>
-                      <strong>{{ lote.nombre }}</strong>
-                      <small>Nac: {{ lote.fecha_nacimiento_label }}</small>
-                    </div>
-                    <span class="aves-compact-count">{{ lote.cantidad_aves }} aves</span>
+                <a class="tool-card aves-lote-tool-card" href="/aves/lotes/{{ lote.id }}">
+                  <div class="tool-icon {% if lote.next_activity and lote.next_activity.tipo == 'vacunacion' %}tool-blue{% elif lote.next_activity and lote.next_activity.tipo == 'despique' %}tool-amber{% elif lote.next_activity and lote.next_activity.tipo == 'desparasitacion' %}tool-green{% else %}tool-purple{% endif %}">
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                      <path d="M5 4.5h14A1.5 1.5 0 0 1 20.5 6v12A1.5 1.5 0 0 1 19 19.5H5A1.5 1.5 0 0 1 3.5 18V6A1.5 1.5 0 0 1 5 4.5zm0 2v3h14v-3H5zm0 5v6h14v-6H5zm2 1.5h3v3H7v-3zm5 0h5v1.5h-5V13zm0 3h4v1.5h-4V16z" />
+                    </svg>
+                  </div>
+
+                  <div class="aves-lote-mini-title">
+                    <span class="aves-summary-label">Lote</span>
+                    <h3>{{ lote.nombre }}</h3>
+                    <p class="aves-lote-meta">Nac: {{ lote.fecha_nacimiento_label }} · {{ lote.cantidad_aves }} aves</p>
                   </div>
 
                   <div class="aves-lote-mini-body">
-                    <div>
-                      <span class="aves-summary-label">Cliente</span>
-                      <p>{{ lote.cliente_nombre }}</p>
-                    </div>
-                    <div>
-                      <span class="aves-summary-label">Programa</span>
-                      <p>{{ lote.plan_nombre }}</p>
-                    </div>
-                    <div class="aves-next-activity">
-                      <span class="aves-summary-label">Siguiente actividad</span>
-                      <strong>{{ lote.next_activity_label }}</strong>
-                      <small>{{ lote.next_activity_date }} · {{ lote.next_activity_status }}</small>
-                    </div>
+                    <p><strong>Cliente:</strong> {{ lote.cliente_nombre }}</p>
+                    <p><strong>Programa:</strong> {{ lote.plan_nombre }}</p>
+                    <p><strong>Siguiente:</strong> {{ lote.next_activity_label }}</p>
+                    <p class="aves-lote-next-detail">{{ lote.next_activity_date }} · {{ lote.next_activity_status }}</p>
                   </div>
 
-                  <div class="form-actions">
-                    <a class="primary-button small-btn" href="/aves/lotes/{{ lote.id }}">Abrir lote</a>
-                  </div>
-                </article>
+                  <span class="tool-action">Abrir lote →</span>
+                </a>
               {% endfor %}
             </div>
           {% else %}
