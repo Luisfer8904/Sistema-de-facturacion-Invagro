@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Detalle Lote | Invagro{% endblock %}
-{% block body_class %}page dashboard-page{% endblock %}
+{% block body_class %}page dashboard-page no-chat{% endblock %}
 {% block content %}
   <div class="dashboard-container">
     <aside class="sidebar">
@@ -61,6 +61,7 @@
 
         <section class="aves-detail-actions">
           {% if not lote.is_closed %}
+            <button type="button" class="secondary-button" data-lote-modal-open="edit">Editar informacion</button>
             <button type="button" class="secondary-button" data-lote-modal-open="custom">Plan personalizado</button>
             <button type="button" class="danger-button" data-lote-modal-open="close">Cerrar lote</button>
           {% endif %}
@@ -256,6 +257,56 @@
         </section>
 
         {% if not lote.is_closed %}
+          <div class="modal" data-lote-modal="edit">
+            <div class="modal-card report-modal-card">
+              <div class="modal-header">
+                <h3>Editar informacion del lote</h3>
+                <button class="modal-close" type="button" data-lote-modal-close>×</button>
+              </div>
+              <form class="module-form" method="post" action="/aves/lotes/{{ lote.id }}">
+                <input type="hidden" name="action" value="update_lote" />
+                <label>
+                  <span>Lote / Galpon</span>
+                  <input type="text" name="nombre" value="{{ lote.nombre }}" required />
+                </label>
+                <label>
+                  <span>Fecha nacimiento pollitas</span>
+                  <input type="date" name="fecha_nacimiento" value="{{ lote.fecha_nacimiento_value }}" required />
+                </label>
+                <label>
+                  <span>Cliente asignado</span>
+                  <select name="cliente_id">
+                    <option value="">Sin asignar</option>
+                    {% for cliente in clientes %}
+                      <option value="{{ cliente.id }}" {% if lote.cliente_nombre == cliente.nombre %}selected{% endif %}>{{ cliente.nombre }}</option>
+                    {% endfor %}
+                  </select>
+                </label>
+                <label>
+                  <span>Programa de manejo base</span>
+                  <select name="plan_nombre">
+                    <option value="">Sin asignar</option>
+                    {% for plan_nombre in planes_nombres %}
+                      <option value="{{ plan_nombre }}" {% if lote.plan_source != "personalizado" and lote.plan_nombre == plan_nombre %}selected{% endif %}>{{ plan_nombre }}</option>
+                    {% endfor %}
+                  </select>
+                </label>
+                <label>
+                  <span>Cantidad de aves</span>
+                  <input type="number" name="cantidad_aves" min="0" value="{{ lote.cantidad_aves }}" />
+                </label>
+                <label class="span-2">
+                  <span>Comentarios del lote</span>
+                  <textarea name="observaciones" rows="4">{{ lote.observaciones }}</textarea>
+                </label>
+                <div class="form-actions span-2">
+                  <button type="submit" class="primary-button">Guardar cambios</button>
+                  <button type="button" class="secondary-button" data-lote-modal-close>Cancelar</button>
+                </div>
+              </form>
+            </div>
+          </div>
+
           <div class="modal" data-lote-modal="custom">
             <div class="modal-card report-modal-card">
               <div class="modal-header">
