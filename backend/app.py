@@ -2214,6 +2214,18 @@ def create_app():
 
         if request.method == "POST":
             action = (request.form.get("action") or "").strip()
+            if action == "delete_lote":
+                try:
+                    AvesLoteActividad.query.filter_by(lote_id=lote.id).delete()
+                    AvesLotePlanPersonalizado.query.filter_by(lote_id=lote.id).delete()
+                    AvesLoteCierre.query.filter_by(lote_id=lote.id).delete()
+                    db.session.delete(lote)
+                    db.session.commit()
+                    return redirect(url_for("aves_lotes"))
+                except SQLAlchemyError as exc:
+                    db.session.rollback()
+                    error = f"No se pudo eliminar el lote. {exc}"
+
             if closure_row and action in {
                 "update_lote",
                 "complete_activity",

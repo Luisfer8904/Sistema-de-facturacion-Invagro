@@ -59,12 +59,13 @@
           {% endif %}
         </section>
 
-        {% if not lote.is_closed %}
-          <section class="aves-detail-actions">
+        <section class="aves-detail-actions">
+          {% if not lote.is_closed %}
             <button type="button" class="secondary-button" data-lote-modal-open="custom">Plan personalizado</button>
             <button type="button" class="danger-button" data-lote-modal-open="close">Cerrar lote</button>
-          </section>
-        {% endif %}
+          {% endif %}
+          <button type="button" class="danger-button" data-lote-modal-open="delete">Eliminar lote</button>
+        </section>
 
         {% if error %}
           <div class="form-error">{{ error }}</div>
@@ -291,7 +292,33 @@
               </form>
             </div>
           </div>
+        {% endif %}
 
+        <div class="modal" data-lote-modal="delete">
+          <div class="modal-card report-modal-card">
+            <div class="modal-header">
+              <h3>Eliminar lote</h3>
+              <button class="modal-close" type="button" data-lote-modal-close>×</button>
+            </div>
+            <div class="aves-delete-warning">
+              <strong>Esta accion elimina el lote y toda su informacion relacionada.</strong>
+              <p>Se borraran actividades realizadas, plan personalizado, cierre registrado y el lote completo.</p>
+            </div>
+            <form class="module-form" method="post" action="/aves/lotes/{{ lote.id }}">
+              <input type="hidden" name="action" value="delete_lote" />
+              <label class="span-2">
+                <span>Confirmacion</span>
+                <input type="text" value="Confirma para eliminar este lote definitivamente." readonly />
+              </label>
+              <div class="form-actions span-2">
+                <button type="submit" class="danger-button">Si, eliminar lote</button>
+                <button type="button" class="secondary-button" data-lote-modal-close>Cancelar</button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        {% if not lote.is_closed %}
           <div class="modal" data-lote-modal="close">
             <div class="modal-card report-modal-card">
               <div class="modal-header">

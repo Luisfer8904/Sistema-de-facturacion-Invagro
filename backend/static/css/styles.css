@@ -1257,6 +1257,26 @@ body {
   line-height: 1.45;
 }
 
+.aves-delete-warning {
+  margin-bottom: 16px;
+  padding: 16px 18px;
+  border-radius: 16px;
+  background: rgba(248, 215, 218, 0.55);
+  border: 1px solid rgba(125, 26, 26, 0.16);
+  display: grid;
+  gap: 8px;
+}
+
+.aves-delete-warning strong,
+.aves-delete-warning p {
+  margin: 0;
+}
+
+.aves-delete-warning p {
+  color: #7d1a1a;
+  line-height: 1.45;
+}
+
 .aves-completed-list {
   display: grid;
   gap: 14px;
