@@ -1909,6 +1909,7 @@ def create_app():
             return redirect(url_for("login", portal="aves"))
 
         error = None
+        open_create_client_modal = False
         form_values = {
             "nombre": "",
             "contacto": "",
@@ -1919,6 +1920,7 @@ def create_app():
         }
 
         if request.method == "POST":
+            action = (request.form.get("action") or "create_client").strip()
             nombre = (request.form.get("nombre") or "").strip()
             contacto = (request.form.get("contacto") or "").strip() or None
             telefono = (request.form.get("telefono") or "").strip() or None
@@ -1933,11 +1935,62 @@ def create_app():
                 "direccion": direccion or "",
                 "observaciones": observaciones or "",
             }
+            open_create_client_modal = action == "create_client"
 
             if not nombre:
                 error = "El nombre del cliente es obligatorio."
 
-            if not error:
+            if action == "delete_client":
+                client_id_raw = (request.form.get("client_id") or "").strip()
+                try:
+                    client_id = int(client_id_raw)
+                except ValueError:
+                    client_id = 0
+
+                if client_id <= 0:
+                    error = "Cliente invalido."
+                else:
+                    try:
+                        cliente = AvesGranjaCliente.query.filter_by(id=client_id, activo=True).first()
+                        if not cliente:
+                            error = "Cliente no encontrado."
+                        else:
+                            cliente.activo = False
+                            db.session.commit()
+                            return redirect(url_for("aves_clientes"))
+                    except SQLAlchemyError:
+                        db.session.rollback()
+                        error = "No se pudo eliminar el cliente."
+
+            elif action == "update_client" and not error:
+                client_id_raw = (request.form.get("client_id") or "").strip()
+                try:
+                    client_id = int(client_id_raw)
+                except ValueError:
+                    client_id = 0
+
+                if client_id <= 0:
+                    error = "Cliente invalido."
+
+                if not error:
+                    try:
+                        cliente = AvesGranjaCliente.query.filter_by(id=client_id, activo=True).first()
+                        if not cliente:
+                            error = "Cliente no encontrado."
+                        else:
+                            cliente.nombre = nombre
+                            cliente.contacto = contacto
+                            cliente.telefono = telefono
+                            cliente.email = email
+                            cliente.direccion = direccion
+                            cliente.observaciones = observaciones
+                            db.session.commit()
+                            return redirect(url_for("aves_clientes"))
+                    except SQLAlchemyError:
+                        db.session.rollback()
+                        error = "No se pudo actualizar el cliente."
+
+            elif not error:
                 try:
                     cliente = AvesGranjaCliente(
                         nombre=nombre,
@@ -1958,9 +2011,15 @@ def create_app():
 
         try:
             clientes_count = AvesGranjaCliente.query.filter_by(activo=True).count()
+            clientes = (
+                AvesGranjaCliente.query.filter_by(activo=True)
+                .order_by(AvesGranjaCliente.nombre.asc(), AvesGranjaCliente.id.desc())
+                .all()
+            )
         except SQLAlchemyError:
             db.session.rollback()
             clientes_count = 0
+            clientes = []
             if not error:
                 error = "No se pudo cargar la informacion de clientes."
 
@@ -1969,6 +2028,8 @@ def create_app():
             user=session["user"],
             error=error,
             clientes_count=clientes_count,
+            clientes=clientes,
+            open_create_client_modal=open_create_client_modal,
             form_values=form_values,
         )
 
@@ -2629,23 +2690,6 @@ def create_app():
 
             if not error:
                 try:
-                    same_day = (
-                        AvesPlan.query.filter(
-                            AvesPlan.activo.is_(True),
-                            AvesPlan.plan_nombre == plan_nombre,
-                            AvesPlan.edad_dias == edad_dias,
-                        ).first()
-                    )
-                    if same_day:
-                        error = (
-                            f"Ya existe una actividad para el dia {edad_dias} en el plan '{plan_nombre}'."
-                        )
-                except SQLAlchemyError:
-                    db.session.rollback()
-                    error = "No se pudo validar el dia de actividad del plan."
-
-            if not error:
-                try:
                     db.session.add(
                         AvesPlan(
                             plan_nombre=plan_nombre,
@@ -2745,23 +2789,6 @@ def create_app():
 
                 if not error:
                     try:
-                        same_day = (
-                            AvesPlan.query.filter(
-                                AvesPlan.activo.is_(True),
-                                AvesPlan.plan_nombre == plan_nombre_original,
-                                AvesPlan.edad_dias == edad_dias,
-                            ).first()
-                        )
-                        if same_day:
-                            error = (
-                                f"Ya existe una actividad para el dia {edad_dias} en este plan."
-                            )
-                    except SQLAlchemyError:
-                        db.session.rollback()
-                        error = "No se pudo validar el dia de la actividad."
-
-                if not error:
-                    try:
                         db.session.add(
                             AvesPlan(
                                 plan_nombre=plan_nombre_original,
@@ -2817,24 +2844,6 @@ def create_app():
                     except SQLAlchemyError:
                         db.session.rollback()
                         error = "No se pudo cargar la actividad."
-
-                if not error:
-                    try:
-                        same_day_other = (
-                            AvesPlan.query.filter(
-                                AvesPlan.activo.is_(True),
-                                AvesPlan.plan_nombre == plan_nombre_original,
-                                AvesPlan.edad_dias == edad_dias,
-                                AvesPlan.id != activity_id,
-                            ).first()
-                        )
-                        if same_day_other:
-                            error = (
-                                f"Ya existe otra actividad para el dia {edad_dias} en este plan."
-                            )
-                    except SQLAlchemyError:
-                        db.session.rollback()
-                        error = "No se pudo validar el dia de la actividad."
 
                 if not error:
                     try:

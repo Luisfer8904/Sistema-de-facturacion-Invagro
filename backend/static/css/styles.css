@@ -1570,6 +1570,14 @@ body {
   color: #4a5568;
 }
 
+.table-row-top {
+  align-items: start;
+}
+
+.table-row small {
+  color: #718096;
+}
+
 .icon-action {
   display: inline-flex;
   align-items: center;

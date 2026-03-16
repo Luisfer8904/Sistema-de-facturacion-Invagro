@@ -49,7 +49,10 @@
         <section class="module-header">
           <div>
             <h1>Registro de clientes</h1>
-            <p>Este modulo solo registra clientes. La asignacion de lotes y planes de manejo se hace aparte en Lotes.</p>
+            <p>Gestiona clientes de granja y luego asignalos a lotes desde el modulo correspondiente.</p>
+          </div>
+          <div class="header-actions">
+            <button type="button" class="primary-button" data-client-modal-open="create">Crear cliente</button>
           </div>
         </section>
 
@@ -57,46 +60,175 @@
           <div class="form-error">{{ error }}</div>
         {% endif %}
 
-        <section class="form-card">
-          <form class="module-form" method="post" action="/aves/clientes">
-            <label>
-              <span>Nombre del cliente</span>
-              <input type="text" name="nombre" value="{{ form_values.nombre }}" required />
-            </label>
-            <label>
-              <span>Contacto principal</span>
-              <input type="text" name="contacto" value="{{ form_values.contacto }}" />
-            </label>
-            <label>
-              <span>Telefono</span>
-              <input type="text" name="telefono" value="{{ form_values.telefono }}" />
-            </label>
-            <label>
-              <span>Email</span>
-              <input type="email" name="email" value="{{ form_values.email }}" />
-            </label>
-            <label class="span-2">
-              <span>Direccion</span>
-              <textarea name="direccion" rows="3">{{ form_values.direccion }}</textarea>
-            </label>
-            <label class="span-2">
-              <span>Observaciones</span>
-              <textarea name="observaciones" rows="3">{{ form_values.observaciones }}</textarea>
-            </label>
-            <div class="form-actions span-2">
-              <button type="submit" class="primary-button">Guardar cliente</button>
-              <a class="secondary-button" href="/aves/lotes">Ir a lotes</a>
-            </div>
-          </form>
-        </section>
-
         <section class="stats-grid">
           <div class="stat-card">
             <div class="stat-label">Clientes registrados</div>
             <div class="stat-value">{{ clientes_count }}</div>
           </div>
         </section>
+
+        <section class="form-card">
+          <div class="module-header">
+            <div>
+              <h3>Listado de clientes</h3>
+              <p>Edita o elimina clientes desde sus acciones.</p>
+            </div>
+          </div>
+
+          {% if clientes %}
+            <div class="module-table">
+              <div class="table-header table-five">
+                <span>Cliente</span>
+                <span>Contacto</span>
+                <span>Email</span>
+                <span>Direccion</span>
+                <span>Acciones</span>
+              </div>
+              {% for cliente in clientes %}
+                <div class="table-row table-five table-row-top">
+                  <span>
+                    <strong>{{ cliente.nombre }}</strong><br />
+                    <small>{{ cliente.telefono or "-" }}</small>
+                  </span>
+                  <span>{{ cliente.contacto or "-" }}</span>
+                  <span>{{ cliente.email or "-" }}</span>
+                  <span>{{ cliente.direccion or "-" }}</span>
+                  <span class="table-actions">
+                    <button type="button" class="secondary-button small-btn" data-client-modal-open="edit-{{ cliente.id }}">Editar</button>
+                    <form method="post" action="/aves/clientes" onsubmit="return confirm('Este cliente se eliminara del listado. Continuar?');">
+                      <input type="hidden" name="action" value="delete_client" />
+                      <input type="hidden" name="client_id" value="{{ cliente.id }}" />
+                      <input type="hidden" name="nombre" value="{{ cliente.nombre }}" />
+                      <button type="submit" class="danger-button small-btn">Eliminar</button>
+                    </form>
+                  </span>
+                </div>
+              {% endfor %}
+            </div>
+          {% else %}
+            <div class="module-table">
+              <div class="table-row">
+                <span>No hay clientes registrados.</span>
+              </div>
+            </div>
+          {% endif %}
+        </section>
+
+        <div class="modal{% if open_create_client_modal %} open{% endif %}" data-client-modal="create">
+          <div class="modal-card report-modal-card">
+            <div class="modal-header">
+              <h3>Crear cliente</h3>
+              <button class="modal-close" type="button" data-client-modal-close>×</button>
+            </div>
+            <form class="module-form" method="post" action="/aves/clientes">
+              <input type="hidden" name="action" value="create_client" />
+              <label>
+                <span>Nombre del cliente</span>
+                <input type="text" name="nombre" value="{{ form_values.nombre }}" required />
+              </label>
+              <label>
+                <span>Contacto principal</span>
+                <input type="text" name="contacto" value="{{ form_values.contacto }}" />
+              </label>
+              <label>
+                <span>Telefono</span>
+                <input type="text" name="telefono" value="{{ form_values.telefono }}" />
+              </label>
+              <label>
+                <span>Email</span>
+                <input type="email" name="email" value="{{ form_values.email }}" />
+              </label>
+              <label class="span-2">
+                <span>Direccion</span>
+                <textarea name="direccion" rows="3">{{ form_values.direccion }}</textarea>
+              </label>
+              <label class="span-2">
+                <span>Observaciones</span>
+                <textarea name="observaciones" rows="3">{{ form_values.observaciones }}</textarea>
+              </label>
+              <div class="form-actions span-2">
+                <button type="submit" class="primary-button">Guardar cliente</button>
+                <button type="button" class="secondary-button" data-client-modal-close>Cancelar</button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        {% for cliente in clientes %}
+          <div class="modal" data-client-modal="edit-{{ cliente.id }}">
+            <div class="modal-card report-modal-card">
+              <div class="modal-header">
+                <h3>Editar cliente</h3>
+                <button class="modal-close" type="button" data-client-modal-close>×</button>
+              </div>
+              <form class="module-form" method="post" action="/aves/clientes">
+                <input type="hidden" name="action" value="update_client" />
+                <input type="hidden" name="client_id" value="{{ cliente.id }}" />
+                <label>
+                  <span>Nombre del cliente</span>
+                  <input type="text" name="nombre" value="{{ cliente.nombre }}" required />
+                </label>
+                <label>
+                  <span>Contacto principal</span>
+                  <input type="text" name="contacto" value="{{ cliente.contacto or '' }}" />
+                </label>
+                <label>
+                  <span>Telefono</span>
+                  <input type="text" name="telefono" value="{{ cliente.telefono or '' }}" />
+                </label>
+                <label>
+                  <span>Email</span>
+                  <input type="email" name="email" value="{{ cliente.email or '' }}" />
+                </label>
+                <label class="span-2">
+                  <span>Direccion</span>
+                  <textarea name="direccion" rows="3">{{ cliente.direccion or '' }}</textarea>
+                </label>
+                <label class="span-2">
+                  <span>Observaciones</span>
+                  <textarea name="observaciones" rows="3">{{ cliente.observaciones or '' }}</textarea>
+                </label>
+                <div class="form-actions span-2">
+                  <button type="submit" class="primary-button">Guardar cambios</button>
+                  <button type="button" class="secondary-button" data-client-modal-close>Cancelar</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        {% endfor %}
       </main>
     </div>
   </div>
+  <script>
+    const clientOpenButtons = document.querySelectorAll("[data-client-modal-open]");
+    const clientCloseButtons = document.querySelectorAll("[data-client-modal-close]");
+    const clientModals = document.querySelectorAll("[data-client-modal]");
+
+    clientOpenButtons.forEach((button) => {
+      button.addEventListener("click", () => {
+        const target = button.getAttribute("data-client-modal-open");
+        const modal = document.querySelector(`[data-client-modal="${target}"]`);
+        if (modal) {
+          modal.classList.add("open");
+        }
+      });
+    });
+
+    clientCloseButtons.forEach((button) => {
+      button.addEventListener("click", () => {
+        const modal = button.closest("[data-client-modal]");
+        if (modal) {
+          modal.classList.remove("open");
+        }
+      });
+    });
+
+    clientModals.forEach((modal) => {
+      modal.addEventListener("click", (event) => {
+        if (event.target === modal) {
+          modal.classList.remove("open");
+        }
+      });
+    });
+  </script>
 {% endblock %}
