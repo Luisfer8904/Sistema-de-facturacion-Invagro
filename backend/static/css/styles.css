@@ -1110,6 +1110,10 @@ body {
   color: inherit;
 }
 
+.aves-lote-tool-card-closed {
+  opacity: 0.92;
+}
+
 .aves-lote-mini-title {
   display: grid;
   gap: 6px;
@@ -1158,6 +1162,21 @@ body {
   text-decoration: underline;
 }
 
+.aves-state-pill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 8px 14px;
+  background: rgba(44, 122, 63, 0.12);
+  color: #2c7a3f;
+  font-weight: 700;
+}
+
+.aves-state-pill.is-closed {
+  background: rgba(100, 116, 139, 0.16);
+  color: #475569;
+}
+
 .aves-lote-detail-grid {
   display: grid;
   grid-template-columns: 220px minmax(0, 1fr);
@@ -1173,8 +1192,62 @@ body {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.aves-closed-note {
+  padding: 16px 18px;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #f8fafc, #eef2f7);
+  border: 1px solid #d8e0ea;
+  display: grid;
+  gap: 6px;
+}
+
+.aves-closed-note strong,
+.aves-closed-note p,
+.aves-closed-note small {
+  margin: 0;
+}
+
+.aves-closed-note p,
+.aves-closed-note small {
+  color: #617086;
+  line-height: 1.45;
+}
+
 .span-4 {
   grid-column: 1 / -1;
+}
+
+.aves-custom-plan-list {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.aves-custom-plan-card {
+  border: 1px solid #e5ece8;
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 8px 18px rgba(12, 32, 28, 0.06);
+  padding: 16px 18px;
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.aves-custom-plan-card div {
+  display: grid;
+  gap: 8px;
+}
+
+.aves-custom-plan-card strong,
+.aves-custom-plan-card p {
+  margin: 0;
+}
+
+.aves-custom-plan-card p {
+  color: #617365;
+  line-height: 1.45;
 }
 
 .aves-completed-list {
@@ -1231,6 +1304,7 @@ body {
     grid-template-columns: 1fr;
   }
 
+  .aves-custom-plan-card,
   .aves-completed-head {
     align-items: start;
     flex-direction: column;

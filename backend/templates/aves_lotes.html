@@ -63,8 +63,8 @@
         <section class="form-card">
           <div class="module-header">
             <div>
-              <h3>Lotes registrados</h3>
-              <p>Abre la tarjeta del lote para asignar cliente, programa y registrar actividades hechas.</p>
+              <h3>Lotes activos</h3>
+              <p>Abre la tarjeta del lote para asignar cliente, programa, personalizar actividades y registrar lo realizado.</p>
             </div>
           </div>
 
@@ -98,7 +98,51 @@
           {% else %}
             <div class="module-table">
               <div class="table-row">
-                <span>No hay lotes registrados.</span>
+                <span>No hay lotes activos.</span>
+              </div>
+            </div>
+          {% endif %}
+        </section>
+
+        <section class="form-card">
+          <div class="module-header">
+            <div>
+              <h3>Lotes cerrados</h3>
+              <p>Historico de lotes terminados por edad, salida o cierre operativo.</p>
+            </div>
+          </div>
+
+          {% if lotes_cerrados %}
+            <div class="report-tools aves-lotes-grid">
+              {% for lote in lotes_cerrados %}
+                <a class="tool-card aves-lote-tool-card aves-lote-tool-card-closed" href="/aves/lotes/{{ lote.id }}">
+                  <div class="tool-icon tool-green">
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                      <path d="M12 2.5 3.5 6v5.4c0 5.3 3.6 10.2 8.5 11.6 4.9-1.4 8.5-6.3 8.5-11.6V6L12 2.5zm-1.2 13.7-3.2-3.1 1.4-1.4 1.8 1.7 4.2-4.3 1.4 1.4-5.6 5.7z" />
+                    </svg>
+                  </div>
+
+                  <div class="aves-lote-mini-title">
+                    <span class="aves-summary-label">Lote cerrado</span>
+                    <h3>{{ lote.nombre }}</h3>
+                    <p class="aves-lote-meta">Cerrado: {{ lote.closed_label }} · {{ lote.cantidad_aves }} aves</p>
+                  </div>
+
+                  <div class="aves-lote-mini-body">
+                    <p><strong>Cliente:</strong> {{ lote.cliente_nombre }}</p>
+                    <p><strong>Programa:</strong> {{ lote.plan_nombre }}</p>
+                    <p><strong>Motivo:</strong> {{ lote.closed_reason }}</p>
+                    <p class="aves-lote-next-detail">Historial disponible en el detalle.</p>
+                  </div>
+
+                  <span class="tool-action">Ver lote cerrado →</span>
+                </a>
+              {% endfor %}
+            </div>
+          {% else %}
+            <div class="module-table">
+              <div class="table-row">
+                <span>No hay lotes cerrados todavia.</span>
               </div>
             </div>
           {% endif %}

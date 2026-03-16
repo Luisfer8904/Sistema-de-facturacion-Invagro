@@ -46,7 +46,9 @@ from models import (
     AjustesNegocio,
     AvesGranjaCliente,
     AvesLoteActividad,
+    AvesLoteCierre,
     AvesLote,
+    AvesLotePlanPersonalizado,
     AvesPlan,
     AvesUser,
     Categoria,
@@ -1610,6 +1612,15 @@ def create_app():
             lookup[(row.lote_id, row.plan_id, row.fecha_programada)] = row
         return lookup
 
+    def build_aves_lote_plan_rows(lote, standard_plan_rows, custom_plan_rows):
+        custom_rows = [row for row in custom_plan_rows if row.activo]
+        if custom_rows:
+            custom_rows.sort(
+                key=lambda item: (item.edad_dias, item.tipo, item.nombre.lower())
+            )
+            return custom_rows, "personalizado"
+        return standard_plan_rows, "base"
+
     def build_aves_lote_schedule(lote, plan_rows, activity_lookup=None, today=None):
         if not lote.fecha_nacimiento:
             return []
@@ -1620,8 +1631,10 @@ def create_app():
         for plan_row in plan_rows:
             if plan_row.edad_dias is None or plan_row.edad_dias < 0:
                 continue
+            is_custom = isinstance(plan_row, AvesLotePlanPersonalizado)
+            activity_plan_id = (-int(plan_row.id)) if is_custom else int(plan_row.id)
             scheduled_date = lote.fecha_nacimiento + timedelta(days=int(plan_row.edad_dias))
-            activity_row = activity_lookup.get((lote.id, plan_row.id, scheduled_date))
+            activity_row = activity_lookup.get((lote.id, activity_plan_id, scheduled_date))
             is_completed = activity_row is not None
             days_delta = (scheduled_date - today).days
             if days_delta < 0:
@@ -1635,7 +1648,9 @@ def create_app():
                 status_label = f"Faltan {days_delta} dias"
             schedule.append(
                 {
-                    "plan_id": plan_row.id,
+                    "plan_id": activity_plan_id,
+                    "custom_id": plan_row.id if is_custom else None,
+                    "is_custom": is_custom,
                     "actividad_nombre": plan_row.nombre,
                     "tipo": plan_row.tipo,
                     "tipo_label": aves_plan_type_label(plan_row.tipo),
@@ -1671,6 +1686,8 @@ def create_app():
             lotes_aves = AvesLote.query.filter_by(activo=True).all()
             planes_aves = AvesPlan.query.filter_by(activo=True).all()
             completed_rows = AvesLoteActividad.query.all()
+            custom_plan_rows = AvesLotePlanPersonalizado.query.filter_by(activo=True).all()
+            closure_rows = AvesLoteCierre.query.all()
         except SQLAlchemyError:
             db.session.rollback()
             return []
@@ -1682,13 +1699,24 @@ def create_app():
                 continue
             planes_by_name.setdefault(key, []).append(plan_aves)
 
+        custom_by_lote = {}
+        for custom_row in custom_plan_rows:
+            custom_by_lote.setdefault(custom_row.lote_id, []).append(custom_row)
+
+        closure_lookup = {row.lote_id: row for row in closure_rows}
         completed_lookup = build_aves_lote_activity_lookup(completed_rows)
         activities = []
         for lote_aves in lotes_aves:
+            if closure_lookup.get(lote_aves.id):
+                continue
             if not lote_aves.fecha_nacimiento:
                 continue
             client_plan_key = (lote_aves.plan_nombre or "").strip().lower()
-            selected_plans = planes_by_name.get(client_plan_key, [])
+            selected_plans, _ = build_aves_lote_plan_rows(
+                lote_aves,
+                planes_by_name.get(client_plan_key, []),
+                custom_by_lote.get(lote_aves.id, []),
+            )
             if not selected_plans:
                 continue
             schedule = build_aves_lote_schedule(
@@ -2026,11 +2054,15 @@ def create_app():
                 .all()
             )
             completed_rows = AvesLoteActividad.query.all()
+            custom_plan_rows = AvesLotePlanPersonalizado.query.filter_by(activo=True).all()
+            closure_rows = AvesLoteCierre.query.all()
         except SQLAlchemyError:
             db.session.rollback()
             all_active_plan_rows = []
             lotes_raw = []
             completed_rows = []
+            custom_plan_rows = []
+            closure_rows = []
             if not error:
                 error = "No se pudo cargar la informacion de lotes."
 
@@ -2041,50 +2073,74 @@ def create_app():
                 continue
             plans_by_name.setdefault(plan_key, []).append(plan_row)
 
+        custom_by_lote = {}
+        for custom_row in custom_plan_rows:
+            custom_by_lote.setdefault(custom_row.lote_id, []).append(custom_row)
+
+        closure_lookup = {row.lote_id: row for row in closure_rows}
         completed_lookup = build_aves_lote_activity_lookup(completed_rows)
         lotes_view = []
+        lotes_cerrados_view = []
         for lote in lotes_raw:
             plan_key = (lote.plan_nombre or "").strip().lower()
-            has_plan = bool(plan_key)
-            schedule = build_aves_lote_schedule(
+            selected_plan_rows, plan_source = build_aves_lote_plan_rows(
                 lote,
                 plans_by_name.get(plan_key, []),
+                custom_by_lote.get(lote.id, []),
+            )
+            has_plan = bool(plan_key) or plan_source == "personalizado"
+            schedule = build_aves_lote_schedule(
+                lote,
+                selected_plan_rows,
                 activity_lookup=completed_lookup,
             )
             next_activity = next(
                 (activity for activity in schedule if not activity["is_completed"]),
                 None,
             )
-            lotes_view.append(
-                {
-                    "id": lote.id,
-                    "nombre": lote.nombre,
-                    "cliente_nombre": lote.encargado or "Sin cliente asignado",
-                    "plan_nombre": (lote.plan_nombre or "").strip() or "Sin programa",
-                    "cantidad_aves": lote.cantidad_aves or 0,
-                    "fecha_nacimiento_label": lote.fecha_nacimiento.strftime("%d/%m/%Y"),
-                    "next_activity": next_activity,
-                    "next_activity_label": (
-                        next_activity["actividad_nombre"]
-                        if next_activity
-                        else ("Sin actividades pendientes" if has_plan else "Sin programa asignado")
-                    ),
-                    "next_activity_date": (
-                        next_activity["fecha_programada_label"]
-                        if next_activity
-                        else ("-" if has_plan else "Pendiente")
-                    ),
-                    "next_activity_status": (
-                        next_activity["status_label"]
-                        if next_activity
-                        else (
-                            "Todo el plan esta al dia"
-                            if has_plan
-                            else "Asigna un programa para generar actividades"
-                        )
-                    ),
-                }
-            )
+            closure_row = closure_lookup.get(lote.id)
+            lote_item = {
+                "id": lote.id,
+                "nombre": lote.nombre,
+                "cliente_nombre": lote.encargado or "Sin cliente asignado",
+                "plan_nombre": (
+                    "Plan personalizado"
+                    if plan_source == "personalizado"
+                    else ((lote.plan_nombre or "").strip() or "Sin programa")
+                ),
+                "cantidad_aves": lote.cantidad_aves or 0,
+                "fecha_nacimiento_label": lote.fecha_nacimiento.strftime("%d/%m/%Y"),
+                "next_activity": next_activity,
+                "next_activity_label": (
+                    next_activity["actividad_nombre"]
+                    if next_activity
+                    else ("Sin actividades pendientes" if has_plan else "Sin programa asignado")
+                ),
+                "next_activity_date": (
+                    next_activity["fecha_programada_label"]
+                    if next_activity
+                    else ("-" if has_plan else "Pendiente")
+                ),
+                "next_activity_status": (
+                    next_activity["status_label"]
+                    if next_activity
+                    else (
+                        "Todo el plan esta al dia"
+                        if has_plan
+                        else "Asigna un programa para generar actividades"
+                    )
+                ),
+                "plan_source": plan_source,
+                "is_closed": bool(closure_row),
+                "closed_label": (
+                    closure_row.fecha_cierre.strftime("%d/%m/%Y") if closure_row else None
+                ),
+                "closed_reason": closure_row.motivo if closure_row else None,
+            }
+            if closure_row:
+                lotes_cerrados_view.append(lote_item)
+            else:
+                lotes_view.append(lote_item)
 
         return render_template(
             "aves_lotes.html",
@@ -2094,6 +2150,8 @@ def create_app():
             form_values=form_values,
             lotes=lotes_view,
             lotes_count=len(lotes_view),
+            lotes_cerrados=lotes_cerrados_view,
+            lotes_cerrados_count=len(lotes_cerrados_view),
         )
 
     @app.route("/aves/lotes/<int:lote_id>", methods=["GET", "POST"])
@@ -2119,12 +2177,24 @@ def create_app():
                 .order_by(AvesLoteActividad.fecha_realizacion.desc(), AvesLoteActividad.id.desc())
                 .all()
             )
+            custom_plan_rows = (
+                AvesLotePlanPersonalizado.query.filter_by(lote_id=lote_id, activo=True)
+                .order_by(
+                    AvesLotePlanPersonalizado.edad_dias.asc(),
+                    AvesLotePlanPersonalizado.tipo.asc(),
+                    AvesLotePlanPersonalizado.id.asc(),
+                )
+                .all()
+            )
+            closure_row = AvesLoteCierre.query.filter_by(lote_id=lote_id).first()
         except SQLAlchemyError:
             db.session.rollback()
             lote = None
             clientes_options = []
             all_active_plan_rows = []
             completed_rows = []
+            custom_plan_rows = []
+            closure_row = None
             error = "No se pudo cargar la informacion del lote."
 
         if not lote:
@@ -2134,6 +2204,7 @@ def create_app():
         plan_names = [group["name"] for group in plan_groups if group["is_complete"]]
         clients_by_id = {cliente.id: cliente for cliente in clientes_options}
         plans_by_id = {plan_row.id: plan_row for plan_row in all_active_plan_rows}
+        custom_by_id = {row.id: row for row in custom_plan_rows}
         plans_by_name = {}
         for plan_row in all_active_plan_rows:
             plan_key = (plan_row.plan_nombre or "").strip().lower()
@@ -2143,7 +2214,15 @@ def create_app():
 
         if request.method == "POST":
             action = (request.form.get("action") or "").strip()
-            if action == "update_lote":
+            if closure_row and action in {
+                "update_lote",
+                "complete_activity",
+                "add_custom_activity",
+                "delete_custom_activity",
+            }:
+                error = "El lote ya esta cerrado. Solo puedes consultarlo."
+
+            if action == "update_lote" and not error:
                 nombre = (request.form.get("nombre") or "").strip()
                 fecha_nacimiento_raw = (request.form.get("fecha_nacimiento") or "").strip()
                 cliente_id_raw = (request.form.get("cliente_id") or "").strip()
@@ -2197,19 +2276,74 @@ def create_app():
                         db.session.rollback()
                         error = f"No se pudo guardar el lote. {exc}"
 
-            if action == "complete_activity":
+            if action == "add_custom_activity" and not error:
+                custom_nombre = (request.form.get("custom_nombre") or "").strip()
+                custom_tipo = normalize_aves_plan_type(request.form.get("custom_tipo"))
+                custom_edad_dias_raw = (request.form.get("custom_edad_dias") or "").strip()
+                custom_descripcion = (request.form.get("custom_descripcion") or "").strip() or None
+
+                if not custom_nombre or not custom_tipo or not custom_edad_dias_raw:
+                    error = "Nombre, tipo y dia son obligatorios para el plan personalizado."
+                else:
+                    try:
+                        custom_edad_dias = int(custom_edad_dias_raw)
+                        if custom_edad_dias < 0:
+                            raise ValueError
+                    except ValueError:
+                        error = "El dia del plan personalizado debe ser valido."
+                        custom_edad_dias = 0
+
+                if not error:
+                    try:
+                        db.session.add(
+                            AvesLotePlanPersonalizado(
+                                lote_id=lote.id,
+                                nombre=custom_nombre,
+                                tipo=custom_tipo,
+                                edad_dias=custom_edad_dias,
+                                descripcion=custom_descripcion,
+                                activo=True,
+                                fecha_registro=datetime.utcnow(),
+                            )
+                        )
+                        db.session.commit()
+                        return redirect(url_for("aves_lote_detalle", lote_id=lote.id))
+                    except SQLAlchemyError as exc:
+                        db.session.rollback()
+                        error = f"No se pudo guardar la actividad personalizada. {exc}"
+
+            if action == "delete_custom_activity" and not error:
+                custom_id_raw = (request.form.get("custom_id") or "").strip()
+                try:
+                    custom_id = int(custom_id_raw)
+                except ValueError:
+                    custom_id = 0
+
+                custom_row = custom_by_id.get(custom_id)
+                if not custom_row:
+                    error = "No se encontro la actividad personalizada."
+                else:
+                    try:
+                        custom_row.activo = False
+                        db.session.commit()
+                        return redirect(url_for("aves_lote_detalle", lote_id=lote.id))
+                    except SQLAlchemyError as exc:
+                        db.session.rollback()
+                        error = f"No se pudo quitar la actividad personalizada. {exc}"
+
+            if action == "complete_activity" and not error:
                 plan_id_raw = (request.form.get("plan_id") or "").strip()
                 fecha_programada_raw = (request.form.get("fecha_programada") or "").strip()
                 fecha_realizacion_raw = (request.form.get("fecha_realizacion") or "").strip()
                 comentarios = (request.form.get("comentarios") or "").strip() or None
 
                 try:
-                    plan_id = int(plan_id_raw)
+                    plan_id = int(plan_id_raw) if plan_id_raw else 0
                 except ValueError:
                     plan_id = 0
 
-                plan_row = plans_by_id.get(plan_id)
-                if not plan_row:
+                source_row = custom_by_id.get(abs(plan_id)) if plan_id < 0 else plans_by_id.get(plan_id)
+                if not source_row:
                     error = "No se encontro la actividad del plan."
 
                 try:
@@ -2233,16 +2367,16 @@ def create_app():
                     try:
                         activity_row = AvesLoteActividad.query.filter_by(
                             lote_id=lote.id,
-                            plan_id=plan_row.id,
+                            plan_id=plan_id,
                             fecha_programada=fecha_programada,
                         ).first()
                         if not activity_row:
                             activity_row = AvesLoteActividad(
                                 lote_id=lote.id,
-                                plan_id=plan_row.id,
-                                actividad_nombre=plan_row.nombre,
-                                tipo=plan_row.tipo,
-                                edad_dias=int(plan_row.edad_dias),
+                                plan_id=plan_id,
+                                actividad_nombre=source_row.nombre,
+                                tipo=source_row.tipo,
+                                edad_dias=int(source_row.edad_dias),
                                 fecha_programada=fecha_programada,
                                 fecha_realizacion=fecha_realizacion,
                                 comentarios=comentarios,
@@ -2258,8 +2392,67 @@ def create_app():
                         db.session.rollback()
                         error = f"No se pudo registrar la actividad. {exc}"
 
+            if action == "close_lote":
+                fecha_cierre_raw = (request.form.get("fecha_cierre") or "").strip()
+                motivo_cierre = (request.form.get("motivo_cierre") or "").strip()
+                comentarios_cierre = (request.form.get("comentarios_cierre") or "").strip() or None
+
+                if closure_row:
+                    error = "El lote ya estaba cerrado."
+                elif not fecha_cierre_raw or not motivo_cierre:
+                    error = "Fecha y motivo de cierre son obligatorios."
+                else:
+                    try:
+                        fecha_cierre = datetime.strptime(
+                            fecha_cierre_raw, "%Y-%m-%d"
+                        ).date()
+                    except ValueError:
+                        error = "La fecha de cierre es invalida."
+                        fecha_cierre = None
+
+                if not error:
+                    try:
+                        db.session.add(
+                            AvesLoteCierre(
+                                lote_id=lote.id,
+                                fecha_cierre=fecha_cierre,
+                                motivo=motivo_cierre,
+                                comentarios=comentarios_cierre,
+                                fecha_registro=datetime.utcnow(),
+                            )
+                        )
+                        db.session.commit()
+                        return redirect(url_for("aves_lotes"))
+                    except SQLAlchemyError as exc:
+                        db.session.rollback()
+                        error = f"No se pudo cerrar el lote. {exc}"
+
+            try:
+                completed_rows = (
+                    AvesLoteActividad.query.filter_by(lote_id=lote_id)
+                    .order_by(AvesLoteActividad.fecha_realizacion.desc(), AvesLoteActividad.id.desc())
+                    .all()
+                )
+                custom_plan_rows = (
+                    AvesLotePlanPersonalizado.query.filter_by(lote_id=lote_id, activo=True)
+                    .order_by(
+                        AvesLotePlanPersonalizado.edad_dias.asc(),
+                        AvesLotePlanPersonalizado.tipo.asc(),
+                        AvesLotePlanPersonalizado.id.asc(),
+                    )
+                    .all()
+                )
+                custom_by_id = {row.id: row for row in custom_plan_rows}
+                closure_row = AvesLoteCierre.query.filter_by(lote_id=lote_id).first()
+            except SQLAlchemyError:
+                db.session.rollback()
+
         completed_lookup = build_aves_lote_activity_lookup(completed_rows)
-        selected_plan_rows = plans_by_name.get((lote.plan_nombre or "").strip().lower(), [])
+        selected_plan_rows, plan_source = build_aves_lote_plan_rows(
+            lote,
+            plans_by_name.get((lote.plan_nombre or "").strip().lower(), []),
+            custom_plan_rows,
+        )
         schedule = build_aves_lote_schedule(
             lote,
             selected_plan_rows,
@@ -2272,14 +2465,19 @@ def create_app():
             reverse=True,
         )
         next_activity = pending_activities[0] if pending_activities else None
-        has_plan = bool((lote.plan_nombre or "").strip())
+        has_plan = bool((lote.plan_nombre or "").strip()) or plan_source == "personalizado"
 
         lote_view = {
             "id": lote.id,
             "nombre": lote.nombre,
             "cliente_nombre": lote.encargado or "Sin cliente asignado",
             "telefono": lote.telefono or "-",
-            "plan_nombre": (lote.plan_nombre or "").strip() or "Sin programa asignado",
+            "plan_nombre": (
+                "Plan personalizado"
+                if plan_source == "personalizado"
+                else ((lote.plan_nombre or "").strip() or "Sin programa asignado")
+            ),
+            "plan_source": plan_source,
             "cantidad_aves": lote.cantidad_aves or 0,
             "fecha_nacimiento_value": lote.fecha_nacimiento.strftime("%Y-%m-%d"),
             "fecha_nacimiento_label": lote.fecha_nacimiento.strftime("%d/%m/%Y"),
@@ -2303,7 +2501,24 @@ def create_app():
                     else "Asigna un programa para generar actividades"
                 )
             ),
+            "is_closed": bool(closure_row),
+            "closed_label": closure_row.fecha_cierre.strftime("%d/%m/%Y") if closure_row else None,
+            "closed_reason": closure_row.motivo if closure_row else None,
+            "closed_comments": (closure_row.comentarios or "") if closure_row else "",
         }
+
+        custom_plan_activities = [
+            {
+                "id": row.id,
+                "nombre": row.nombre,
+                "tipo": row.tipo,
+                "tipo_label": aves_plan_type_label(row.tipo),
+                "tipo_class": f"aves-type-{row.tipo or 'actividad'}",
+                "edad_dias": row.edad_dias,
+                "descripcion": (row.descripcion or "").strip() or "Sin descripcion adicional.",
+            }
+            for row in custom_plan_rows
+        ]
 
         return render_template(
             "aves_lote_detalle.html",
@@ -2314,6 +2529,8 @@ def create_app():
             planes_nombres=plan_names,
             pending_activities=pending_activities,
             completed_activities=completed_activities,
+            custom_plan_activities=custom_plan_activities,
+            today_value=datetime.utcnow().strftime("%Y-%m-%d"),
         )
 
     @app.route("/aves/programacion", methods=["GET"])

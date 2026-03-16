@@ -90,6 +90,32 @@ class AvesLoteActividad(db.Model):
     fecha_registro = db.Column(db.DateTime)
 
 
+class AvesLotePlanPersonalizado(db.Model):
+    __tablename__ = "inva_aves_lote_plan_personalizado"
+    __table_args__ = {"extend_existing": True}
+
+    id = db.Column(db.Integer, primary_key=True)
+    lote_id = db.Column(db.Integer, nullable=False, index=True)
+    nombre = db.Column(db.String(120), nullable=False)
+    tipo = db.Column(db.String(30), nullable=False)
+    edad_dias = db.Column(db.Integer, nullable=False)
+    descripcion = db.Column(db.Text)
+    activo = db.Column(db.Boolean, default=True)
+    fecha_registro = db.Column(db.DateTime)
+
+
+class AvesLoteCierre(db.Model):
+    __tablename__ = "inva_aves_lote_cierres"
+    __table_args__ = {"extend_existing": True}
+
+    id = db.Column(db.Integer, primary_key=True)
+    lote_id = db.Column(db.Integer, nullable=False, unique=True, index=True)
+    fecha_cierre = db.Column(db.Date, nullable=False)
+    motivo = db.Column(db.String(120), nullable=False)
+    comentarios = db.Column(db.Text)
+    fecha_registro = db.Column(db.DateTime)
+
+
 class Producto(db.Model):
     __tablename__ = "inva-productos"
     __table_args__ = {"extend_existing": True}

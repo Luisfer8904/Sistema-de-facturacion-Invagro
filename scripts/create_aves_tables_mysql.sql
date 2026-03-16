@@ -50,3 +50,27 @@ CREATE TABLE IF NOT EXISTS `inva_aves_lote_actividades` (
   PRIMARY KEY (`id`),
   KEY `idx_inva_aves_lote_actividades_lote_id` (`lote_id`)
 );
+
+CREATE TABLE IF NOT EXISTS `inva_aves_lote_plan_personalizado` (
+  `id` INT NOT NULL AUTO_INCREMENT,
+  `lote_id` INT NOT NULL,
+  `nombre` VARCHAR(120) NOT NULL,
+  `tipo` VARCHAR(30) NOT NULL,
+  `edad_dias` INT NOT NULL,
+  `descripcion` TEXT NULL,
+  `activo` TINYINT(1) DEFAULT 1,
+  `fecha_registro` DATETIME NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_inva_aves_lote_plan_personalizado_lote_id` (`lote_id`)
+);
+
+CREATE TABLE IF NOT EXISTS `inva_aves_lote_cierres` (
+  `id` INT NOT NULL AUTO_INCREMENT,
+  `lote_id` INT NOT NULL,
+  `fecha_cierre` DATE NOT NULL,
+  `motivo` VARCHAR(120) NOT NULL,
+  `comentarios` TEXT NULL,
+  `fecha_registro` DATETIME NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_inva_aves_lote_cierres_lote_id` (`lote_id`)
+);

@@ -52,6 +52,11 @@
             <h1>{{ lote.nombre }}</h1>
             <p>Revisa actividades futuras, registra las realizadas y deja comentarios operativos del lote.</p>
           </div>
+          {% if lote.is_closed %}
+            <span class="aves-state-pill is-closed">Lote cerrado</span>
+          {% else %}
+            <span class="aves-state-pill">Lote activo</span>
+          {% endif %}
         </section>
 
         {% if error %}
@@ -75,7 +80,7 @@
               <article class="aves-summary-card">
                 <span class="aves-summary-label">Programa</span>
                 <strong>{{ lote.plan_nombre }}</strong>
-                <small>Plan activo del lote</small>
+                <small>{% if lote.plan_source == "personalizado" %}Cronograma propio del lote{% else %}Plan activo del lote{% endif %}</small>
               </article>
               <article class="aves-summary-card">
                 <span class="aves-summary-label">Cantidad</span>
@@ -99,46 +104,120 @@
             </div>
           </div>
 
-          <form class="module-form" method="post" action="/aves/lotes/{{ lote.id }}">
-            <input type="hidden" name="action" value="update_lote" />
-            <label>
-              <span>Lote / Galpon</span>
-              <input type="text" name="nombre" value="{{ lote.nombre }}" required />
-            </label>
-            <label>
-              <span>Fecha nacimiento pollitas</span>
-              <input type="date" name="fecha_nacimiento" value="{{ lote.fecha_nacimiento_value }}" required />
-            </label>
-            <label>
-              <span>Cliente asignado</span>
-              <select name="cliente_id">
-                <option value="">Sin asignar</option>
-                {% for cliente in clientes %}
-                  <option value="{{ cliente.id }}" {% if lote.cliente_nombre == cliente.nombre %}selected{% endif %}>{{ cliente.nombre }}</option>
-                {% endfor %}
-              </select>
-            </label>
-            <label>
-              <span>Programa de manejo</span>
-              <select name="plan_nombre">
-                <option value="">Sin asignar</option>
-                {% for plan_nombre in planes_nombres %}
-                  <option value="{{ plan_nombre }}" {% if lote.plan_nombre == plan_nombre %}selected{% endif %}>{{ plan_nombre }}</option>
-                {% endfor %}
-              </select>
-            </label>
-            <label>
-              <span>Cantidad de aves</span>
-              <input type="number" name="cantidad_aves" min="0" value="{{ lote.cantidad_aves }}" />
-            </label>
-            <label class="span-2">
-              <span>Comentarios del lote</span>
-              <textarea name="observaciones" rows="4">{{ lote.observaciones }}</textarea>
-            </label>
-            <div class="form-actions span-2">
-              <button type="submit" class="primary-button">Guardar lote</button>
+          {% if lote.is_closed %}
+            <div class="aves-closed-note">
+              <strong>Cierre registrado el {{ lote.closed_label }}</strong>
+              <p>Motivo: {{ lote.closed_reason }}</p>
+              <small>{% if lote.closed_comments %}{{ lote.closed_comments }}{% else %}Sin comentario adicional de cierre.{% endif %}</small>
             </div>
-          </form>
+          {% else %}
+            <form class="module-form" method="post" action="/aves/lotes/{{ lote.id }}">
+              <input type="hidden" name="action" value="update_lote" />
+              <label>
+                <span>Lote / Galpon</span>
+                <input type="text" name="nombre" value="{{ lote.nombre }}" required />
+              </label>
+              <label>
+                <span>Fecha nacimiento pollitas</span>
+                <input type="date" name="fecha_nacimiento" value="{{ lote.fecha_nacimiento_value }}" required />
+              </label>
+              <label>
+                <span>Cliente asignado</span>
+                <select name="cliente_id">
+                  <option value="">Sin asignar</option>
+                  {% for cliente in clientes %}
+                    <option value="{{ cliente.id }}" {% if lote.cliente_nombre == cliente.nombre %}selected{% endif %}>{{ cliente.nombre }}</option>
+                  {% endfor %}
+                </select>
+              </label>
+              <label>
+                <span>Programa de manejo base</span>
+                <select name="plan_nombre">
+                  <option value="">Sin asignar</option>
+                  {% for plan_nombre in planes_nombres %}
+                    <option value="{{ plan_nombre }}" {% if lote.plan_source != "personalizado" and lote.plan_nombre == plan_nombre %}selected{% endif %}>{{ plan_nombre }}</option>
+                  {% endfor %}
+                </select>
+              </label>
+              <label>
+                <span>Cantidad de aves</span>
+                <input type="number" name="cantidad_aves" min="0" value="{{ lote.cantidad_aves }}" />
+              </label>
+              <label class="span-2">
+                <span>Comentarios del lote</span>
+                <textarea name="observaciones" rows="4">{{ lote.observaciones }}</textarea>
+              </label>
+              <div class="form-actions span-2">
+                <button type="submit" class="primary-button">Guardar lote</button>
+              </div>
+            </form>
+          {% endif %}
+        </section>
+
+        <section class="form-card">
+          <div class="module-header">
+            <div>
+              <h3>Plan personalizado del lote</h3>
+              <p>Si agregas actividades aqui, este lote usa su propio cronograma y deja de depender del plan base.</p>
+            </div>
+          </div>
+
+          {% if custom_plan_activities %}
+            <div class="aves-custom-plan-list">
+              {% for activity in custom_plan_activities %}
+                <article class="aves-custom-plan-card">
+                  <div>
+                    <span class="aves-metric-pill {{ activity.tipo_class }}">{{ activity.tipo_label }}</span>
+                    <strong>{{ activity.nombre }}</strong>
+                    <p>Dia {{ activity.edad_dias }} · {{ activity.descripcion }}</p>
+                  </div>
+                  {% if not lote.is_closed %}
+                    <form method="post" action="/aves/lotes/{{ lote.id }}">
+                      <input type="hidden" name="action" value="delete_custom_activity" />
+                      <input type="hidden" name="custom_id" value="{{ activity.id }}" />
+                      <button type="submit" class="danger-button small-btn">Quitar</button>
+                    </form>
+                  {% endif %}
+                </article>
+              {% endfor %}
+            </div>
+          {% else %}
+            <div class="module-table">
+              <div class="table-row">
+                <span>Este lote aun no tiene actividades personalizadas.</span>
+              </div>
+            </div>
+          {% endif %}
+
+          {% if not lote.is_closed %}
+            <form class="module-form" method="post" action="/aves/lotes/{{ lote.id }}">
+              <input type="hidden" name="action" value="add_custom_activity" />
+              <label>
+                <span>Actividad personalizada</span>
+                <input type="text" name="custom_nombre" placeholder="Ej. Refuerzo vitamina" required />
+              </label>
+              <label>
+                <span>Tipo</span>
+                <select name="custom_tipo" required>
+                  <option value="">Selecciona tipo</option>
+                  <option value="vacunacion">Vacunacion</option>
+                  <option value="despique">Despique</option>
+                  <option value="desparasitacion">Desparasitacion</option>
+                </select>
+              </label>
+              <label>
+                <span>Dia de vida</span>
+                <input type="number" name="custom_edad_dias" min="0" required />
+              </label>
+              <label class="span-2">
+                <span>Descripcion</span>
+                <textarea name="custom_descripcion" rows="3"></textarea>
+              </label>
+              <div class="form-actions span-2">
+                <button type="submit" class="secondary-button">Agregar al plan personalizado</button>
+              </div>
+            </form>
+          {% endif %}
         </section>
 
         <section class="form-card">
@@ -149,7 +228,13 @@
             </div>
           </div>
 
-          {% if pending_activities %}
+          {% if lote.is_closed %}
+            <div class="module-table">
+              <div class="table-row">
+                <span>El lote esta cerrado, por lo que ya no admite nuevas actividades pendientes.</span>
+              </div>
+            </div>
+          {% elif pending_activities %}
             <div class="aves-plan-timeline">
               {% for activity in pending_activities %}
                 <div class="aves-day-block">
@@ -205,6 +290,36 @@
             </div>
           {% endif %}
         </section>
+
+        {% if not lote.is_closed %}
+          <section class="form-card">
+            <div class="module-header">
+              <div>
+                <h3>Terminar lote</h3>
+                <p>Cuando el lote ya salio por edad o por otra razon operativa, puedes cerrarlo y pasara al historico.</p>
+              </div>
+            </div>
+
+            <form class="module-form" method="post" action="/aves/lotes/{{ lote.id }}">
+              <input type="hidden" name="action" value="close_lote" />
+              <label>
+                <span>Fecha de cierre</span>
+                <input type="date" name="fecha_cierre" value="{{ today_value }}" required />
+              </label>
+              <label>
+                <span>Motivo de cierre</span>
+                <input type="text" name="motivo_cierre" placeholder="Ej. Salida por edad" required />
+              </label>
+              <label class="span-2">
+                <span>Comentarios de cierre</span>
+                <textarea name="comentarios_cierre" rows="3"></textarea>
+              </label>
+              <div class="form-actions span-2">
+                <button type="submit" class="danger-button">Cerrar lote</button>
+              </div>
+            </form>
+          </section>
+        {% endif %}
 
         <section class="form-card">
           <div class="module-header">
