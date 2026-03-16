@@ -1885,6 +1885,7 @@ def create_app():
             return redirect(url_for("login", portal="aves"))
 
         error = None
+        open_create_lote_modal = False
         form_values = {
             "nombre": "",
             "cliente_id": "",
@@ -1917,6 +1918,7 @@ def create_app():
 
         if request.method == "POST":
             action = (request.form.get("action") or "create_lote").strip()
+            open_create_lote_modal = action == "create_lote"
             nombre = (request.form.get("nombre") or "").strip()
             cliente_id_raw = (request.form.get("cliente_id") or "").strip()
             fecha_nacimiento_raw = (request.form.get("fecha_nacimiento") or "").strip()
@@ -2047,6 +2049,7 @@ def create_app():
             "aves_lotes.html",
             user=session["user"],
             error=error,
+            open_create_lote_modal=open_create_lote_modal,
             form_values=form_values,
             lotes=lotes_view,
             lotes_count=len(lotes_view),

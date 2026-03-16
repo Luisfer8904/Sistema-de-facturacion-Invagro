@@ -51,90 +51,14 @@
             <h1>Registro y control de lotes</h1>
             <p>Crea el lote primero. La asignacion de cliente y programa de manejo puede hacerse despues desde cada tarjeta.</p>
           </div>
+          <div class="header-actions">
+            <button type="button" class="primary-button" data-create-lote-open>Crear lote</button>
+          </div>
         </section>
 
         {% if error %}
           <div class="form-error">{{ error }}</div>
         {% endif %}
-
-        {% if planes_incompletos %}
-          <section class="form-card">
-            <h3>Planes incompletos</h3>
-            <ul class="aves-activity-list">
-              {% for plan in planes_incompletos %}
-                <li>
-                  <strong>{{ plan.name }}</strong> - faltan:
-                  {{ plan.missing_labels|join(", ") }}
-                </li>
-              {% endfor %}
-            </ul>
-          </section>
-        {% endif %}
-
-        <section class="form-card">
-          <div class="module-header">
-            <div>
-              <h3>Crear lote</h3>
-              <p>Registra la edad base del lote y completa la asignacion cuando ya tengas cliente y plan definidos.</p>
-            </div>
-          </div>
-          <form class="module-form" method="post" action="/aves/lotes">
-            <input type="hidden" name="action" value="create_lote" />
-            <label>
-              <span>Lote / Galpon</span>
-              <input type="text" name="nombre" value="{{ form_values.nombre }}" required />
-            </label>
-            <label>
-              <span>Cliente asignado</span>
-              <select name="cliente_id">
-                <option value="">Sin asignar por ahora</option>
-                {% for cliente in clientes %}
-                  <option value="{{ cliente.id }}" {% if form_values.cliente_id|int == cliente.id %}selected{% endif %}>{{ cliente.nombre }}</option>
-                {% endfor %}
-              </select>
-            </label>
-            <label>
-              <span>Fecha nacimiento pollitas</span>
-              <input type="date" name="fecha_nacimiento" value="{{ form_values.fecha_nacimiento }}" required />
-            </label>
-            <label>
-              <span>Plan de manejo</span>
-              <select name="plan_nombre">
-                <option value="">Sin asignar por ahora</option>
-                {% for plan_nombre in planes_nombres %}
-                  <option value="{{ plan_nombre }}" {% if form_values.plan_nombre == plan_nombre %}selected{% endif %}>{{ plan_nombre }}</option>
-                {% endfor %}
-              </select>
-            </label>
-            <label>
-              <span>Cantidad de aves</span>
-              <input type="number" name="cantidad_aves" min="0" value="{{ form_values.cantidad_aves }}" />
-            </label>
-            <label class="span-2">
-              <span>Observaciones</span>
-              <textarea name="observaciones" rows="3">{{ form_values.observaciones }}</textarea>
-            </label>
-            <div class="form-actions span-2">
-              <button type="submit" class="primary-button">Guardar lote</button>
-              <a class="secondary-button" href="/aves/clientes">Ir a clientes</a>
-            </div>
-          </form>
-        </section>
-
-        <section class="stats-grid">
-          <div class="stat-card">
-            <div class="stat-label">Lotes registrados</div>
-            <div class="stat-value">{{ lotes_count }}</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-label">Clientes disponibles</div>
-            <div class="stat-value">{{ clientes|length }}</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-label">Planes de manejo</div>
-            <div class="stat-value">{{ planes_nombres|length }}</div>
-          </div>
-        </section>
 
         <section class="form-card">
           <div class="module-header">
@@ -245,7 +169,74 @@
             </div>
           {% endif %}
         </section>
+
+        <div class="modal{% if open_create_lote_modal %} open{% endif %}" data-create-lote-modal>
+          <div class="modal-card">
+            <div class="modal-header">
+              <h3>Crear lote</h3>
+              <button class="modal-close" type="button" data-create-lote-close>×</button>
+            </div>
+            <form class="module-form" method="post" action="/aves/lotes">
+              <input type="hidden" name="action" value="create_lote" />
+              <label>
+                <span>Lote / Galpon</span>
+                <input type="text" name="nombre" value="{{ form_values.nombre }}" required />
+              </label>
+              <label>
+                <span>Fecha nacimiento pollitas</span>
+                <input type="date" name="fecha_nacimiento" value="{{ form_values.fecha_nacimiento }}" required />
+              </label>
+              <label>
+                <span>Cliente asignado</span>
+                <select name="cliente_id">
+                  <option value="">Sin asignar por ahora</option>
+                  {% for cliente in clientes %}
+                    <option value="{{ cliente.id }}" {% if form_values.cliente_id|int == cliente.id %}selected{% endif %}>{{ cliente.nombre }}</option>
+                  {% endfor %}
+                </select>
+              </label>
+              <label>
+                <span>Plan de manejo</span>
+                <select name="plan_nombre">
+                  <option value="">Sin asignar por ahora</option>
+                  {% for plan_nombre in planes_nombres %}
+                    <option value="{{ plan_nombre }}" {% if form_values.plan_nombre == plan_nombre %}selected{% endif %}>{{ plan_nombre }}</option>
+                  {% endfor %}
+                </select>
+              </label>
+              <label>
+                <span>Cantidad de aves</span>
+                <input type="number" name="cantidad_aves" min="0" value="{{ form_values.cantidad_aves }}" />
+              </label>
+              <label class="span-2">
+                <span>Observaciones</span>
+                <textarea name="observaciones" rows="3">{{ form_values.observaciones }}</textarea>
+              </label>
+              <div class="form-actions span-2">
+                <button type="submit" class="primary-button">Guardar lote</button>
+                <button type="button" class="secondary-button" data-create-lote-close>Cancelar</button>
+              </div>
+            </form>
+          </div>
+        </div>
       </main>
     </div>
   </div>
+  <script>
+    const createLoteModal = document.querySelector("[data-create-lote-modal]");
+    const createLoteOpenButton = document.querySelector("[data-create-lote-open]");
+    const createLoteCloseButtons = document.querySelectorAll("[data-create-lote-close]");
+
+    if (createLoteModal && createLoteOpenButton) {
+      createLoteOpenButton.addEventListener("click", () => createLoteModal.classList.add("open"));
+      createLoteCloseButtons.forEach((button) => {
+        button.addEventListener("click", () => createLoteModal.classList.remove("open"));
+      });
+      createLoteModal.addEventListener("click", (event) => {
+        if (event.target === createLoteModal) {
+          createLoteModal.classList.remove("open");
+        }
+      });
+    }
+  </script>
 {% endblock %}
