@@ -1571,6 +1571,13 @@ def create_app():
         }
         return labels.get(plan_type, "Actividad")
 
+    def aves_lote_age_weeks_label(fecha_nacimiento, reference_date=None):
+        if not fecha_nacimiento:
+            return "Edad no disponible"
+        age_days = max(((reference_date or datetime.utcnow().date()) - fecha_nacimiento).days, 0)
+        weeks = age_days // 7
+        return f"Edad: {weeks} semanas"
+
     def build_aves_plan_groups(planes_rows):
         required_types = ("vacunacion", "despique", "desparasitacion")
         groups = {}
@@ -2140,6 +2147,7 @@ def create_app():
 
         closure_lookup = {row.lote_id: row for row in closure_rows}
         completed_lookup = build_aves_lote_activity_lookup(completed_rows)
+        today = datetime.utcnow().date()
         lotes_view = []
         lotes_cerrados_view = []
         for lote in lotes_raw:
@@ -2171,6 +2179,10 @@ def create_app():
                 ),
                 "cantidad_aves": lote.cantidad_aves or 0,
                 "fecha_nacimiento_label": lote.fecha_nacimiento.strftime("%d/%m/%Y"),
+                "edad_semanas_label": aves_lote_age_weeks_label(
+                    lote.fecha_nacimiento,
+                    reference_date=(closure_row.fecha_cierre if closure_row else today),
+                ),
                 "next_activity": next_activity,
                 "next_activity_label": (
                     next_activity["actividad_nombre"]
