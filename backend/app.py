@@ -2,12 +2,10 @@ import json
 import logging
 import os
 import re
-import smtplib
 import time
 import unicodedata
 from datetime import datetime, timedelta
 from decimal import Decimal
-from email.message import EmailMessage
 from uuid import uuid4
 
 import pymysql
@@ -1244,151 +1242,6 @@ def create_app():
         db.session.commit()
         return settings
 
-    def get_env_value(*names):
-        for name in names:
-            value = (os.getenv(name) or "").strip()
-            if value:
-                return value
-        return ""
-
-    def parse_env_bool(raw_value, default=False):
-        if raw_value is None or raw_value == "":
-            return default
-        return raw_value.strip().lower() in {"1", "true", "yes", "on", "si"}
-
-    def get_contact_mail_settings():
-        settings = get_business_settings()
-        smtp_host = get_env_value("SMTP_HOST", "EMAIL_HOST", "MAIL_SERVER")
-        smtp_port_raw = get_env_value("SMTP_PORT", "EMAIL_PORT", "MAIL_PORT") or "587"
-        smtp_user = get_env_value(
-            "SMTP_USER",
-            "SMTP_USERNAME",
-            "EMAIL_USER",
-            "EMAIL_USERNAME",
-            "MAIL_USERNAME",
-        )
-        smtp_password = get_env_value(
-            "SMTP_PASSWORD",
-            "EMAIL_PASSWORD",
-            "MAIL_PASSWORD",
-        )
-        sender_email = (
-            get_env_value("SMTP_FROM_EMAIL", "EMAIL_FROM", "MAIL_DEFAULT_SENDER")
-            or smtp_user
-            or (settings.email or "").strip()
-        )
-        recipient_email = (
-            get_env_value("CONTACT_FORM_TO_EMAIL", "SALES_TO_EMAIL")
-            or (settings.email or "").strip()
-            or sender_email
-        )
-        smtp_use_ssl = parse_env_bool(
-            get_env_value("SMTP_USE_SSL", "EMAIL_USE_SSL", "MAIL_USE_SSL"),
-            default=False,
-        )
-        smtp_use_tls = parse_env_bool(
-            get_env_value("SMTP_USE_TLS", "EMAIL_USE_TLS", "MAIL_USE_TLS"),
-            default=not smtp_use_ssl,
-        )
-
-        try:
-            smtp_port = int(smtp_port_raw)
-        except ValueError as exc:
-            raise ValueError("El puerto SMTP configurado no es valido.") from exc
-
-        if not smtp_host:
-            raise ValueError("Falta configurar el host SMTP para el formulario.")
-        if not sender_email:
-            raise ValueError("Falta configurar el correo remitente del formulario.")
-        if not recipient_email:
-            raise ValueError("Falta configurar el correo destino del formulario.")
-        if smtp_user and not smtp_password:
-            raise ValueError("Falta la contrasena del correo configurado para enviar.")
-
-        return {
-            "smtp_host": smtp_host,
-            "smtp_port": smtp_port,
-            "smtp_user": smtp_user,
-            "smtp_password": smtp_password,
-            "sender_email": sender_email,
-            "recipient_email": recipient_email,
-            "smtp_use_ssl": smtp_use_ssl,
-            "smtp_use_tls": smtp_use_tls,
-        }
-
-    def send_contact_form_email(form_values):
-        mail_settings = get_contact_mail_settings()
-        message = EmailMessage()
-        message["Subject"] = (
-            f"Nueva solicitud comercial - {form_values.get('plan') or 'Pago a convenir'} - "
-            f"{form_values.get('nombre') or 'Sin nombre'}"
-        )
-        message["From"] = mail_settings["sender_email"]
-        message["To"] = mail_settings["recipient_email"]
-        if form_values.get("email"):
-            message["Reply-To"] = form_values["email"]
-
-        body_lines = [
-            "Nueva solicitud desde la landing de Invagro.",
-            "",
-            f"Plan solicitado: {form_values.get('plan') or 'Pago a convenir'}",
-            f"Nombre: {form_values.get('nombre') or '-'}",
-            f"Empresa: {form_values.get('empresa') or '-'}",
-            f"Telefono: {form_values.get('telefono') or '-'}",
-            f"Correo: {form_values.get('email') or '-'}",
-            "",
-            "Detalle de la solicitud:",
-            form_values.get("mensaje") or "-",
-        ]
-        message.set_content("\n".join(body_lines))
-
-        smtp_class = smtplib.SMTP_SSL if mail_settings["smtp_use_ssl"] else smtplib.SMTP
-        with smtp_class(
-            mail_settings["smtp_host"],
-            mail_settings["smtp_port"],
-            timeout=20,
-        ) as smtp:
-            if not mail_settings["smtp_use_ssl"] and mail_settings["smtp_use_tls"]:
-                smtp.starttls()
-            if mail_settings["smtp_user"] and mail_settings["smtp_password"]:
-                smtp.login(mail_settings["smtp_user"], mail_settings["smtp_password"])
-            smtp.send_message(message)
-
-    def build_landing_context(form_values=None, form_message=None, form_success=False):
-        default_form_values = {
-            "nombre": "",
-            "empresa": "",
-            "telefono": "",
-            "email": "",
-            "mensaje": "",
-            "plan": "Pago a convenir",
-        }
-        if form_values:
-            default_form_values.update(form_values)
-
-        business_email = "ventas@invagro.com"
-        business_phone = "+504 0000-0000"
-        try:
-            settings = get_business_settings()
-            business_email = (
-                get_env_value("CONTACT_FORM_TO_EMAIL", "SALES_TO_EMAIL")
-                or (settings.email or "").strip()
-                or business_email
-            )
-            business_phone = (settings.telefono or "").strip() or business_phone
-        except Exception:
-            fallback_email = get_env_value("CONTACT_FORM_TO_EMAIL", "SALES_TO_EMAIL")
-            if fallback_email:
-                business_email = fallback_email
-
-        return {
-            "business_email": business_email,
-            "business_phone": business_phone,
-            "contact_form_values": default_form_values,
-            "contact_form_message": form_message,
-            "contact_form_success": form_success,
-        }
-
     def create_invoice_pdf(file_path, settings, invoice, detalles, tipo, cliente, usuario):
         styles = getSampleStyleSheet()
         doc = SimpleDocTemplate(
@@ -1694,76 +1547,9 @@ def create_app():
             format="%(asctime)s %(levelname)s %(name)s %(message)s",
         )
 
-    @app.route("/", methods=["GET", "POST"])
+    @app.get("/")
     def landing():
-        if request.method == "POST":
-            form_values = {
-                "nombre": (request.form.get("nombre") or "").strip(),
-                "empresa": (request.form.get("empresa") or "").strip(),
-                "telefono": (request.form.get("telefono") or "").strip(),
-                "email": (request.form.get("email") or "").strip(),
-                "mensaje": (request.form.get("mensaje") or "").strip(),
-                "plan": (request.form.get("plan") or "Pago a convenir").strip(),
-            }
-
-            if not form_values["nombre"] or not form_values["email"] or not form_values["mensaje"]:
-                return (
-                    render_template(
-                        "landing.html",
-                        **build_landing_context(
-                            form_values=form_values,
-                            form_message="Completa nombre, correo y detalle de la solicitud.",
-                            form_success=False,
-                        ),
-                    ),
-                    400,
-                )
-
-            try:
-                send_contact_form_email(form_values)
-            except ValueError as exc:
-                app.logger.warning("Configuracion de correo incompleta para landing: %s", exc)
-                return (
-                    render_template(
-                        "landing.html",
-                        **build_landing_context(
-                            form_values=form_values,
-                            form_message=str(exc),
-                            form_success=False,
-                        ),
-                    ),
-                    503,
-                )
-            except Exception:
-                app.logger.exception("No se pudo enviar la solicitud comercial")
-                return (
-                    render_template(
-                        "landing.html",
-                        **build_landing_context(
-                            form_values=form_values,
-                            form_message="No se pudo enviar tu solicitud en este momento. Intenta de nuevo en unos minutos.",
-                            form_success=False,
-                        ),
-                    ),
-                    500,
-                )
-
-            return redirect(f"{url_for('landing', contact_status='sent')}#contacto")
-
-        contact_status = (request.args.get("contact_status") or "").strip().lower()
-        form_message = None
-        form_success = False
-        if contact_status == "sent":
-            form_message = "Recibimos tu solicitud. Te contactaremos con una propuesta de pago a convenir."
-            form_success = True
-
-        return render_template(
-            "landing.html",
-            **build_landing_context(
-                form_message=form_message,
-                form_success=form_success,
-            ),
-        )
+        return render_template("landing.html")
 
     @app.get("/aves")
     def aves_landing():
