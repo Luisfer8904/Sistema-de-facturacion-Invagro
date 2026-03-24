@@ -16,8 +16,9 @@
   <body class="page landing-page landing-v2">
     <header class="landing-v2-topbar">
       <div class="landing-v2-topbar-inner">
-        <a href="#soluciones">Animal Nutrition Honduras</a>
-        <a href="#contacto">Contact Us</a>
+        <a href="#soluciones">Nutricion animal en Honduras</a>
+        <a href="#precios">Pago a convenir</a>
+        <a href="#contacto">Contacto</a>
       </div>
     </header>
 
@@ -32,6 +33,7 @@
             <a href="#inicio" class="is-active">Inicio</a>
             <a href="#soluciones">Soluciones</a>
             <a href="#productos">Productos</a>
+            <a href="#precios">Precios</a>
             <a href="#contacto">Contacto</a>
           </nav>
           <div class="landing-v2-nav-actions">
@@ -48,7 +50,7 @@
             para que tu operacion siga creciendo con control y confianza.
           </p>
           <div class="landing-v2-hero-actions hero-buttons">
-            <a class="landing-v2-btn primary" href="#contacto">Hablar con ventas</a>
+            <a class="landing-v2-btn primary" href="#precios">Ver modalidad comercial</a>
             <a class="landing-v2-btn ghost" href="/login">Portal interno</a>
           </div>
         </div>
@@ -106,6 +108,32 @@
         </div>
       </section>
 
+      <section class="landing-v2-section landing-v2-pricing" id="precios">
+        <div class="landing-v2-section-head">
+          <h2>Precios y propuestas comerciales</h2>
+          <p>
+            Trabajamos con una sola modalidad comercial para adaptar volumen,
+            distribucion y acompanamiento a cada operacion.
+          </p>
+        </div>
+        <div class="landing-v2-pricing-grid">
+          <article class="landing-v2-pricing-card">
+            <span class="landing-v2-pricing-label">Modalidad disponible</span>
+            <h3>Pago a convenir</h3>
+            <p class="landing-v2-pricing-lead">
+              Cotizacion personalizada segun tus necesidades comerciales.
+            </p>
+            <div class="landing-v2-price-value">Propuesta a medida</div>
+            <ul class="landing-v2-pricing-list">
+              <li>Condiciones definidas segun volumen y frecuencia de compra</li>
+              <li>Atencion comercial para distribuidores y operaciones agropecuarias</li>
+              <li>Seguimiento tecnico y acompanamiento posterior a la venta</li>
+            </ul>
+            <a class="landing-v2-btn primary" href="#contacto">Solicitar cotizacion</a>
+          </article>
+        </div>
+      </section>
+
       <section class="landing-v2-section landing-v2-highlight">
         <div class="landing-v2-highlight-copy">
           <p class="landing-v2-kicker">Por que Invagro</p>
@@ -144,8 +172,41 @@
           <article class="landing-v2-card contact">
             <h3>Invagro Honduras</h3>
             <p>Agroindustria y veterinaria.</p>
-            <p>Email: ventas@invagro.com</p>
-            <p>Telefono: +504 0000-0000</p>
+            <p>Email: {{ business_email }}</p>
+            <p>Telefono: {{ business_phone }}</p>
+          </article>
+          <article class="landing-v2-card contact landing-v2-contact-form-card">
+            <h3>Solicita tu cotizacion</h3>
+            <p>Envia tus datos y te respondemos con una propuesta de pago a convenir.</p>
+            {% if contact_form_message %}
+              <div class="landing-v2-form-alert {% if contact_form_success %}success{% else %}error{% endif %}">
+                {{ contact_form_message }}
+              </div>
+            {% endif %}
+            <form class="landing-v2-form" method="post" action="{{ url_for('landing') }}#contacto">
+              <input type="hidden" name="plan" value="Pago a convenir" />
+              <label>
+                <span>Nombre</span>
+                <input type="text" name="nombre" value="{{ contact_form_values.nombre }}" required />
+              </label>
+              <label>
+                <span>Empresa</span>
+                <input type="text" name="empresa" value="{{ contact_form_values.empresa }}" />
+              </label>
+              <label>
+                <span>Telefono</span>
+                <input type="text" name="telefono" value="{{ contact_form_values.telefono }}" />
+              </label>
+              <label>
+                <span>Correo</span>
+                <input type="email" name="email" value="{{ contact_form_values.email }}" required />
+              </label>
+              <label class="full">
+                <span>Que necesitas</span>
+                <textarea name="mensaje" rows="5" required>{{ contact_form_values.mensaje }}</textarea>
+              </label>
+              <button type="submit" class="landing-v2-btn primary">Enviar solicitud</button>
+            </form>
           </article>
           <article class="landing-v2-card contact">
             <h3>Portal para distribuidores</h3>

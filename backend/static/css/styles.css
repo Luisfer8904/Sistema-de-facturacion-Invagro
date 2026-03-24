@@ -3239,6 +3239,8 @@ body {
   padding: 11px 18px;
   font-weight: 800;
   border: 1px solid transparent;
+  cursor: pointer;
+  font: inherit;
 }
 
 .landing-v2-btn.primary {
@@ -3324,6 +3326,127 @@ body {
   margin: 0;
   line-height: 1.6;
   color: var(--v2-muted);
+}
+
+.landing-v2-pricing-grid {
+  margin-top: 22px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.landing-v2-pricing-card {
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.98), rgba(241, 245, 239, 0.92));
+  border: 1px solid rgba(11, 109, 61, 0.16);
+  border-radius: 24px;
+  padding: clamp(24px, 4vw, 38px);
+  box-shadow: 0 18px 36px rgba(17, 42, 29, 0.1);
+  display: grid;
+  gap: 14px;
+}
+
+.landing-v2-pricing-label {
+  display: inline-flex;
+  justify-self: start;
+  border-radius: 999px;
+  padding: 6px 12px;
+  background: rgba(9, 111, 61, 0.1);
+  color: var(--v2-green-800);
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.landing-v2-pricing-card h3 {
+  margin: 0;
+  font-size: clamp(2rem, 4vw, 3.4rem);
+  color: var(--v2-green-900);
+}
+
+.landing-v2-pricing-lead {
+  margin: 0;
+  max-width: 60ch;
+  color: var(--v2-muted);
+  font-size: 1.02rem;
+}
+
+.landing-v2-price-value {
+  font-family: "Fraunces", "Times New Roman", serif;
+  font-size: clamp(1.8rem, 3vw, 2.8rem);
+  color: #f59e0b;
+}
+
+.landing-v2-pricing-list {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 10px;
+  color: var(--v2-text);
+}
+
+.landing-v2-contact-form-card {
+  align-content: start;
+}
+
+.landing-v2-form-alert {
+  border-radius: 14px;
+  padding: 12px 14px;
+  font-weight: 700;
+}
+
+.landing-v2-form-alert.success {
+  background: rgba(10, 143, 74, 0.12);
+  color: #086638;
+  border: 1px solid rgba(10, 143, 74, 0.2);
+}
+
+.landing-v2-form-alert.error {
+  background: rgba(190, 24, 24, 0.08);
+  color: #991b1b;
+  border: 1px solid rgba(190, 24, 24, 0.14);
+}
+
+.landing-v2-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.landing-v2-form label {
+  display: grid;
+  gap: 6px;
+  color: var(--v2-text);
+  font-weight: 700;
+}
+
+.landing-v2-form label span {
+  font-size: 0.92rem;
+}
+
+.landing-v2-form label.full,
+.landing-v2-form button {
+  grid-column: 1 / -1;
+}
+
+.landing-v2-form input,
+.landing-v2-form textarea {
+  width: 100%;
+  border-radius: 14px;
+  border: 1px solid rgba(9, 63, 36, 0.16);
+  background: #fbfcfa;
+  padding: 12px 14px;
+  color: var(--v2-text);
+}
+
+.landing-v2-form textarea {
+  resize: vertical;
+  min-height: 128px;
+}
+
+.landing-v2-form input:focus,
+.landing-v2-form textarea:focus {
+  outline: 2px solid rgba(10, 143, 74, 0.18);
+  border-color: rgba(10, 143, 74, 0.38);
 }
 
 .landing-v2-highlight {
@@ -3497,5 +3620,9 @@ body {
   .landing-v2-highlight {
     grid-template-columns: 1fr;
     padding: 20px 16px;
+  }
+
+  .landing-v2-form {
+    grid-template-columns: 1fr;
   }
 }
