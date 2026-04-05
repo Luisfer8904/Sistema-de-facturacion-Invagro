@@ -1612,6 +1612,139 @@ def create_app():
             story.append(KeepTogether(footer_blocks))
         doc.build(story)
 
+    def create_personal_charge_order_pdf(file_path, settings, cobro, usuario):
+        parent_dir = os.path.dirname(file_path)
+        if parent_dir and not os.path.isdir(parent_dir):
+            os.makedirs(parent_dir, exist_ok=True)
+        styles = getSampleStyleSheet()
+        doc = SimpleDocTemplate(
+            file_path,
+            pagesize=letter,
+            leftMargin=28,
+            rightMargin=28,
+            topMargin=26,
+            bottomMargin=26,
+        )
+        story = []
+        logo_path = os.path.join(app.static_folder, "assets", "logo.jpg")
+        logo_image = None
+        if os.path.exists(logo_path):
+            logo_image = Image(logo_path, width=62, height=62)
+
+        fecha_emision = cobro.fecha.strftime("%d/%m/%Y %I:%M %p") if cobro.fecha else "-"
+        header_center = (
+            f"<b>{settings.nombre}</b><br/>"
+            f"{settings.direccion or ''}<br/>"
+            f"TEL: {settings.telefono or '-'} &nbsp;&nbsp; EMAIL: {settings.email or '-'}"
+        )
+        header_right = (
+            "<b>ORDEN DE ENTREGA</b><br/>"
+            f"FECHA: {fecha_emision}"
+        )
+        header_table = Table(
+            [[logo_image or "", Paragraph(header_center, styles["Normal"]), Paragraph(header_right, styles["Normal"])]],
+            colWidths=[82, 310, 120],
+        )
+        header_table.setStyle(
+            TableStyle(
+                [
+                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                    ("ALIGN", (2, 0), (2, 0), "RIGHT"),
+                    ("LINEBELOW", (0, 0), (-1, 0), 0.75, colors.black),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+                ]
+            )
+        )
+        story.append(header_table)
+        story.append(Spacer(1, 12))
+
+        receptor_data = [
+            ["Entregado a", cobro.nombre or "-"],
+            ["Telefono", cobro.telefono or "-"],
+            [
+                "Vencimiento",
+                cobro.fecha_vencimiento.strftime("%d/%m/%Y")
+                if cobro.fecha_vencimiento
+                else "-",
+            ],
+            [
+                "Preparado por",
+                usuario.nombre_completo if usuario and usuario.nombre_completo else (usuario.username if usuario else "-"),
+            ],
+        ]
+        receptor_table = Table(receptor_data, colWidths=[120, 392])
+        receptor_table.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#f3f4f6")),
+                    ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+                    ("BOX", (0, 0), (-1, -1), 0.6, colors.HexColor("#d1d5db")),
+                    ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#e5e7eb")),
+                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 8),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+                    ("TOPPADDING", (0, 0), (-1, -1), 7),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
+                ]
+            )
+        )
+        story.append(receptor_table)
+        story.append(Spacer(1, 14))
+
+        detalle_data = [
+            ["Detalle", "Monto"],
+            [cobro.concepto or "-", f"L {float(cobro.total or 0):,.2f}"],
+        ]
+        detalle_table = Table(detalle_data, colWidths=[392, 120])
+        detalle_table.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#f3f4f6")),
+                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("BOX", (0, 0), (-1, -1), 0.75, colors.black),
+                    ("LINEBELOW", (0, 0), (-1, 0), 0.6, colors.black),
+                    ("ALIGN", (1, 1), (1, -1), "RIGHT"),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 8),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+                    ("TOPPADDING", (0, 0), (-1, -1), 8),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+                ]
+            )
+        )
+        story.append(detalle_table)
+        story.append(Spacer(1, 12))
+
+        total_en_letras = amount_to_words(cobro.total or 0).upper()
+        story.append(Paragraph(f"<b>Total:</b> L {float(cobro.total or 0):,.2f}", styles["Normal"]))
+        story.append(Spacer(1, 6))
+        story.append(Paragraph(f"<b>Total en letras:</b> {total_en_letras}", styles["Normal"]))
+        story.append(Spacer(1, 10))
+
+        if cobro.observaciones:
+            story.append(Paragraph("<b>Observaciones:</b>", styles["Normal"]))
+            story.append(Spacer(1, 4))
+            story.append(Paragraph(cobro.observaciones, styles["Normal"]))
+            story.append(Spacer(1, 16))
+
+        story.append(Paragraph("Documento interno de entrega. No sustituye una factura fiscal.", styles["Normal"]))
+        story.append(Spacer(1, 34))
+
+        firmas = Table(
+            [["______________________________", "______________________________"], ["Entrega Invagro", "Recibe conforme"]],
+            colWidths=[256, 256],
+        )
+        firmas.setStyle(
+            TableStyle(
+                [
+                    ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                    ("TOPPADDING", (0, 0), (-1, -1), 10),
+                ]
+            )
+        )
+        story.append(firmas)
+
+        doc.build(story)
+
     def create_receipt_pdf(file_path, settings, factura, cliente, usuario, monto, saldo):
         parent_dir = os.path.dirname(file_path)
         if parent_dir and not os.path.isdir(parent_dir):
@@ -4546,6 +4679,26 @@ def create_app():
             return redirect(url_for("cobros_personales", status="payment_error"))
 
         return redirect(url_for("cobros_personales", status="payment_recorded"))
+
+    @app.get("/cobros-personales/<int:cobro_id>/orden")
+    def imprimir_orden_cobro_personal(cobro_id):
+        if not session.get("user"):
+            return redirect(url_for("login"))
+
+        try:
+            cobro = CobroPersonal.query.get_or_404(cobro_id)
+            usuario = User.query.get(cobro.usuario_id) if cobro.usuario_id else None
+            settings = get_business_settings()
+        except SQLAlchemyError:
+            db.session.rollback()
+            return redirect(url_for("cobros_personales", status="invalid_charge"))
+
+        safe_base = f"orden-entrega-{cobro.id}-{datetime.utcnow():%Y%m%d%H%M%S}"
+        filename = build_invoice_pdf_filename(safe_base)
+        file_path = os.path.join(app.config["INVOICE_PDF_FOLDER"], filename)
+        cleanup_old_pdfs(app.config["INVOICE_PDF_FOLDER"], prefix="orden-entrega-")
+        create_personal_charge_order_pdf(file_path, settings, cobro, usuario)
+        return redirect(url_for("static", filename=f"invoices/{filename}"))
 
     @app.get("/receipts/<path:filename>")
     def receipt_file(filename):
