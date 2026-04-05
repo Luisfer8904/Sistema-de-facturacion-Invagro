@@ -213,6 +213,40 @@ class AbonoFactura(db.Model):
     fecha = db.Column(db.DateTime)
 
 
+class CobroPersonal(db.Model):
+    __tablename__ = "inva-cobros_personales"
+    __table_args__ = {"extend_existing": True}
+
+    id = db.Column(db.Integer, primary_key=True)
+    numero_cobro = db.Column(db.String(50), unique=True, nullable=False)
+    nombre = db.Column(db.String(120), nullable=False)
+    concepto = db.Column(db.String(160), nullable=False)
+    telefono = db.Column(db.String(30))
+    fecha = db.Column(db.DateTime)
+    fecha_vencimiento = db.Column(db.Date)
+    total = db.Column(db.Numeric(10, 2), nullable=False)
+    saldo = db.Column(db.Numeric(10, 2), nullable=False)
+    observaciones = db.Column(db.Text)
+    usuario_id = db.Column(db.Integer, db.ForeignKey("inva-usuarios.id"))
+    estado = db.Column(
+        db.Enum("pendiente", "pagado", "anulado"), default="pendiente"
+    )
+
+
+class AbonoCobroPersonal(db.Model):
+    __tablename__ = "inva-abonos_cobros_personales"
+    __table_args__ = {"extend_existing": True}
+
+    id = db.Column(db.Integer, primary_key=True)
+    cobro_id = db.Column(
+        db.Integer, db.ForeignKey("inva-cobros_personales.id"), nullable=False
+    )
+    usuario_id = db.Column(db.Integer, db.ForeignKey("inva-usuarios.id"))
+    monto = db.Column(db.Numeric(10, 2), nullable=False)
+    comentario = db.Column(db.String(255))
+    fecha = db.Column(db.DateTime)
+
+
 class FacturaCredito(db.Model):
     __tablename__ = "inva-facturas_credito"
     __table_args__ = {"extend_existing": True}

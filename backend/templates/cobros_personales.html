@@ -1,0 +1,206 @@
+{% extends "base.html" %}
+{% block title %}Cobros personales | Invagro{% endblock %}
+{% block body_class %}page dashboard-page{% endblock %}
+{% block content %}
+  <div class="dashboard-container">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <img class="sidebar-logo" src="/static/assets/logo.jpg" alt="Invagro" />
+        <h3>Invagro</h3>
+      </div>
+      <nav class="sidebar-nav">
+        <a class="nav-item" href="/dashboard"><svg class="nav-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10.5L12 3l9 7.5M5.25 10.5V20.25h5.25V15h3v5.25h5.25V10.5"/></svg><span class="nav-text">Dashboard</span></a>
+        <a class="nav-item" href="/facturacion"><svg class="nav-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m-6-8h6M6 4.5h12A1.5 1.5 0 0 1 19.5 6v12A1.5 1.5 0 0 1 18 19.5H6A1.5 1.5 0 0 1 4.5 18V6A1.5 1.5 0 0 1 6 4.5z"/></svg><span class="nav-text">Facturacion</span></a>
+        <a class="nav-item" href="/pedidos"><svg class="nav-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.091.835L5.7 7.5m0 0H19.5l-1.35 6.75a1.125 1.125 0 0 1-1.102.9H7.35a1.125 1.125 0 0 1-1.102-.9L5.7 7.5zm0 0L4.5 4.5m3.75 12.75a1.125 1.125 0 1 0 0 2.25 1.125 1.125 0 0 0 0-2.25zm9 0a1.125 1.125 0 1 0 0 2.25 1.125 1.125 0 0 0 0-2.25"/></svg><span class="nav-text">Pedidos</span></a>
+        <a class="nav-item" href="/facturas/credito"><svg class="nav-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 6.75A2.25 2.25 0 0 1 4.5 4.5h15A2.25 2.25 0 0 1 21.75 6.75v10.5A2.25 2.25 0 0 1 19.5 19.5h-15A2.25 2.25 0 0 1 2.25 17.25V6.75zm0 1.5h19.5m-15 7.5h6"/></svg><span class="nav-text">Facturas credito</span></a>
+        <a class="nav-item" href="/pagos"><svg class="nav-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12h19.5m-16.5 6h13.5m-15-12h15a2.25 2.25 0 0 1 2.25 2.25v7.5A2.25 2.25 0 0 1 18.75 18h-15A2.25 2.25 0 0 1 1.5 15.75v-7.5A2.25 2.25 0 0 1 3.75 6z"/></svg><span class="nav-text">Pagos</span></a>
+        <a class="nav-item active" href="/cobros-personales"><svg class="nav-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-2.071 0-3.75 1.343-3.75 3s1.679 3 3.75 3 3.75 1.343 3.75 3-1.679 3-3.75 3m0-12c1.454 0 2.714.662 3.336 1.63M12 8V6m0 14v-2m-3.336-8.63A3.746 3.746 0 0 1 12 8m0 6a3.746 3.746 0 0 1-3.336-1.63"/></svg><span class="nav-text">Cobros personales</span></a>
+        <a class="nav-item" href="/facturas/historial"><svg class="nav-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6l4 2m6-2a10 10 0 1 1-4.293-8.293"/></svg><span class="nav-text">Historial facturas</span></a>
+        <a class="nav-item" href="/clientes"><svg class="nav-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M18 18.72a9.06 9.06 0 0 0-6-2.22 9.06 9.06 0 0 0-6 2.22M15 9a3 3 0 1 1-6 0 3 3 0 0 1 6 0zm7.5 3a7.5 7.5 0 1 1-15 0 7.5 7.5 0 0 1 15 0z"/></svg><span class="nav-text">Clientes</span></a>
+        <a class="nav-item" href="/productos"><svg class="nav-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M21 8.25V16.5a2.25 2.25 0 0 1-1.125 1.95l-6.75 3.9a2.25 2.25 0 0 1-2.25 0l-6.75-3.9A2.25 2.25 0 0 1 3 16.5V8.25m18 0-8.25 4.764a2.25 2.25 0 0 1-2.25 0L3 8.25m18 0-8.25-4.764a2.25 2.25 0 0 0-2.25 0L3 8.25"/></svg><span class="nav-text">Productos</span></a>
+        <a class="nav-item" href="/reportes"><svg class="nav-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M3 3v18h18M7.5 15.75v-6m4.5 6v-9m4.5 9v-4.5"/></svg><span class="nav-text">Reportes</span></a>
+        <a class="nav-item" href="/ajustes"><svg class="nav-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94a1.5 1.5 0 0 1 2.812 0l.286.857a1.5 1.5 0 0 0 1.346 1.01h.902a1.5 1.5 0 0 1 1.06 2.56l-.655.655a1.5 1.5 0 0 0-.35 1.592l.286.857a1.5 1.5 0 0 1-1.42 1.987h-.902a1.5 1.5 0 0 0-1.346 1.01l-.286.857a1.5 1.5 0 0 1-2.812 0l-.286-.857a1.5 1.5 0 0 0-1.346-1.01h-.902a1.5 1.5 0 0 1-1.06-2.56l.655-.655a1.5 1.5 0 0 0 .35-1.592l-.286-.857a1.5 1.5 0 0 1 1.42-1.987h.902a1.5 1.5 0 0 0 1.346-1.01l.286-.857z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"/></svg><span class="nav-text">Ajustes</span></a>
+        <a class="nav-item" href="/logout"><svg class="nav-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6A2.25 2.25 0 0 0 5.25 5.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15"/><path stroke-linecap="round" stroke-linejoin="round" d="M18 12H9m0 0 3-3m-3 3 3 3"/></svg><span class="nav-text">Cerrar sesion</span></a>
+      </nav>
+      <div class="sidebar-footer">
+        <img class="sidebar-mascot" src="/static/assets/mascota.jpeg" alt="Mascota" />
+      </div>
+    </aside>
+
+    <div class="main-content">
+      <div class="topbar">
+        <div class="topbar-left">
+          <h2>Cobros personales</h2>
+        </div>
+        <div class="topbar-right">
+          <span class="user-pill">Sesion: {{ user }}</span>
+        </div>
+      </div>
+
+      <main class="content-area">
+        <section class="module-header">
+          <div>
+            <h1>Cobros personales</h1>
+            <p>Administra cobros manuales sin tocar las facturas ni los pagos del sistema principal.</p>
+          </div>
+        </section>
+
+        <section class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-label">Cobros pendientes</div>
+            <div class="stat-value">{{ "{:,}".format(cobros_pendientes_count or 0) }}</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Saldo pendiente</div>
+            <div class="stat-value">L {{ "{:,.2f}".format(cobros_saldo_total or 0) }}</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Cobros pagados</div>
+            <div class="stat-value">{{ "{:,}".format(cobros_pagados_count or 0) }}</div>
+          </div>
+        </section>
+
+        {% if personal_charge_message %}
+          <div class="{% if personal_charge_message_error %}form-error{% else %}form-success{% endif %}">
+            {{ personal_charge_message }}
+          </div>
+        {% endif %}
+
+        <section class="form-card">
+          <div class="module-header">
+            <div>
+              <h3>Nuevo cobro personal</h3>
+              <p>Genera un saldo pendiente independiente del historial de pagos actual.</p>
+            </div>
+          </div>
+          <form class="module-form" method="post" action="/cobros-personales">
+            <label>
+              <span>Nombre</span>
+              <input type="text" name="nombre" value="{{ form_values.nombre }}" required />
+            </label>
+            <label>
+              <span>Concepto</span>
+              <input type="text" name="concepto" value="{{ form_values.concepto }}" required />
+            </label>
+            <label>
+              <span>Telefono</span>
+              <input type="text" name="telefono" value="{{ form_values.telefono }}" />
+            </label>
+            <label>
+              <span>Fecha de vencimiento</span>
+              <input type="date" name="fecha_vencimiento" value="{{ form_values.fecha_vencimiento }}" />
+            </label>
+            <label>
+              <span>Monto total</span>
+              <input type="number" step="0.01" min="0.01" name="total" value="{{ form_values.total }}" required />
+            </label>
+            <label class="span-2">
+              <span>Observaciones</span>
+              <textarea name="observaciones" rows="3">{{ form_values.observaciones }}</textarea>
+            </label>
+            <div class="form-actions span-2">
+              <button class="primary-button" type="submit">Guardar cobro</button>
+            </div>
+          </form>
+        </section>
+
+        <section class="module-header">
+          <div>
+            <h3>Cobros pendientes</h3>
+            <p>Cada cobro mantiene su saldo y sus abonos por separado.</p>
+          </div>
+        </section>
+        <section class="module-table">
+          <div class="table-header personal-charges-table">
+            <span>Cobro</span>
+            <span>Persona</span>
+            <span>Total</span>
+            <span>Saldo</span>
+            <span>Vence</span>
+            <span>Registrar pago</span>
+          </div>
+          {% if pending_charges %}
+            {% for cobro in pending_charges %}
+              <div class="table-row personal-charges-table table-row-top">
+                <span>
+                  <strong>{{ cobro.numero_cobro }}</strong>
+                  <small>{{ cobro.concepto }}</small>
+                </span>
+                <span>
+                  <strong>{{ cobro.nombre }}</strong>
+                  <small>{{ cobro.telefono }}</small>
+                </span>
+                <span>L {{ "%.2f"|format(cobro.total or 0) }}</span>
+                <span>L {{ "%.2f"|format(cobro.saldo or 0) }}</span>
+                <span>
+                  <strong>{{ cobro.vencimiento_label }}</strong>
+                  <small>Creado: {{ cobro.fecha_label }}</small>
+                </span>
+                <span>
+                  <form class="personal-payment-form" method="post" action="/cobros-personales/{{ cobro.id }}/abonos">
+                    <input type="number" step="0.01" min="0.01" max="{{ '%.2f'|format(cobro.saldo or 0) }}" name="monto" placeholder="Monto" required />
+                    <input type="text" name="comentario" placeholder="Comentario opcional" />
+                    <button class="primary-button" type="submit">Aplicar pago</button>
+                  </form>
+                  {% if cobro.observaciones %}
+                    <small>{{ cobro.observaciones }}</small>
+                  {% endif %}
+                </span>
+              </div>
+            {% endfor %}
+          {% else %}
+            <div class="table-row personal-charges-table">
+              <span>Sin cobros</span>
+              <span>-</span>
+              <span>-</span>
+              <span>-</span>
+              <span>-</span>
+              <span>-</span>
+            </div>
+          {% endif %}
+        </section>
+
+        <section class="module-header">
+          <div>
+            <h3>Historial de pagos</h3>
+            <p>Este historial es exclusivo de los cobros personales.</p>
+          </div>
+        </section>
+        <section class="module-table">
+          <div class="table-header personal-history-table">
+            <span>Fecha</span>
+            <span>Cobro</span>
+            <span>Persona</span>
+            <span>Monto</span>
+            <span>Usuario</span>
+            <span>Comentario</span>
+          </div>
+          {% if payment_history %}
+            {% for pago in payment_history %}
+              <div class="table-row personal-history-table">
+                <span>{{ pago.fecha_label }}</span>
+                <span>
+                  <strong>{{ pago.numero_cobro }}</strong>
+                  <small>{{ pago.concepto }}</small>
+                </span>
+                <span>{{ pago.nombre }}</span>
+                <span>L {{ "%.2f"|format(pago.monto or 0) }}</span>
+                <span>{{ pago.usuario }}</span>
+                <span>{{ pago.comentario or "-" }}</span>
+              </div>
+            {% endfor %}
+          {% else %}
+            <div class="table-row personal-history-table">
+              <span>Sin pagos</span>
+              <span>-</span>
+              <span>-</span>
+              <span>-</span>
+              <span>-</span>
+              <span>-</span>
+            </div>
+          {% endif %}
+        </section>
+      </main>
+    </div>
+  </div>
+{% endblock %}

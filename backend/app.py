@@ -42,6 +42,7 @@ from reportlab.platypus import (
 )
 
 from models import (
+    AbonoCobroPersonal,
     AbonoFactura,
     AjustesNegocio,
     AvesGranjaCliente,
@@ -53,6 +54,7 @@ from models import (
     AvesUser,
     Categoria,
     Cliente,
+    CobroPersonal,
     ChatAudit,
     ChatMessage,
     ChatSession,
@@ -184,6 +186,9 @@ def create_app():
 
     def generate_order_number():
         return f"PED-{datetime.utcnow():%Y%m%d%H%M%S}"
+
+    def generate_personal_charge_number():
+        return f"CP-{datetime.utcnow():%Y%m%d%H%M%S}"
 
     def build_invoice_pdf_filename(numero_factura, token=None):
         safe_base = re.sub(r"[\\/\\s]+", "-", numero_factura).strip("-")
@@ -351,6 +356,138 @@ def create_app():
         if value is None:
             return "0"
         return f"{int(value):,}"
+
+    def get_personal_charge_status_message(status_code):
+        status_map = {
+            "created": ("Cobro personal creado correctamente.", False),
+            "payment_recorded": ("Pago registrado correctamente.", False),
+            "invalid_charge": ("No se encontro el cobro personal solicitado.", True),
+            "invalid_amount": ("El monto indicado no es valido para este cobro.", True),
+            "closed_charge": ("Este cobro ya no admite pagos porque no esta pendiente.", True),
+            "save_error": ("No se pudo guardar el cobro personal.", True),
+            "payment_error": ("No se pudo registrar el pago del cobro personal.", True),
+        }
+        return status_map.get(status_code, (None, False))
+
+    def build_personal_charges_context(form_values=None, status_code=None, error=None):
+        default_form_values = {
+            "nombre": "",
+            "concepto": "",
+            "telefono": "",
+            "fecha_vencimiento": "",
+            "total": "",
+            "observaciones": "",
+        }
+        if form_values:
+            default_form_values.update(form_values)
+
+        message, is_error = get_personal_charge_status_message(status_code)
+        if error:
+            message = error
+            is_error = True
+
+        try:
+            pending_rows = (
+                db.session.query(CobroPersonal, User)
+                .outerjoin(User, CobroPersonal.usuario_id == User.id)
+                .filter(CobroPersonal.estado == "pendiente")
+                .order_by(
+                    CobroPersonal.fecha_vencimiento.is_(None),
+                    CobroPersonal.fecha_vencimiento.asc(),
+                    CobroPersonal.fecha.desc(),
+                )
+                .all()
+            )
+            payment_rows = (
+                db.session.query(AbonoCobroPersonal, CobroPersonal, User)
+                .join(CobroPersonal, AbonoCobroPersonal.cobro_id == CobroPersonal.id)
+                .outerjoin(User, AbonoCobroPersonal.usuario_id == User.id)
+                .order_by(AbonoCobroPersonal.fecha.desc())
+                .all()
+            )
+            cobros_pendientes_count = (
+                CobroPersonal.query.filter_by(estado="pendiente").count()
+            )
+            saldo_total = (
+                db.session.query(func.coalesce(func.sum(CobroPersonal.saldo), 0))
+                .filter(CobroPersonal.estado == "pendiente")
+                .scalar()
+                or 0
+            )
+            cobros_pagados_count = (
+                CobroPersonal.query.filter_by(estado="pagado").count()
+            )
+        except SQLAlchemyError:
+            db.session.rollback()
+            pending_rows = []
+            payment_rows = []
+            cobros_pendientes_count = 0
+            saldo_total = 0
+            cobros_pagados_count = 0
+            if not error:
+                message = "No se pudieron cargar los cobros personales."
+                is_error = True
+
+        pending_charges = []
+        for cobro, usuario in pending_rows:
+            usuario_nombre = (
+                usuario.nombre_completo
+                if usuario and usuario.nombre_completo
+                else (usuario.username if usuario else "N/A")
+            )
+            pending_charges.append(
+                {
+                    "id": cobro.id,
+                    "numero_cobro": cobro.numero_cobro,
+                    "nombre": cobro.nombre,
+                    "concepto": cobro.concepto,
+                    "telefono": cobro.telefono or "-",
+                    "total": cobro.total or Decimal("0"),
+                    "saldo": cobro.saldo or Decimal("0"),
+                    "fecha_label": (
+                        cobro.fecha.strftime("%d/%m/%Y") if cobro.fecha else "-"
+                    ),
+                    "vencimiento_label": (
+                        cobro.fecha_vencimiento.strftime("%d/%m/%Y")
+                        if cobro.fecha_vencimiento
+                        else "-"
+                    ),
+                    "usuario": usuario_nombre,
+                    "observaciones": (cobro.observaciones or "").strip(),
+                }
+            )
+
+        payment_history = []
+        for abono, cobro, usuario in payment_rows:
+            usuario_nombre = (
+                usuario.nombre_completo
+                if usuario and usuario.nombre_completo
+                else (usuario.username if usuario else "N/A")
+            )
+            payment_history.append(
+                {
+                    "numero_cobro": cobro.numero_cobro,
+                    "nombre": cobro.nombre,
+                    "concepto": cobro.concepto,
+                    "monto": abono.monto or Decimal("0"),
+                    "fecha_label": (
+                        abono.fecha.strftime("%d/%m/%Y %I:%M %p") if abono.fecha else "-"
+                    ),
+                    "usuario": usuario_nombre,
+                    "comentario": (abono.comentario or "").strip(),
+                }
+            )
+
+        return {
+            "form_values": default_form_values,
+            "personal_charge_message": message,
+            "personal_charge_message_error": is_error,
+            "pending_charges": pending_charges,
+            "payment_history": payment_history,
+            "cobros_pendientes_count": cobros_pendientes_count,
+            "cobros_pagados_count": cobros_pagados_count,
+            "cobros_saldo_total": saldo_total,
+        }
 
     def sales_cte_sql():
         return """
@@ -1854,6 +1991,15 @@ def create_app():
                 .scalar()
                 or 0
             )
+            cobros_personales_pendientes = (
+                CobroPersonal.query.filter_by(estado="pendiente").count()
+            )
+            cobros_personales_saldo = (
+                db.session.query(func.coalesce(func.sum(CobroPersonal.saldo), 0))
+                .filter(CobroPersonal.estado == "pendiente")
+                .scalar()
+                or 0
+            )
         except SQLAlchemyError:
             db.session.rollback()
             clientes_count = 0
@@ -1863,6 +2009,8 @@ def create_app():
             credito_total = 0
             credito_menor_30 = 0
             credito_mayor_30 = 0
+            cobros_personales_pendientes = 0
+            cobros_personales_saldo = 0
 
         return render_template(
             "dashboard.html",
@@ -1874,6 +2022,8 @@ def create_app():
             credito_total=credito_total,
             credito_menor_30=credito_menor_30,
             credito_mayor_30=credito_mayor_30,
+            cobros_personales_pendientes=cobros_personales_pendientes,
+            cobros_personales_saldo=cobros_personales_saldo,
         )
 
     @app.get("/dashboard-aves")
@@ -4257,6 +4407,145 @@ def create_app():
             user=session["user"],
             pagos=pagos_view,
         )
+
+    @app.route("/cobros-personales", methods=["GET", "POST"])
+    def cobros_personales():
+        if not session.get("user"):
+            return redirect(url_for("login"))
+
+        if request.method == "POST":
+            form_values = {
+                "nombre": (request.form.get("nombre") or "").strip(),
+                "concepto": (request.form.get("concepto") or "").strip(),
+                "telefono": (request.form.get("telefono") or "").strip(),
+                "fecha_vencimiento": (request.form.get("fecha_vencimiento") or "").strip(),
+                "total": (request.form.get("total") or "").strip(),
+                "observaciones": (request.form.get("observaciones") or "").strip(),
+            }
+
+            if not form_values["nombre"] or not form_values["concepto"] or not form_values["total"]:
+                return render_template(
+                    "cobros_personales.html",
+                    user=session["user"],
+                    **build_personal_charges_context(
+                        form_values=form_values,
+                        error="Completa nombre, concepto y monto del cobro.",
+                    ),
+                )
+
+            try:
+                total = Decimal(form_values["total"])
+            except Exception:
+                total = Decimal("0")
+
+            if total <= 0:
+                return render_template(
+                    "cobros_personales.html",
+                    user=session["user"],
+                    **build_personal_charges_context(
+                        form_values=form_values,
+                        error="El monto total del cobro debe ser mayor a cero.",
+                    ),
+                )
+
+            fecha_vencimiento = None
+            if form_values["fecha_vencimiento"]:
+                try:
+                    fecha_vencimiento = datetime.strptime(
+                        form_values["fecha_vencimiento"], "%Y-%m-%d"
+                    ).date()
+                except ValueError:
+                    return render_template(
+                        "cobros_personales.html",
+                        user=session["user"],
+                        **build_personal_charges_context(
+                            form_values=form_values,
+                            error="La fecha de vencimiento no es valida.",
+                        ),
+                    )
+
+            try:
+                usuario = User.query.filter_by(username=session["user"]).first()
+                cobro = CobroPersonal(
+                    numero_cobro=generate_personal_charge_number(),
+                    nombre=form_values["nombre"],
+                    concepto=form_values["concepto"],
+                    telefono=form_values["telefono"] or None,
+                    fecha=datetime.utcnow(),
+                    fecha_vencimiento=fecha_vencimiento,
+                    total=total,
+                    saldo=total,
+                    observaciones=form_values["observaciones"] or None,
+                    usuario_id=usuario.id if usuario else None,
+                    estado="pendiente",
+                )
+                db.session.add(cobro)
+                db.session.commit()
+            except SQLAlchemyError:
+                db.session.rollback()
+                return render_template(
+                    "cobros_personales.html",
+                    user=session["user"],
+                    **build_personal_charges_context(
+                        form_values=form_values,
+                        error="No se pudo guardar el cobro personal.",
+                    ),
+                )
+
+            return redirect(url_for("cobros_personales", status="created"))
+
+        return render_template(
+            "cobros_personales.html",
+            user=session["user"],
+            **build_personal_charges_context(
+                status_code=(request.args.get("status") or "").strip().lower()
+            ),
+        )
+
+    @app.post("/cobros-personales/<int:cobro_id>/abonos")
+    def registrar_abono_cobro_personal(cobro_id):
+        if not session.get("user"):
+            return redirect(url_for("login"))
+
+        try:
+            monto = Decimal((request.form.get("monto") or "0").strip())
+        except Exception:
+            return redirect(url_for("cobros_personales", status="invalid_amount"))
+
+        comentario = (request.form.get("comentario") or "").strip() or None
+
+        try:
+            cobro = CobroPersonal.query.get_or_404(cobro_id)
+        except Exception:
+            return redirect(url_for("cobros_personales", status="invalid_charge"))
+
+        if cobro.estado != "pendiente":
+            return redirect(url_for("cobros_personales", status="closed_charge"))
+
+        saldo_actual = cobro.saldo or Decimal("0")
+        if monto <= 0 or monto > saldo_actual:
+            return redirect(url_for("cobros_personales", status="invalid_amount"))
+
+        try:
+            usuario = User.query.filter_by(username=session["user"]).first()
+            abono = AbonoCobroPersonal(
+                cobro_id=cobro.id,
+                usuario_id=usuario.id if usuario else None,
+                monto=monto,
+                comentario=comentario,
+                fecha=datetime.utcnow(),
+            )
+            db.session.add(abono)
+            cobro.saldo = saldo_actual - monto
+            if cobro.saldo <= 0:
+                cobro.saldo = Decimal("0")
+                cobro.estado = "pagado"
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            return redirect(url_for("cobros_personales", status="payment_error"))
+
+        return redirect(url_for("cobros_personales", status="payment_recorded"))
 
     @app.get("/receipts/<path:filename>")
     def receipt_file(filename):

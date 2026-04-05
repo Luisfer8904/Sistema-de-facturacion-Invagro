@@ -217,6 +217,40 @@ CREATE TABLE IF NOT EXISTS `inva-abonos_facturas` (
     INDEX idx_abono_fecha (fecha)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Tabla de Cobros Personales
+CREATE TABLE IF NOT EXISTS `inva-cobros_personales` (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    numero_cobro VARCHAR(50) UNIQUE NOT NULL,
+    nombre VARCHAR(120) NOT NULL,
+    concepto VARCHAR(160) NOT NULL,
+    telefono VARCHAR(30),
+    fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    fecha_vencimiento DATE NULL,
+    total DECIMAL(10,2) NOT NULL,
+    saldo DECIMAL(10,2) NOT NULL,
+    observaciones TEXT,
+    usuario_id INT,
+    estado ENUM('pendiente', 'pagado', 'anulado') DEFAULT 'pendiente',
+    FOREIGN KEY (usuario_id) REFERENCES `inva-usuarios`(id) ON DELETE SET NULL,
+    INDEX idx_numero_cobro_personal (numero_cobro),
+    INDEX idx_estado_cobro_personal (estado),
+    INDEX idx_fecha_cobro_personal (fecha)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Tabla de Abonos de Cobros Personales
+CREATE TABLE IF NOT EXISTS `inva-abonos_cobros_personales` (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    cobro_id INT NOT NULL,
+    usuario_id INT,
+    monto DECIMAL(10,2) NOT NULL,
+    comentario VARCHAR(255),
+    fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (cobro_id) REFERENCES `inva-cobros_personales`(id) ON DELETE CASCADE,
+    FOREIGN KEY (usuario_id) REFERENCES `inva-usuarios`(id) ON DELETE SET NULL,
+    INDEX idx_abono_cobro_personal_id (cobro_id),
+    INDEX idx_abono_cobro_personal_fecha (fecha)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Tabla de Detalle Facturas Credito
 CREATE TABLE IF NOT EXISTS `inva-detalle_facturas_credito` (
     id INT AUTO_INCREMENT PRIMARY KEY,

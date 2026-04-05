@@ -347,6 +347,15 @@ body {
   font-weight: 600;
 }
 
+.form-success {
+  background: #e8f6ec;
+  border: 1px solid #b9e0c4;
+  color: #166534;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-weight: 600;
+}
+
 .login-header {
   text-align: center;
 }
@@ -1766,6 +1775,25 @@ body {
 
 .table-seven {
   grid-template-columns: 1.6fr 0.8fr 0.8fr 0.8fr 0.8fr 0.8fr 1.4fr;
+}
+
+.personal-charges-table {
+  grid-template-columns: 1fr 1fr 0.7fr 0.7fr 0.8fr 1.4fr;
+}
+
+.personal-history-table {
+  grid-template-columns: 1fr 1fr 0.9fr 0.7fr 0.8fr 1fr;
+}
+
+.personal-payment-form {
+  display: grid;
+  gap: 8px;
+}
+
+.personal-payment-form input {
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid #dfe6e5;
 }
 
 .table-five {
