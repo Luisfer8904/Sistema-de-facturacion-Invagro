@@ -2219,6 +2219,14 @@ def create_app():
                 .scalar()
                 or 0
             )
+            cartera_total_pendiente = (credito_total or 0) + (cobros_personales_saldo or 0)
+            credito_share = 0
+            cobros_personales_share = 0
+            if cartera_total_pendiente:
+                credito_share = float((credito_total / cartera_total_pendiente) * 100)
+                cobros_personales_share = float(
+                    (cobros_personales_saldo / cartera_total_pendiente) * 100
+                )
         except SQLAlchemyError:
             db.session.rollback()
             clientes_count = 0
@@ -2230,6 +2238,9 @@ def create_app():
             credito_mayor_30 = 0
             cobros_personales_pendientes = 0
             cobros_personales_saldo = 0
+            cartera_total_pendiente = 0
+            credito_share = 0
+            cobros_personales_share = 0
 
         return render_template(
             "dashboard.html",
@@ -2243,6 +2254,9 @@ def create_app():
             credito_mayor_30=credito_mayor_30,
             cobros_personales_pendientes=cobros_personales_pendientes,
             cobros_personales_saldo=cobros_personales_saldo,
+            cartera_total_pendiente=cartera_total_pendiente,
+            credito_share=credito_share,
+            cobros_personales_share=cobros_personales_share,
         )
 
     @app.get("/dashboard-aves")

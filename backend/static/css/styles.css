@@ -657,8 +657,24 @@ body {
   display: flex;
   justify-content: space-between;
   gap: 24px;
-  background: linear-gradient(135deg, #ffffff 0%, #f2f7f3 100%);
-  border: 1px solid rgba(44, 122, 63, 0.08);
+  background:
+    radial-gradient(circle at top right, rgba(56, 189, 118, 0.16), transparent 30%),
+    linear-gradient(135deg, #ffffff 0%, #eff6f1 52%, #e4efe7 100%);
+  border: 1px solid rgba(44, 122, 63, 0.1);
+  overflow: hidden;
+}
+
+.hero-kicker {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(44, 122, 63, 0.12);
+  color: #1f6b36;
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 .welcome-content h1 {
@@ -673,10 +689,126 @@ body {
   margin-top: 14px;
 }
 
+.dashboard-kpi-band {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 22px;
+}
+
+.hero-kpi-card {
+  background: rgba(255, 255, 255, 0.76);
+  border: 1px solid rgba(44, 122, 63, 0.1);
+  border-radius: 18px;
+  padding: 16px 18px;
+  display: grid;
+  gap: 6px;
+  box-shadow: 0 14px 28px rgba(12, 32, 28, 0.06);
+}
+
+.hero-kpi-card span {
+  color: #698074;
+  font-weight: 700;
+}
+
+.hero-kpi-card strong {
+  font-size: 1.8rem;
+  line-height: 1;
+  color: #173126;
+}
+
+.hero-kpi-card small {
+  color: #6b7280;
+  font-weight: 600;
+}
+
+.hero-kpi-card.accent {
+  background: linear-gradient(135deg, #125d36, #1f7a45);
+  border-color: transparent;
+}
+
+.hero-kpi-card.accent span,
+.hero-kpi-card.accent strong,
+.hero-kpi-card.accent small {
+  color: #ffffff;
+}
+
+.hero-panel {
+  min-width: 330px;
+  max-width: 380px;
+  background: rgba(14, 42, 28, 0.92);
+  color: #ffffff;
+  border-radius: 22px;
+  padding: 22px;
+  display: grid;
+  gap: 18px;
+  box-shadow: 0 22px 38px rgba(12, 32, 28, 0.16);
+}
+
+.hero-panel-head {
+  display: grid;
+  gap: 6px;
+}
+
+.hero-panel-head span {
+  color: rgba(255, 255, 255, 0.74);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-size: 0.8rem;
+}
+
+.hero-panel-head strong {
+  font-size: 2rem;
+  line-height: 1.05;
+}
+
+.hero-progress-stack {
+  display: grid;
+  gap: 10px;
+}
+
+.hero-progress-labels {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-weight: 700;
+}
+
+.hero-progress-labels span {
+  color: rgba(255, 255, 255, 0.76);
+}
+
+.hero-progress-track {
+  width: 100%;
+  height: 10px;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.hero-progress-fill {
+  height: 100%;
+  border-radius: 999px;
+}
+
+.hero-progress-fill.credit {
+  background: linear-gradient(90deg, #f59e0b, #fbbf24);
+}
+
+.hero-progress-fill.personal {
+  background: linear-gradient(90deg, #22c55e, #4ade80);
+}
+
 .welcome-metrics {
   display: grid;
   gap: 12px;
   min-width: 220px;
+}
+
+.welcome-metrics.refined {
+  min-width: 0;
 }
 
 .welcome-metrics .metric {
@@ -688,14 +820,34 @@ body {
   gap: 6px;
 }
 
+.welcome-metrics.refined .metric {
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: none;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
 .welcome-metrics .metric span {
   color: #7f8c8d;
   font-weight: 600;
 }
 
+.welcome-metrics.refined .metric span,
+.welcome-metrics.refined .metric small {
+  color: rgba(255, 255, 255, 0.72);
+}
+
 .welcome-metrics .metric strong {
   font-size: 1.2rem;
   color: #2c3e50;
+}
+
+.welcome-metrics.refined .metric strong {
+  color: #ffffff;
+}
+
+.welcome-metrics .metric small {
+  color: #8a938d;
+  font-weight: 600;
 }
 
 .modules-grid {
@@ -2624,6 +2776,18 @@ body {
   border: 1px solid rgba(44, 122, 63, 0.08);
 }
 
+.stat-card.featured {
+  background: linear-gradient(135deg, #173126, #26553e);
+  border-color: transparent;
+  box-shadow: 0 16px 28px rgba(12, 32, 28, 0.16);
+}
+
+.stat-card.featured .stat-label,
+.stat-card.featured .stat-value,
+.stat-card.featured .stat-footnote {
+  color: #ffffff;
+}
+
 .stat-label {
   color: #7f8c8d;
   font-weight: 600;
@@ -2636,9 +2800,25 @@ body {
   color: #2c3e50;
 }
 
+.stat-footnote {
+  margin-top: 8px;
+  color: #8a938d;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
 @media (max-width: 900px) {
   .dashboard-hero {
     flex-direction: column;
+  }
+
+  .dashboard-kpi-band {
+    grid-template-columns: 1fr;
+  }
+
+  .hero-panel {
+    min-width: 0;
+    max-width: none;
   }
 
   .welcome-metrics {

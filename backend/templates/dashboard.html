@@ -40,21 +40,59 @@
       <main class="content-area">
         <section class="welcome-card dashboard-hero">
           <div class="welcome-content">
+            <span class="hero-kicker">Control comercial</span>
             <h1>Bienvenido, {{ user }}</h1>
-            <p>Tu panel de control esta listo para gestionar la facturacion y las ventas del dia.</p>
+            <p>Supervisa la cartera pendiente total, separando credito facturado y cobros personales desde un solo resumen.</p>
             <div class="hero-actions">
               <a class="primary-button" href="/facturacion">Nueva factura</a>
+              <a class="secondary-button" href="/cobros-personales">Cobros personales</a>
               <a class="secondary-button" href="/reportes">Ver reportes</a>
             </div>
-          </div>
-          <div class="welcome-metrics">
-            <div class="metric">
-              <span>Total pedidos</span>
-              <strong>L {{ "{:,.2f}".format(pedidos_total or 0) }}</strong>
+            <div class="dashboard-kpi-band">
+              <article class="hero-kpi-card">
+                <span>Cartera pendiente total</span>
+                <strong>L {{ "{:,.2f}".format(cartera_total_pendiente or 0) }}</strong>
+                <small>Credito + cobros personales</small>
+              </article>
+              <article class="hero-kpi-card accent">
+                <span>Cobros personales pendientes</span>
+                <strong>L {{ "{:,.2f}".format(cobros_personales_saldo or 0) }}</strong>
+                <small>{{ "{:,}".format(cobros_personales_pendientes or 0) }} cobros activos</small>
+              </article>
             </div>
-            <div class="metric">
-              <span>Credito pendiente</span>
-              <strong>{{ "{:,}".format(facturas_credito_count or 0) }}</strong>
+          </div>
+          <div class="hero-panel">
+            <div class="hero-panel-head">
+              <span>Distribucion de saldos</span>
+              <strong>L {{ "{:,.2f}".format(cartera_total_pendiente or 0) }}</strong>
+            </div>
+            <div class="hero-progress-stack">
+              <div class="hero-progress-labels">
+                <span>Credito facturado</span>
+                <strong>{{ "{:.1f}".format(credito_share or 0) }}%</strong>
+              </div>
+              <div class="hero-progress-track">
+                <div class="hero-progress-fill credit" style="width: {{ '%.2f'|format(credito_share or 0) }}%"></div>
+              </div>
+              <div class="hero-progress-labels">
+                <span>Cobros personales</span>
+                <strong>{{ "{:.1f}".format(cobros_personales_share or 0) }}%</strong>
+              </div>
+              <div class="hero-progress-track">
+                <div class="hero-progress-fill personal" style="width: {{ '%.2f'|format(cobros_personales_share or 0) }}%"></div>
+              </div>
+            </div>
+            <div class="welcome-metrics refined">
+              <div class="metric">
+                <span>Credito pendiente</span>
+                <strong>L {{ "{:,.2f}".format(credito_total or 0) }}</strong>
+                <small>{{ "{:,}".format(facturas_credito_count or 0) }} facturas</small>
+              </div>
+              <div class="metric">
+                <span>Total pedidos</span>
+                <strong>L {{ "{:,.2f}".format(pedidos_total or 0) }}</strong>
+                <small>Operacion comercial acumulada</small>
+              </div>
             </div>
           </div>
         </section>
@@ -93,12 +131,17 @@
         </section>
 
         <section class="stats-grid">
+          <div class="stat-card featured">
+            <div class="stat-label">Saldo cobros personales</div>
+            <div class="stat-value">L {{ "{:,.2f}".format(cobros_personales_saldo or 0) }}</div>
+            <div class="stat-footnote">Impacta la cartera pendiente total del negocio.</div>
+          </div>
           <div class="stat-card">
             <div class="stat-label">Total pedidos</div>
             <div class="stat-value">L {{ "{:,.2f}".format(pedidos_total or 0) }}</div>
           </div>
           <div class="stat-card">
-            <div class="stat-label">Credito pendiente</div>
+            <div class="stat-label">Facturas a credito</div>
             <div class="stat-value">{{ "{:,}".format(facturas_credito_count or 0) }}</div>
           </div>
           <div class="stat-card">
@@ -116,10 +159,6 @@
           <div class="stat-card">
             <div class="stat-label">Cobros personales pendientes</div>
             <div class="stat-value">{{ "{:,}".format(cobros_personales_pendientes or 0) }}</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-label">Saldo cobros personales</div>
-            <div class="stat-value">L {{ "{:,.2f}".format(cobros_personales_saldo or 0) }}</div>
           </div>
           <div class="stat-card">
             <div class="stat-label">Clientes</div>
