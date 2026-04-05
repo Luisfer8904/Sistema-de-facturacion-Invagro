@@ -54,6 +54,7 @@ from models import (
     AvesUser,
     Categoria,
     Cliente,
+    CobroPersonalDetalle,
     CobroPersonal,
     ChatAudit,
     ChatMessage,
@@ -369,6 +370,62 @@ def create_app():
         }
         return status_map.get(status_code, (None, False))
 
+    def build_default_personal_charge_items():
+        return [{"descripcion": "", "cantidad": "1", "precio_unitario": ""}]
+
+    def parse_personal_charge_items(form_data):
+        descriptions = form_data.getlist("detalle_descripcion")
+        quantities = form_data.getlist("detalle_cantidad")
+        unit_prices = form_data.getlist("detalle_precio_unitario")
+
+        raw_items = []
+        parsed_items = []
+        total = Decimal("0")
+        max_len = max(len(descriptions), len(quantities), len(unit_prices), 1)
+
+        for index in range(max_len):
+            descripcion = (descriptions[index] if index < len(descriptions) else "").strip()
+            cantidad_raw = (quantities[index] if index < len(quantities) else "").strip()
+            precio_raw = (unit_prices[index] if index < len(unit_prices) else "").strip()
+
+            raw_items.append(
+                {
+                    "descripcion": descripcion,
+                    "cantidad": cantidad_raw or "1",
+                    "precio_unitario": precio_raw,
+                }
+            )
+
+            if not descripcion and not cantidad_raw and not precio_raw:
+                continue
+            if not descripcion:
+                raise ValueError("Cada linea debe incluir una descripcion.")
+
+            try:
+                cantidad = Decimal(cantidad_raw or "0")
+                precio_unitario = Decimal(precio_raw or "0")
+            except Exception as exc:
+                raise ValueError("Cantidad y precio deben ser valores numericos.") from exc
+
+            if cantidad <= 0 or precio_unitario < 0:
+                raise ValueError("Cantidad debe ser mayor a cero y precio no puede ser negativo.")
+
+            subtotal = (cantidad * precio_unitario).quantize(Decimal("0.01"))
+            total += subtotal
+            parsed_items.append(
+                {
+                    "descripcion": descripcion,
+                    "cantidad": cantidad.quantize(Decimal("0.01")),
+                    "precio_unitario": precio_unitario.quantize(Decimal("0.01")),
+                    "subtotal": subtotal,
+                }
+            )
+
+        if not parsed_items:
+            raise ValueError("Agrega al menos una linea de producto o servicio.")
+
+        return raw_items or build_default_personal_charge_items(), parsed_items, total.quantize(Decimal("0.01"))
+
     def build_personal_charges_context(form_values=None, status_code=None, error=None):
         default_form_values = {
             "nombre": "",
@@ -377,6 +434,7 @@ def create_app():
             "fecha_vencimiento": "",
             "total": "",
             "observaciones": "",
+            "detalle_items": build_default_personal_charge_items(),
         }
         if form_values:
             default_form_values.update(form_values)
@@ -417,16 +475,24 @@ def create_app():
             cobros_pagados_count = (
                 CobroPersonal.query.filter_by(estado="pagado").count()
             )
+            detail_rows = CobroPersonalDetalle.query.order_by(
+                CobroPersonalDetalle.id.asc()
+            ).all()
         except SQLAlchemyError:
             db.session.rollback()
             pending_rows = []
             payment_rows = []
+            detail_rows = []
             cobros_pendientes_count = 0
             saldo_total = 0
             cobros_pagados_count = 0
             if not error:
                 message = "No se pudieron cargar los cobros personales."
                 is_error = True
+
+        detail_map = {}
+        for detail in detail_rows:
+            detail_map.setdefault(detail.cobro_id, []).append(detail)
 
         pending_charges = []
         for cobro, usuario in pending_rows:
@@ -435,6 +501,7 @@ def create_app():
                 if usuario and usuario.nombre_completo
                 else (usuario.username if usuario else "N/A")
             )
+            detail_count = len(detail_map.get(cobro.id, []))
             pending_charges.append(
                 {
                     "id": cobro.id,
@@ -454,6 +521,7 @@ def create_app():
                     ),
                     "usuario": usuario_nombre,
                     "observaciones": (cobro.observaciones or "").strip(),
+                    "detail_count": detail_count,
                 }
             )
 
@@ -1612,7 +1680,7 @@ def create_app():
             story.append(KeepTogether(footer_blocks))
         doc.build(story)
 
-    def create_personal_charge_order_pdf(file_path, settings, cobro, usuario):
+    def create_personal_charge_order_pdf(file_path, settings, cobro, usuario, details=None):
         parent_dir = os.path.dirname(file_path)
         if parent_dir and not os.path.isdir(parent_dir):
             os.makedirs(parent_dir, exist_ok=True)
@@ -1691,11 +1759,29 @@ def create_app():
         story.append(receptor_table)
         story.append(Spacer(1, 14))
 
-        detalle_data = [
-            ["Detalle", "Monto"],
-            [cobro.concepto or "-", f"L {float(cobro.total or 0):,.2f}"],
-        ]
-        detalle_table = Table(detalle_data, colWidths=[392, 120])
+        detail_rows = details or []
+        detalle_data = [["Descripcion", "Cantidad", "Precio unit.", "Subtotal"]]
+        if detail_rows:
+            for detail in detail_rows:
+                detalle_data.append(
+                    [
+                        detail.descripcion,
+                        f"{float(detail.cantidad or 0):,.2f}",
+                        f"L {float(detail.precio_unitario or 0):,.2f}",
+                        f"L {float(detail.subtotal or 0):,.2f}",
+                    ]
+                )
+        else:
+            detalle_data.append(
+                [
+                    cobro.concepto or "-",
+                    "1.00",
+                    f"L {float(cobro.total or 0):,.2f}",
+                    f"L {float(cobro.total or 0):,.2f}",
+                ]
+            )
+
+        detalle_table = Table(detalle_data, colWidths=[270, 72, 85, 85])
         detalle_table.setStyle(
             TableStyle(
                 [
@@ -1703,7 +1789,7 @@ def create_app():
                     ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
                     ("BOX", (0, 0), (-1, -1), 0.75, colors.black),
                     ("LINEBELOW", (0, 0), (-1, 0), 0.6, colors.black),
-                    ("ALIGN", (1, 1), (1, -1), "RIGHT"),
+                    ("ALIGN", (1, 1), (-1, -1), "RIGHT"),
                     ("LEFTPADDING", (0, 0), (-1, -1), 8),
                     ("RIGHTPADDING", (0, 0), (-1, -1), 8),
                     ("TOPPADDING", (0, 0), (-1, -1), 8),
@@ -4547,6 +4633,32 @@ def create_app():
             return redirect(url_for("login"))
 
         if request.method == "POST":
+            detail_descriptions = request.form.getlist("detalle_descripcion")
+            detail_quantities = request.form.getlist("detalle_cantidad")
+            detail_unit_prices = request.form.getlist("detalle_precio_unitario")
+            detail_items = []
+            detail_count = max(
+                len(detail_descriptions),
+                len(detail_quantities),
+                len(detail_unit_prices),
+                1,
+            )
+            for index in range(detail_count):
+                detail_items.append(
+                    {
+                        "descripcion": (
+                            detail_descriptions[index] if index < len(detail_descriptions) else ""
+                        ).strip(),
+                        "cantidad": (
+                            detail_quantities[index] if index < len(detail_quantities) else ""
+                        ).strip()
+                        or "1",
+                        "precio_unitario": (
+                            detail_unit_prices[index] if index < len(detail_unit_prices) else ""
+                        ).strip(),
+                    }
+                )
+
             form_values = {
                 "nombre": (request.form.get("nombre") or "").strip(),
                 "concepto": (request.form.get("concepto") or "").strip(),
@@ -4554,22 +4666,31 @@ def create_app():
                 "fecha_vencimiento": (request.form.get("fecha_vencimiento") or "").strip(),
                 "total": (request.form.get("total") or "").strip(),
                 "observaciones": (request.form.get("observaciones") or "").strip(),
+                "detalle_items": detail_items,
             }
-
-            if not form_values["nombre"] or not form_values["concepto"] or not form_values["total"]:
+            try:
+                raw_items, parsed_items, total = parse_personal_charge_items(request.form)
+                form_values["detalle_items"] = raw_items
+                form_values["total"] = f"{total:.2f}"
+            except ValueError as exc:
                 return render_template(
                     "cobros_personales.html",
                     user=session["user"],
                     **build_personal_charges_context(
                         form_values=form_values,
-                        error="Completa nombre, concepto y monto del cobro.",
+                        error=str(exc),
                     ),
                 )
 
-            try:
-                total = Decimal(form_values["total"])
-            except Exception:
-                total = Decimal("0")
+            if not form_values["nombre"] or not form_values["total"]:
+                return render_template(
+                    "cobros_personales.html",
+                    user=session["user"],
+                    **build_personal_charges_context(
+                        form_values=form_values,
+                        error="Completa el nombre y al menos una linea del cobro.",
+                    ),
+                )
 
             if total <= 0:
                 return render_template(
@@ -4599,10 +4720,11 @@ def create_app():
 
             try:
                 usuario = User.query.filter_by(username=session["user"]).first()
+                concepto_resumen = form_values["concepto"] or parsed_items[0]["descripcion"]
                 cobro = CobroPersonal(
                     numero_cobro=generate_personal_charge_number(),
                     nombre=form_values["nombre"],
-                    concepto=form_values["concepto"],
+                    concepto=concepto_resumen,
                     telefono=form_values["telefono"] or None,
                     fecha=datetime.utcnow(),
                     fecha_vencimiento=fecha_vencimiento,
@@ -4613,6 +4735,17 @@ def create_app():
                     estado="pendiente",
                 )
                 db.session.add(cobro)
+                db.session.flush()
+                for item in parsed_items:
+                    db.session.add(
+                        CobroPersonalDetalle(
+                            cobro_id=cobro.id,
+                            descripcion=item["descripcion"],
+                            cantidad=item["cantidad"],
+                            precio_unitario=item["precio_unitario"],
+                            subtotal=item["subtotal"],
+                        )
+                    )
                 db.session.commit()
             except SQLAlchemyError:
                 db.session.rollback()
@@ -4689,6 +4822,11 @@ def create_app():
             cobro = CobroPersonal.query.get_or_404(cobro_id)
             usuario = User.query.get(cobro.usuario_id) if cobro.usuario_id else None
             settings = get_business_settings()
+            details = (
+                CobroPersonalDetalle.query.filter_by(cobro_id=cobro.id)
+                .order_by(CobroPersonalDetalle.id.asc())
+                .all()
+            )
         except SQLAlchemyError:
             db.session.rollback()
             return redirect(url_for("cobros_personales", status="invalid_charge"))
@@ -4697,7 +4835,7 @@ def create_app():
         filename = build_invoice_pdf_filename(safe_base)
         file_path = os.path.join(app.config["INVOICE_PDF_FOLDER"], filename)
         cleanup_old_pdfs(app.config["INVOICE_PDF_FOLDER"], prefix="orden-entrega-")
-        create_personal_charge_order_pdf(file_path, settings, cobro, usuario)
+        create_personal_charge_order_pdf(file_path, settings, cobro, usuario, details)
         return redirect(url_for("static", filename=f"invoices/{filename}"))
 
     @app.get("/receipts/<path:filename>")

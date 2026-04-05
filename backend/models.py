@@ -233,6 +233,20 @@ class CobroPersonal(db.Model):
     )
 
 
+class CobroPersonalDetalle(db.Model):
+    __tablename__ = "inva-cobros_personales_detalle"
+    __table_args__ = {"extend_existing": True}
+
+    id = db.Column(db.Integer, primary_key=True)
+    cobro_id = db.Column(
+        db.Integer, db.ForeignKey("inva-cobros_personales.id"), nullable=False
+    )
+    descripcion = db.Column(db.String(255), nullable=False)
+    cantidad = db.Column(db.Numeric(10, 2), nullable=False)
+    precio_unitario = db.Column(db.Numeric(10, 2), nullable=False)
+    subtotal = db.Column(db.Numeric(10, 2), nullable=False)
+
+
 class AbonoCobroPersonal(db.Model):
     __tablename__ = "inva-abonos_cobros_personales"
     __table_args__ = {"extend_existing": True}

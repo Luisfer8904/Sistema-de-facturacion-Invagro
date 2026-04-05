@@ -79,8 +79,8 @@
               <input type="text" name="nombre" value="{{ form_values.nombre }}" required />
             </label>
             <label>
-              <span>Concepto</span>
-              <input type="text" name="concepto" value="{{ form_values.concepto }}" required />
+              <span>Resumen general</span>
+              <input type="text" name="concepto" value="{{ form_values.concepto }}" placeholder="Opcional, se usa como referencia corta" />
             </label>
             <label>
               <span>Telefono</span>
@@ -92,8 +92,24 @@
             </label>
             <label>
               <span>Monto total</span>
-              <input type="number" step="0.01" min="0.01" name="total" value="{{ form_values.total }}" required />
+              <input type="number" step="0.01" min="0.01" name="total" value="{{ form_values.total }}" readonly />
             </label>
+            <div class="span-2 personal-charge-lines">
+              <div class="personal-charge-lines-head">
+                <strong>Detalle de productos o servicios</strong>
+                <button class="secondary-button" type="button" id="add-charge-line">Agregar linea</button>
+              </div>
+              <div class="personal-charge-lines-grid" id="personal-charge-lines">
+                {% for item in form_values.detalle_items %}
+                  <div class="personal-charge-line">
+                    <input type="text" name="detalle_descripcion" value="{{ item.descripcion }}" placeholder="Descripcion" required />
+                    <input type="number" name="detalle_cantidad" step="0.01" min="0.01" value="{{ item.cantidad }}" placeholder="Cantidad" required />
+                    <input type="number" name="detalle_precio_unitario" step="0.01" min="0" value="{{ item.precio_unitario }}" placeholder="Precio unitario" required />
+                    <button class="danger-button line-remove" type="button">Quitar</button>
+                  </div>
+                {% endfor %}
+              </div>
+            </div>
             <label class="span-2">
               <span>Observaciones</span>
               <textarea name="observaciones" rows="3">{{ form_values.observaciones }}</textarea>
@@ -125,7 +141,7 @@
               <div class="table-row personal-charges-table table-row-top">
                 <span>
                   <strong>{{ cobro.numero_cobro }}</strong>
-                  <small>{{ cobro.concepto }}</small>
+                  <small>{{ cobro.concepto }}{% if cobro.detail_count %} | {{ cobro.detail_count }} lineas{% endif %}</small>
                 </span>
                 <span>
                   <strong>{{ cobro.nombre }}</strong>
@@ -208,4 +224,50 @@
       </main>
     </div>
   </div>
+  <script>
+    const linesContainer = document.getElementById("personal-charge-lines");
+    const addLineButton = document.getElementById("add-charge-line");
+    const totalInput = document.querySelector('input[name="total"]');
+
+    const createLineRow = () => {
+      const row = document.createElement("div");
+      row.className = "personal-charge-line";
+      row.innerHTML = `
+        <input type="text" name="detalle_descripcion" placeholder="Descripcion" required />
+        <input type="number" name="detalle_cantidad" step="0.01" min="0.01" value="1" placeholder="Cantidad" required />
+        <input type="number" name="detalle_precio_unitario" step="0.01" min="0" placeholder="Precio unitario" required />
+        <button class="danger-button line-remove" type="button">Quitar</button>
+      `;
+      return row;
+    };
+
+    const updateChargeTotal = () => {
+      if (!linesContainer || !totalInput) return;
+      const rows = Array.from(linesContainer.querySelectorAll(".personal-charge-line"));
+      const total = rows.reduce((sum, row) => {
+        const cantidad = parseFloat(row.querySelector('input[name="detalle_cantidad"]').value || "0");
+        const precio = parseFloat(row.querySelector('input[name="detalle_precio_unitario"]').value || "0");
+        return sum + (isNaN(cantidad) || isNaN(precio) ? 0 : cantidad * precio);
+      }, 0);
+      totalInput.value = total.toFixed(2);
+    };
+
+    if (addLineButton && linesContainer) {
+      addLineButton.addEventListener("click", () => {
+        linesContainer.appendChild(createLineRow());
+        updateChargeTotal();
+      });
+
+      linesContainer.addEventListener("click", (event) => {
+        if (!event.target.classList.contains("line-remove")) return;
+        const rows = linesContainer.querySelectorAll(".personal-charge-line");
+        if (rows.length <= 1) return;
+        event.target.closest(".personal-charge-line").remove();
+        updateChargeTotal();
+      });
+
+      linesContainer.addEventListener("input", updateChargeTotal);
+      updateChargeTotal();
+    }
+  </script>
 {% endblock %}

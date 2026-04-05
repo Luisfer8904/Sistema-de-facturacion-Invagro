@@ -237,6 +237,18 @@ CREATE TABLE IF NOT EXISTS `inva-cobros_personales` (
     INDEX idx_fecha_cobro_personal (fecha)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Tabla de Detalle de Cobros Personales
+CREATE TABLE IF NOT EXISTS `inva-cobros_personales_detalle` (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    cobro_id INT NOT NULL,
+    descripcion VARCHAR(255) NOT NULL,
+    cantidad DECIMAL(10,2) NOT NULL,
+    precio_unitario DECIMAL(10,2) NOT NULL,
+    subtotal DECIMAL(10,2) NOT NULL,
+    FOREIGN KEY (cobro_id) REFERENCES `inva-cobros_personales`(id) ON DELETE CASCADE,
+    INDEX idx_cobro_personal_detalle_id (cobro_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Tabla de Abonos de Cobros Personales
 CREATE TABLE IF NOT EXISTS `inva-abonos_cobros_personales` (
     id INT AUTO_INCREMENT PRIMARY KEY,
