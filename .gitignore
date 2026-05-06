@@ -63,3 +63,7 @@ Thumbs.db
 *.db
 *.sqlite
 *.sqlite3
+
+# Respaldos y previews del rediseño visual
+backend/static/css/styles.backup-*.css
+backend/static/css/preview-*.html
