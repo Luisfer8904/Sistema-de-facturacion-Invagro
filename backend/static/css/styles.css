@@ -4025,3 +4025,393 @@ h1 { letter-spacing: -0.025em; }
     scroll-behavior: auto !important;
   }
 }
+
+/* ============================================================
+   CAPA RESPONSIVE · Soporte completo para móviles y tablets
+   Anexa al final, sobrescribe lo necesario para pantallas <900px
+   ============================================================ */
+
+/* --- Botón hamburguesa (oculto en escritorio) --- */
+.mobile-menu-toggle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  margin-right: 12px;
+  background: #ffffff;
+  color: #1c2b2a;
+  border: 1px solid rgba(15, 76, 58, 0.12);
+  border-radius: 10px;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+  transition: background 0.18s ease, transform 0.12s ease;
+}
+.mobile-menu-toggle:active { transform: scale(0.95); }
+.mobile-menu-toggle:hover { background: #f0f7f1; }
+.mobile-menu-toggle svg { width: 22px; height: 22px; }
+
+/* --- Backdrop del drawer (siempre en DOM pero invisible salvo activo) --- */
+.mobile-sidebar-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 76, 58, 0.45);
+  backdrop-filter: blur(2px);
+  z-index: 998;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+body.sidebar-open .mobile-sidebar-backdrop {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* ============================================================
+   Tablet y celular: ≤ 900px
+   ============================================================ */
+@media (max-width: 900px) {
+
+  /* ----- Botón hamburguesa visible ----- */
+  .mobile-menu-toggle { display: inline-flex; }
+
+  /* ----- Sidebar como cajón deslizable ----- */
+  .dashboard-container {
+    flex-direction: column;
+    --sidebar-collapsed: 0;
+    --sidebar-expanded: 0;
+  }
+
+  .sidebar {
+    position: fixed !important;
+    top: 0;
+    left: 0;
+    width: 280px !important;
+    height: 100vh !important;
+    transform: translateX(-100%);
+    transition: transform 0.28s ease;
+    z-index: 999;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.25);
+    overflow-y: auto;
+    display: flex !important;
+    padding: 20px 0;
+  }
+  body.sidebar-open .sidebar { transform: translateX(0); }
+
+  /* Mostrar SIEMPRE el texto del menú dentro del drawer (no colapsa) */
+  .sidebar .nav-text,
+  .sidebar .sidebar-header h3 {
+    opacity: 1 !important;
+    width: auto !important;
+  }
+  .sidebar .nav-item {
+    justify-content: flex-start !important;
+    padding: 14px 22px !important;
+    font-size: 0.95rem !important;
+  }
+  .sidebar .sidebar-header {
+    text-align: center;
+    padding: 0 20px 20px;
+  }
+  .sidebar .sidebar-logo {
+    width: 70px !important;
+    height: 70px !important;
+  }
+
+  /* main-content ocupa todo el ancho */
+  .main-content {
+    width: 100% !important;
+    margin-left: 0 !important;
+  }
+
+  /* ----- Topbar ----- */
+  .topbar {
+    padding: 12px 16px !important;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .topbar-left {
+    display: flex;
+    align-items: center;
+    flex: 1;
+    min-width: 0;
+  }
+  .topbar h2 {
+    font-size: 1rem !important;
+    margin: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .topbar-right { gap: 6px; }
+  .user-pill {
+    font-size: 0.75rem;
+    padding: 4px 10px;
+  }
+
+  /* ----- Content area menos padding ----- */
+  .content-area {
+    padding: 16px !important;
+    gap: 14px !important;
+  }
+
+  /* ----- Hero dashboard apila ----- */
+  .dashboard-hero {
+    grid-template-columns: 1fr !important;
+    gap: 16px !important;
+    padding: 16px !important;
+  }
+  .welcome-content h1 { font-size: 1.5rem !important; }
+  .welcome-content p { font-size: 0.9rem; }
+
+  .dashboard-kpi-band {
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+  }
+
+  .hero-actions { gap: 6px; }
+  .hero-actions .primary-button,
+  .hero-actions .secondary-button {
+    flex: 1;
+    min-width: 0;
+    padding: 10px 14px;
+    font-size: 0.85rem;
+  }
+
+  /* ----- Welcome / form / módulo cards menos padding ----- */
+  .welcome-card,
+  .form-card,
+  .module-form,
+  .pos-left,
+  .pos-right {
+    padding: 16px !important;
+  }
+
+  /* ----- Tablas: scroll horizontal con ancho mínimo ----- */
+  .module-table {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .module-table .table-header,
+  .module-table .table-row {
+    min-width: 560px;
+    font-size: 0.82rem;
+    padding: 10px 12px !important;
+    gap: 8px;
+  }
+  .table-row small { font-size: 0.72rem; }
+
+  /* Indicador visual de scroll en tablas (sombra al borde derecho) */
+  .module-table::after {
+    content: "";
+    position: sticky;
+    right: 0;
+    pointer-events: none;
+  }
+
+  /* ----- POS / Facturación: se apila ----- */
+  .pos-layout {
+    grid-template-columns: 1fr !important;
+    gap: 14px !important;
+  }
+  .pos-right {
+    position: static !important;
+    top: auto !important;
+  }
+  .pos-grid {
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)) !important;
+  }
+  .pos-product { padding: 8px; }
+  .pos-product h4 { font-size: 0.78rem; }
+
+  /* ----- Formularios apila ----- */
+  .module-form,
+  .module-form-compact,
+  .personal-payment-form,
+  .report-form,
+  .report-form-wide,
+  .account-form {
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+  }
+  .span-2, .span-4 { grid-column: span 1 !important; }
+
+  /* ----- Inputs: mínimo 16px para evitar zoom automático en iOS ----- */
+  input[type="text"],
+  input[type="number"],
+  input[type="email"],
+  input[type="password"],
+  input[type="search"],
+  input[type="tel"],
+  input[type="date"],
+  input[type="datetime-local"],
+  input[type="time"],
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+
+  /* ----- Stats: 2 columnas en tablet ----- */
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 10px !important;
+  }
+  .stat-value { font-size: 1.3rem !important; }
+
+  /* ----- Modules: 1 columna ----- */
+  .modules-grid {
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+  }
+
+  /* ----- Module header se apila ----- */
+  .module-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .module-header h1 { font-size: 1.3rem !important; }
+  .header-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+  .header-actions .primary-button,
+  .header-actions .secondary-button,
+  .header-actions .ghost-button {
+    flex: 1;
+    min-width: 0;
+  }
+
+  /* ----- Botones más fáciles de presionar ----- */
+  .primary-button,
+  .secondary-button,
+  .danger-button,
+  .ghost-button {
+    min-height: 44px;
+    padding: 10px 16px;
+  }
+  .icon-action {
+    width: 40px !important;
+    height: 40px !important;
+  }
+
+  /* ----- Tarjetas tool / aves ----- */
+  .report-tools,
+  .aves-lotes-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* ----- Modal full-screen friendly ----- */
+  .modal { padding: 12px !important; align-items: flex-end; }
+  .modal-card {
+    max-width: 100% !important;
+    width: 100%;
+    max-height: 92vh;
+    border-radius: 16px 16px 0 0;
+    padding: 18px !important;
+  }
+  .modal-header { margin-bottom: 12px; padding-bottom: 10px; }
+
+  /* ----- Chat: bottom sheet ----- */
+  .chat-fab {
+    bottom: 16px !important;
+    right: 16px !important;
+    width: 56px !important;
+    height: 56px !important;
+  }
+  .chat-drawer {
+    max-width: 100% !important;
+    height: 100vh !important;
+    border-radius: 0 !important;
+  }
+
+  /* ----- Landing / hero público ----- */
+  .landing-hero, .hero {
+    grid-template-columns: 1fr !important;
+    gap: 24px !important;
+    padding: 32px 20px !important;
+  }
+  .landing-hero h1, .landing-hero-content h1 {
+    font-size: 1.9rem !important;
+  }
+  .site-header {
+    padding: 14px 20px !important;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .menu a { margin-left: 12px; font-size: 0.85rem; }
+
+  /* ----- Aves ----- */
+  .aves-lote-detail-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .aves-plan-summary-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
+  }
+  .aves-inline-search {
+    flex-direction: column;
+  }
+  .aves-inline-search input,
+  .aves-inline-search select {
+    width: 100%;
+  }
+}
+
+/* ============================================================
+   Celular pequeño: ≤ 480px
+   ============================================================ */
+@media (max-width: 480px) {
+
+  .stats-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .aves-plan-summary-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .pos-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  .topbar h2 { font-size: 0.95rem !important; }
+  .user-pill { display: none; }
+
+  .welcome-content h1 { font-size: 1.3rem !important; }
+  .stat-value { font-size: 1.2rem !important; }
+  h1 { font-size: 1.3rem !important; }
+  h2 { font-size: 1.1rem !important; }
+
+  .login-box {
+    padding: 24px !important;
+    border-radius: 16px !important;
+  }
+  .login-header h1 { font-size: 1.4rem !important; }
+
+  /* Botones de toda la barra de acciones se vuelven verticales */
+  .form-actions {
+    flex-direction: column;
+  }
+  .form-actions > * {
+    width: 100%;
+  }
+}
+
+/* ============================================================
+   Landscape en celular: aprovechar el ancho
+   ============================================================ */
+@media (max-width: 900px) and (orientation: landscape) {
+  .modal { align-items: center; }
+  .modal-card { max-height: 88vh; border-radius: 16px; }
+  .chat-drawer { border-radius: 16px 0 0 16px; max-width: 480px; }
+}
+
+/* ============================================================
+   Touch devices: anular hover-expansion del sidebar desktop
+   (en escritorios táctiles >900px sin mouse, evita pegarse expandido)
+   ============================================================ */
+@media (hover: none) and (pointer: coarse) and (min-width: 901px) {
+  .sidebar:hover, .sidebar:focus-within {
+    width: var(--sidebar-collapsed, 76px);
+  }
+}
