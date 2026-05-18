@@ -92,7 +92,7 @@
               <h3>Documento</h3>
               <span>F001-000012</span>
             </div>
-            <div class="pos-type">
+            <div class="pos-type"{% if is_vendedor %} style="display:none"{% endif %}>
               <label>
                 <input type="radio" name="tipo" value="contado" checked />
                 Contado
@@ -190,8 +190,12 @@
           </div>
 
           <div class="pos-actions">
-            <button class="secondary-button" type="button" id="save-order">Guardar pedido</button>
-            <button class="primary-button" type="button" id="emit-invoice">Emitir factura</button>
+            {% if is_vendedor %}
+              <button class="primary-button" type="button" id="save-order">Guardar pedido</button>
+            {% else %}
+              <button class="secondary-button" type="button" id="save-order">Guardar pedido</button>
+              <button class="primary-button" type="button" id="emit-invoice">Emitir factura</button>
+            {% endif %}
           </div>
         </section>
       </main>

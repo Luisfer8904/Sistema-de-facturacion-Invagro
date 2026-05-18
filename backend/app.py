@@ -2208,13 +2208,108 @@ def create_app():
         return render_template("login.html", portal=portal_target)
 
     @app.get("/dashboard")
+    @login_required
     def dashboard():
-        if not session.get("user"):
-            return redirect(url_for("login"))
-
         now = datetime.utcnow()
         cutoff = now - timedelta(days=30)
 
+        # ===== Dashboard para VENDEDOR (KPIs propios del mes) =====
+        if current_user_is_vendedor():
+            uid = current_user_id()
+            inicio_mes = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            try:
+                pedidos_mes_count = (
+                    Pedido.query
+                    .filter(Pedido.usuario_id == uid, Pedido.fecha >= inicio_mes)
+                    .count()
+                )
+                pedidos_mes_total = (
+                    db.session.query(func.coalesce(func.sum(Pedido.total), 0))
+                    .filter(Pedido.usuario_id == uid, Pedido.fecha >= inicio_mes)
+                    .scalar()
+                    or 0
+                )
+                pedidos_pendientes_count = (
+                    Pedido.query
+                    .filter(
+                        Pedido.usuario_id == uid,
+                        or_(Pedido.estado.is_(None), Pedido.estado == "pendiente"),
+                    )
+                    .count()
+                )
+                ventas_mes_total = (
+                    db.session.query(func.coalesce(func.sum(Pedido.total), 0))
+                    .filter(
+                        Pedido.usuario_id == uid,
+                        Pedido.fecha >= inicio_mes,
+                        Pedido.estado == "facturado",
+                    )
+                    .scalar()
+                    or 0
+                )
+                cobros_mes_total = (
+                    db.session.query(func.coalesce(func.sum(AbonoCobroPersonal.monto), 0))
+                    .filter(
+                        AbonoCobroPersonal.usuario_id == uid,
+                        AbonoCobroPersonal.fecha >= inicio_mes,
+                    )
+                    .scalar()
+                    or 0
+                )
+                cobros_mes_count = (
+                    AbonoCobroPersonal.query
+                    .filter(
+                        AbonoCobroPersonal.usuario_id == uid,
+                        AbonoCobroPersonal.fecha >= inicio_mes,
+                    )
+                    .count()
+                )
+                cobros_pendientes_propios = (
+                    CobroPersonal.query
+                    .filter(
+                        CobroPersonal.usuario_id == uid,
+                        CobroPersonal.estado == "pendiente",
+                    )
+                    .count()
+                )
+                cobros_saldo_propio = (
+                    db.session.query(func.coalesce(func.sum(CobroPersonal.saldo), 0))
+                    .filter(
+                        CobroPersonal.usuario_id == uid,
+                        CobroPersonal.estado == "pendiente",
+                    )
+                    .scalar()
+                    or 0
+                )
+                clientes_count = Cliente.query.count()
+            except SQLAlchemyError:
+                db.session.rollback()
+                pedidos_mes_count = 0
+                pedidos_mes_total = 0
+                pedidos_pendientes_count = 0
+                ventas_mes_total = 0
+                cobros_mes_total = 0
+                cobros_mes_count = 0
+                cobros_pendientes_propios = 0
+                cobros_saldo_propio = 0
+                clientes_count = 0
+
+            return render_template(
+                "dashboard_vendedor.html",
+                user=session["user"],
+                mes_label=now.strftime("%B %Y").capitalize(),
+                pedidos_mes_count=pedidos_mes_count,
+                pedidos_mes_total=pedidos_mes_total,
+                pedidos_pendientes_count=pedidos_pendientes_count,
+                ventas_mes_total=ventas_mes_total,
+                cobros_mes_total=cobros_mes_total,
+                cobros_mes_count=cobros_mes_count,
+                cobros_pendientes_propios=cobros_pendientes_propios,
+                cobros_saldo_propio=cobros_saldo_propio,
+                clientes_count=clientes_count,
+            )
+
+        # ===== Dashboard ADMIN (vista completa, como antes) =====
         try:
             clientes_count = Cliente.query.count()
             productos_count = Producto.query.filter_by(activo=True).count()
@@ -3582,8 +3677,10 @@ def create_app():
         )
 
     @app.get("/facturacion")
-    @admin_required
+    @login_required
     def facturacion():
+        # Vendedor accede para CAPTURAR pedidos; los botones de facturar
+        # se ocultan en el template mediante role-vendedor CSS.
         clientes_list = Cliente.query.order_by(Cliente.nombre.asc()).all()
         clientes_map = {cliente.id: cliente.nombre for cliente in clientes_list}
         categorias_list = Categoria.query.filter_by(activo=True).order_by(
