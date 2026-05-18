@@ -1479,7 +1479,35 @@ def create_app():
         db.session.commit()
         return settings
 
-    def create_invoice_pdf(file_path, settings, invoice, detalles, tipo, cliente, usuario):
+    def get_user_display_name(user, fallback="General"):
+        if not user:
+            return fallback
+        return (user.nombre_completo or user.username or fallback).strip() or fallback
+
+    def build_user_name_map(user_ids):
+        valid_ids = {int(user_id) for user_id in (user_ids or []) if user_id}
+        if not valid_ids:
+            return {}
+        users = User.query.filter(User.id.in_(valid_ids)).all()
+        return {user.id: get_user_display_name(user) for user in users}
+
+    def get_active_vendedores():
+        return (
+            User.query.filter_by(activo=True, rol="vendedor")
+            .order_by(User.nombre_completo.asc(), User.username.asc())
+            .all()
+        )
+
+    def create_invoice_pdf(
+        file_path,
+        settings,
+        invoice,
+        detalles,
+        tipo,
+        cliente,
+        cajero_usuario,
+        vendedor_usuario=None,
+    ):
         styles = getSampleStyleSheet()
         doc = SimpleDocTemplate(
             file_path,
@@ -1534,11 +1562,12 @@ def create_app():
         story.append(Spacer(1, 4))
 
         tipo_texto = "CONTADO" if tipo == "contado" else "CREDITO"
-        vendedor = usuario.nombre_completo if usuario and usuario.nombre_completo else "General"
+        cajero = get_user_display_name(cajero_usuario)
+        vendedor = get_user_display_name(vendedor_usuario)
         estado = invoice.estado.upper() if invoice.estado else "-"
         meta_line = (
-            f"<b>CAJERO:</b> {vendedor} &nbsp;&nbsp; "
-            f"<b>VENDEDOR:</b> GENERAL &nbsp;&nbsp; "
+            f"<b>CAJERO:</b> {cajero} &nbsp;&nbsp; "
+            f"<b>VENDEDOR:</b> {vendedor} &nbsp;&nbsp; "
             f"<b>TERMINOS:</b> {tipo_texto} &nbsp;&nbsp; "
             f"<b>ESTADO:</b> {estado}"
         )
@@ -3717,6 +3746,9 @@ def create_app():
 
         pedidos_list = base_query.order_by(Pedido.fecha.desc()).all()
         pedidos_view = []
+        vendedores_map = build_user_name_map(
+            [pedido.usuario_id for pedido in pedidos_list if pedido.usuario_id]
+        )
         for pedido in pedidos_list:
             fecha_label = pedido.fecha.strftime("%d/%m/%Y") if pedido.fecha else "-"
             estado_label = (pedido.estado or "-").replace("_", " ").upper()
@@ -3729,6 +3761,7 @@ def create_app():
                     "total": pedido.total or Decimal("0"),
                     "estado": pedido.estado or "-",
                     "estado_label": estado_label,
+                    "vendedor": vendedores_map.get(pedido.usuario_id, "General"),
                 }
             )
         return render_template(
@@ -4828,6 +4861,10 @@ def create_app():
         except SQLAlchemyError:
             db.session.rollback()
             facturas_raw = []
+        vendedores_map = build_user_name_map(
+            [factura.usuario_id for factura in facturas_raw if factura.usuario_id]
+        )
+        vendedores = get_active_vendedores()
         facturas = []
         for factura in facturas_raw:
             fecha_label = factura.fecha.strftime("%d/%m/%Y") if factura.fecha else "-"
@@ -4845,6 +4882,8 @@ def create_app():
                     "saldo": saldo,
                     "estado_label": "credito",
                     "pdf_filename": factura.pdf_filename,
+                    "vendedor": vendedores_map.get(factura.usuario_id, "General"),
+                    "vendedor_id": factura.usuario_id,
                 }
             )
         clientes = Cliente.query.all()
@@ -4864,6 +4903,7 @@ def create_app():
             user=session["user"],
             facturas=facturas,
             clientes_map=clientes_map,
+            vendedores=vendedores,
             recibo_url=recibo_url,
             whatsapp_url=whatsapp_url,
         )
@@ -4884,6 +4924,13 @@ def create_app():
             db.session.rollback()
             pagos_raw = []
 
+        vendedores_map = build_user_name_map(
+            [
+                factura.usuario_id
+                for _, factura, _, _ in pagos_raw
+                if factura and factura.usuario_id
+            ]
+        )
         pagos_view = []
         for abono, factura, cliente, usuario in pagos_raw:
             fecha = abono.fecha if abono else None
@@ -4891,11 +4938,7 @@ def create_app():
             fecha_iso = fecha.strftime("%Y-%m-%d") if fecha else ""
             numero_factura = factura.numero_factura if factura else "-"
             cliente_nombre = cliente.nombre if cliente else "N/A"
-            usuario_nombre = (
-                usuario.nombre_completo
-                if usuario and usuario.nombre_completo
-                else (usuario.username if usuario else "N/A")
-            )
+            usuario_nombre = get_user_display_name(usuario, fallback="N/A")
             saldo = Decimal("0")
             if factura:
                 saldo = (factura.total or Decimal("0")) - (factura.pago or Decimal("0"))
@@ -4918,6 +4961,11 @@ def create_app():
                     "monto": abono.monto if abono else Decimal("0"),
                     "saldo": saldo,
                     "usuario": usuario_nombre,
+                    "vendedor": (
+                        vendedores_map.get(factura.usuario_id, "General")
+                        if factura
+                        else "General"
+                    ),
                     "recibo_url": recibo_url,
                 }
             )
@@ -4926,6 +4974,128 @@ def create_app():
             "pagos.html",
             user=session["user"],
             pagos=pagos_view,
+        )
+
+    @app.get("/comisiones")
+    @admin_required
+    def comisiones():
+        today = datetime.utcnow().date()
+        first_day = today.replace(day=1)
+
+        fecha_inicio_raw = (request.args.get("fecha_inicio") or first_day.isoformat()).strip()
+        fecha_fin_raw = (request.args.get("fecha_fin") or today.isoformat()).strip()
+        vendedor_id_raw = (request.args.get("vendedor_id") or "").strip()
+        porcentaje_raw = (request.args.get("porcentaje") or "5").strip()
+
+        try:
+            fecha_inicio = datetime.strptime(fecha_inicio_raw, "%Y-%m-%d")
+        except ValueError:
+            fecha_inicio = datetime.combine(first_day, datetime.min.time())
+            fecha_inicio_raw = first_day.isoformat()
+        try:
+            fecha_fin_date = datetime.strptime(fecha_fin_raw, "%Y-%m-%d")
+        except ValueError:
+            fecha_fin_date = datetime.combine(today, datetime.min.time())
+            fecha_fin_raw = today.isoformat()
+        fecha_fin = fecha_fin_date.replace(hour=23, minute=59, second=59, microsecond=999999)
+
+        try:
+            porcentaje = Decimal(porcentaje_raw)
+        except Exception:
+            porcentaje = Decimal("5")
+            porcentaje_raw = "5"
+        porcentaje = max(Decimal("0"), min(Decimal("100"), porcentaje))
+
+        vendedores = get_active_vendedores()
+        vendedores_map = {vendedor.id: get_user_display_name(vendedor) for vendedor in vendedores}
+        vendedor_id = None
+        if vendedor_id_raw.isdigit():
+            posible_id = int(vendedor_id_raw)
+            if posible_id in vendedores_map:
+                vendedor_id = posible_id
+
+        try:
+            pagos_raw = (
+                db.session.query(AbonoFactura, FacturaContado, Cliente, User)
+                .join(FacturaContado, AbonoFactura.factura_id == FacturaContado.id)
+                .outerjoin(Cliente, FacturaContado.cliente_id == Cliente.id)
+                .join(User, AbonoFactura.usuario_id == User.id)
+                .filter(
+                    User.rol == "vendedor",
+                    AbonoFactura.fecha >= fecha_inicio,
+                    AbonoFactura.fecha <= fecha_fin,
+                )
+                .order_by(AbonoFactura.fecha.desc())
+            )
+            if vendedor_id:
+                pagos_raw = pagos_raw.filter(AbonoFactura.usuario_id == vendedor_id)
+            pagos_raw = pagos_raw.all()
+        except SQLAlchemyError:
+            db.session.rollback()
+            pagos_raw = []
+
+        vendedores_venta_map = build_user_name_map(
+            [
+                factura.usuario_id
+                for _, factura, _, _ in pagos_raw
+                if factura and factura.usuario_id
+            ]
+        )
+        porcentaje_factor = porcentaje / Decimal("100")
+        total_cobrado = Decimal("0")
+        total_comision = Decimal("0")
+        breakdown = {}
+        commission_rows = []
+
+        for abono, factura, cliente, cobrador in pagos_raw:
+            monto = abono.monto or Decimal("0")
+            comision = (monto * porcentaje_factor).quantize(Decimal("0.01"))
+            cobrador_nombre = get_user_display_name(cobrador, fallback="N/A")
+            vendedor_venta = (
+                vendedores_venta_map.get(factura.usuario_id, "General")
+                if factura
+                else "General"
+            )
+            total_cobrado += monto
+            total_comision += comision
+            bucket = breakdown.setdefault(
+                cobrador_nombre,
+                {"vendedor": cobrador_nombre, "cobrado": Decimal("0"), "comision": Decimal("0"), "cantidad": 0},
+            )
+            bucket["cobrado"] += monto
+            bucket["comision"] += comision
+            bucket["cantidad"] += 1
+            commission_rows.append(
+                {
+                    "fecha_label": abono.fecha.strftime("%d/%m/%Y") if abono.fecha else "-",
+                    "numero_factura": factura.numero_factura if factura else "-",
+                    "cliente": cliente.nombre if cliente else "N/A",
+                    "vendedor_venta": vendedor_venta,
+                    "cobrador": cobrador_nombre,
+                    "monto": monto,
+                    "comision": comision,
+                }
+            )
+
+        breakdown_rows = sorted(
+            breakdown.values(),
+            key=lambda item: (item["cobrado"], item["cantidad"]),
+            reverse=True,
+        )
+
+        return render_template(
+            "comisiones.html",
+            user=session["user"],
+            vendedores=vendedores,
+            vendedor_id=vendedor_id,
+            porcentaje=porcentaje,
+            fecha_inicio=fecha_inicio_raw,
+            fecha_fin=fecha_fin_raw,
+            commission_rows=commission_rows,
+            breakdown_rows=breakdown_rows,
+            total_cobrado=total_cobrado,
+            total_comision=total_comision,
+            total_cobros=len(commission_rows),
         )
 
     @app.route("/cobros-personales", methods=["GET", "POST"])
@@ -5164,7 +5334,13 @@ def create_app():
         recibo_filename = None
         try:
             usuario = User.query.filter_by(username=session["user"]).first()
-            usuario_id = usuario.id if usuario else None
+            cobrador_id_raw = (request.form.get("cobrador_id") or "").strip()
+            cobrador = usuario
+            if cobrador_id_raw.isdigit():
+                posible_cobrador = User.query.get(int(cobrador_id_raw))
+                if posible_cobrador and posible_cobrador.activo:
+                    cobrador = posible_cobrador
+            usuario_id = cobrador.id if cobrador else None
             saldo = (factura.total or Decimal("0")) - (factura.pago or Decimal("0"))
             if saldo > 0:
                 abono = AbonoFactura(
@@ -5191,7 +5367,7 @@ def create_app():
                         settings,
                         factura,
                         cliente,
-                        usuario,
+                        cobrador,
                         saldo,
                         Decimal("0"),
                         abono.id,
@@ -5229,7 +5405,13 @@ def create_app():
         recibo_filename = None
         try:
             usuario = User.query.filter_by(username=session["user"]).first()
-            usuario_id = usuario.id if usuario else None
+            cobrador_id_raw = (request.form.get("cobrador_id") or "").strip()
+            cobrador = usuario
+            if cobrador_id_raw.isdigit():
+                posible_cobrador = User.query.get(int(cobrador_id_raw))
+                if posible_cobrador and posible_cobrador.activo:
+                    cobrador = posible_cobrador
+            usuario_id = cobrador.id if cobrador else None
             abono = AbonoFactura(
                 factura_id=factura.id,
                 usuario_id=usuario_id,
@@ -5255,7 +5437,7 @@ def create_app():
                     settings,
                     factura,
                     cliente,
-                    usuario,
+                    cobrador,
                     monto,
                     max(Decimal("0"), nuevo_saldo),
                     abono.id,
@@ -5278,6 +5460,9 @@ def create_app():
         except SQLAlchemyError:
             db.session.rollback()
             facturas_contado = []
+        vendedores_map = build_user_name_map(
+            [factura.usuario_id for factura in facturas_contado if factura.usuario_id]
+        )
         facturas = []
         for factura in facturas_contado:
             fecha_label = factura.fecha.strftime("%d/%m/%Y") if factura.fecha else "-"
@@ -5300,6 +5485,7 @@ def create_app():
                     "total": factura.total,
                     "estado_label": estado_label,
                     "pdf_filename": factura.pdf_filename,
+                    "vendedor": vendedores_map.get(factura.usuario_id, "General"),
                 }
             )
         facturas.sort(
@@ -5608,15 +5794,28 @@ def create_app():
 
         usuario = User.query.filter_by(username=session["user"]).first()
         usuario_id = usuario.id if usuario else None
+        vendedor_factura = usuario
+        vendedor_factura_id = usuario_id
         numero_factura = generate_invoice_number()
 
         try:
+            pedido = None
+            if pedido_id:
+                try:
+                    pedido_ref = int(pedido_id)
+                except (TypeError, ValueError):
+                    pedido_ref = None
+                if pedido_ref:
+                    pedido = Pedido.query.get(pedido_ref)
+                    if pedido and pedido.usuario_id:
+                        vendedor_factura_id = pedido.usuario_id
+                        vendedor_factura = User.query.get(pedido.usuario_id)
             if tipo == "contado":
                 cambio = pago - total
                 factura = FacturaContado(
                     numero_factura=numero_factura,
                     cliente_id=cliente_id,
-                    usuario_id=usuario_id,
+                    usuario_id=vendedor_factura_id,
                     rtn=rtn,
                     fecha=fecha_factura,
                     subtotal=subtotal,
@@ -5645,7 +5844,7 @@ def create_app():
                 factura = FacturaContado(
                     numero_factura=numero_factura,
                     cliente_id=cliente_id,
-                    usuario_id=usuario_id,
+                    usuario_id=vendedor_factura_id,
                     rtn=rtn,
                     fecha=fecha_factura,
                     subtotal=subtotal,
@@ -5670,15 +5869,8 @@ def create_app():
                             isv_aplica=producto.isv_aplica,
                         )
                     )
-            if pedido_id:
-                try:
-                    pedido_ref = int(pedido_id)
-                except (TypeError, ValueError):
-                    pedido_ref = None
-                if pedido_ref:
-                    pedido = Pedido.query.get(pedido_ref)
-                    if pedido:
-                        pedido.estado = "facturado"
+            if pedido:
+                pedido.estado = "facturado"
             db.session.commit()
         except SQLAlchemyError:
             db.session.rollback()
@@ -5702,7 +5894,16 @@ def create_app():
             random_token = uuid4().hex[:6]
             pdf_filename = build_invoice_pdf_filename(numero_factura, token=random_token)
             pdf_path = os.path.join(app.config["INVOICE_PDF_FOLDER"], pdf_filename)
-            create_invoice_pdf(pdf_path, settings, factura, detalles_pdf, tipo, cliente, usuario)
+            create_invoice_pdf(
+                pdf_path,
+                settings,
+                factura,
+                detalles_pdf,
+                tipo,
+                cliente,
+                usuario,
+                vendedor_factura,
+            )
             factura.pdf_filename = pdf_filename
             db.session.commit()
             pdf_url = url_for("static", filename=f"invoices/{pdf_filename}")

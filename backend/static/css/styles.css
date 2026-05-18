@@ -1929,6 +1929,30 @@ body {
   grid-template-columns: 1.6fr 0.8fr 0.8fr 0.8fr 0.8fr 0.8fr 1.4fr;
 }
 
+.table-orders {
+  grid-template-columns: 1.2fr 1.3fr 1fr 0.9fr 0.8fr 0.8fr 1.5fr;
+}
+
+.table-credit {
+  grid-template-columns: 1fr 1.2fr 1fr 0.8fr 0.8fr 0.8fr 0.8fr 1.7fr;
+}
+
+.table-history {
+  grid-template-columns: 1fr 1.2fr 1fr 0.8fr 0.8fr 0.8fr 1fr;
+}
+
+.table-payments {
+  grid-template-columns: 0.9fr 1fr 1.1fr 1fr 1fr 0.8fr 0.8fr 0.8fr;
+}
+
+.table-commissions {
+  grid-template-columns: 0.9fr 1fr 1.2fr 1fr 1fr 0.8fr 0.8fr;
+}
+
+.table-commission-summary {
+  grid-template-columns: 1.4fr 0.7fr 0.9fr 0.9fr;
+}
+
 .personal-charges-table {
   grid-template-columns: 1fr 1fr 0.7fr 0.7fr 0.8fr 0.9fr 1.3fr;
 }
@@ -2006,6 +2030,44 @@ body {
   padding: 6px 8px;
   border-radius: 8px;
   border: 1px solid #dfe6e5;
+}
+
+.inline-select {
+  min-width: 132px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid #dfe6e5;
+  background: #ffffff;
+  color: #2c3e50;
+}
+
+.commission-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 14px;
+  align-items: end;
+}
+
+.commission-filter-grid label {
+  display: grid;
+  gap: 6px;
+  color: #425466;
+  font-weight: 700;
+}
+
+.commission-filter-grid input,
+.commission-filter-grid select {
+  width: 100%;
+  padding: 11px 12px;
+  border-radius: 10px;
+  border: 1px solid #dfe6e5;
+  background: #ffffff;
+}
+
+.commission-filter-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .tax-toggle {
@@ -2839,6 +2901,10 @@ body {
 
   .personal-charge-line {
     grid-template-columns: 1fr;
+  }
+
+  .commission-filter-actions {
+    display: grid;
   }
 }
 
