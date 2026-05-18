@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}{% if modo == "nuevo" %}Nuevo usuario{% else %}Editar usuario{% endif %} | Invagro{% endblock %}
+{% block body_class %}page dashboard-page{% endblock %}
+{% block content %}
+  <div class="dashboard-container">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <img class="sidebar-logo" src="/static/assets/logo.jpg" alt="Invagro" />
+        <h3>Invagro</h3>
+      </div>
+      <nav class="sidebar-nav">
+        <a class="nav-item" href="/dashboard"><svg class="nav-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10.5L12 3l9 7.5M5.25 10.5V20.25h5.25V15h3v5.25h5.25V10.5"/></svg><span class="nav-text">Dashboard</span></a>
+        <a class="nav-item active" href="/usuarios"><svg class="nav-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z"/></svg><span class="nav-text">Usuarios</span></a>
+        <a class="nav-item" href="/logout"><svg class="nav-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6A2.25 2.25 0 0 0 5.25 5.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15M12 9l-3 3m0 0 3 3m-3-3h12.75"/></svg><span class="nav-text">Cerrar sesion</span></a>
+      </nav>
+    </aside>
+
+    <div class="main-content">
+      <div class="topbar">
+        <div class="topbar-left">
+          <h2>{% if modo == "nuevo" %}Nuevo usuario{% else %}Editar usuario · {{ usuario.username }}{% endif %}</h2>
+        </div>
+        <div class="topbar-right">
+          <span class="user-pill">Sesion: {{ user }}</span>
+        </div>
+      </div>
+
+      <main class="content-area">
+        <a class="back-link" href="/usuarios">← Volver a usuarios</a>
+
+        {% if error %}
+          <div class="form-error">{{ error }}</div>
+        {% endif %}
+
+        <section class="form-card">
+          <form method="post" class="module-form" style="grid-template-columns: 1fr 1fr">
+            {% if modo == "nuevo" %}
+              <label>Usuario (login)<input type="text" name="username" placeholder="ejemplo: jperez" required autocomplete="off" /></label>
+              <label>Rol
+                <select name="rol" required>
+                  <option value="vendedor" selected>Vendedor</option>
+                  <option value="admin">Admin</option>
+                  <option value="contador">Contador</option>
+                </select>
+              </label>
+            {% else %}
+              <label>Usuario (login)<input type="text" value="{{ usuario.username }}" disabled /></label>
+              <label>Rol
+                <select name="rol" required>
+                  <option value="vendedor" {% if usuario.rol == "vendedor" %}selected{% endif %}>Vendedor</option>
+                  <option value="admin" {% if usuario.rol == "admin" %}selected{% endif %}>Admin</option>
+                  <option value="contador" {% if usuario.rol == "contador" %}selected{% endif %}>Contador</option>
+                </select>
+              </label>
+            {% endif %}
+
+            <label class="span-2">Nombre completo<input type="text" name="nombre_completo" value="{{ usuario.nombre_completo if usuario else '' }}" placeholder="Juan Pérez" /></label>
+            <label>Email<input type="email" name="email" value="{{ usuario.email if usuario else '' }}" placeholder="usuario@dominio.com" /></label>
+
+            {% if modo == "editar" %}
+              <label>Estado
+                <select name="activo">
+                  <option value="on" {% if usuario.activo %}selected{% endif %}>Activo</option>
+                  <option value="" {% if not usuario.activo %}selected{% endif %}>Inactivo</option>
+                </select>
+              </label>
+            {% endif %}
+
+            {% if modo == "nuevo" %}
+              <label>Contraseña<input type="password" name="password" minlength="6" required autocomplete="new-password" /></label>
+              <label>Repetir contraseña<input type="password" name="password2" minlength="6" required autocomplete="new-password" /></label>
+            {% endif %}
+
+            <div class="form-actions span-2">
+              <a class="ghost-button" href="/usuarios">Cancelar</a>
+              <button class="primary-button" type="submit">
+                {% if modo == "nuevo" %}Crear usuario{% else %}Guardar cambios{% endif %}
+              </button>
+            </div>
+          </form>
+        </section>
+
+        {% if modo == "editar" %}
+          <section class="form-card" style="margin-top:14px">
+            <h3 style="margin:0 0 12px;font-size:1rem">Cambiar contraseña</h3>
+            <form method="post" action="/usuarios/{{ usuario.id }}/password" class="module-form" style="grid-template-columns:1fr 1fr">
+              <label>Nueva contraseña<input type="password" name="password" minlength="6" required autocomplete="new-password" /></label>
+              <label>Repetir contraseña<input type="password" name="password2" minlength="6" required autocomplete="new-password" /></label>
+              <div class="form-actions span-2">
+                <button class="secondary-button" type="submit">Actualizar contraseña</button>
+              </div>
+            </form>
+          </section>
+        {% endif %}
+      </main>
+    </div>
+  </div>
+{% endblock %}

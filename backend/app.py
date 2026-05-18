@@ -68,12 +68,31 @@ from models import (
     User,
     db,
 )
+from auth_helpers import (
+    admin_required,
+    current_user,
+    current_user_id,
+    current_user_is_admin,
+    current_user_is_vendedor,
+    current_user_role,
+    login_required,
+    role_required,
+)
 
 
 def create_app():
     app = Flask(__name__)
     app.config.from_object("config.Config")
     db.init_app(app)
+
+    # Exponer helpers de rol al sistema de plantillas Jinja
+    @app.context_processor
+    def _inject_role_helpers():
+        return {
+            "current_user_role": current_user_role(),
+            "is_admin": current_user_is_admin(),
+            "is_vendedor": current_user_is_vendedor(),
+        }
 
     chat_db_user = os.getenv("CHAT_DB_USER")
     chat_db_pass = os.getenv("CHAT_DB_PASS")
@@ -444,37 +463,50 @@ def create_app():
             message = error
             is_error = True
 
+        # Vendedor solo ve SUS cobros; admin/contador ven todos
+        es_vendedor_filtro = current_user_is_vendedor()
+        uid_filtro = current_user_id() if es_vendedor_filtro else None
+
         try:
-            pending_rows = (
+            pending_q = (
                 db.session.query(CobroPersonal, User)
                 .outerjoin(User, CobroPersonal.usuario_id == User.id)
                 .filter(CobroPersonal.estado == "pendiente")
-                .order_by(
-                    CobroPersonal.fecha_vencimiento.is_(None),
-                    CobroPersonal.fecha_vencimiento.asc(),
-                    CobroPersonal.fecha.desc(),
-                )
-                .all()
             )
-            payment_rows = (
+            if es_vendedor_filtro:
+                pending_q = pending_q.filter(CobroPersonal.usuario_id == uid_filtro)
+            pending_rows = pending_q.order_by(
+                CobroPersonal.fecha_vencimiento.is_(None),
+                CobroPersonal.fecha_vencimiento.asc(),
+                CobroPersonal.fecha.desc(),
+            ).all()
+
+            payment_q = (
                 db.session.query(AbonoCobroPersonal, CobroPersonal, User)
                 .join(CobroPersonal, AbonoCobroPersonal.cobro_id == CobroPersonal.id)
                 .outerjoin(User, AbonoCobroPersonal.usuario_id == User.id)
-                .order_by(AbonoCobroPersonal.fecha.desc())
-                .all()
             )
-            cobros_pendientes_count = (
-                CobroPersonal.query.filter_by(estado="pendiente").count()
-            )
-            saldo_total = (
+            if es_vendedor_filtro:
+                payment_q = payment_q.filter(CobroPersonal.usuario_id == uid_filtro)
+            payment_rows = payment_q.order_by(AbonoCobroPersonal.fecha.desc()).all()
+
+            count_q = CobroPersonal.query.filter_by(estado="pendiente")
+            if es_vendedor_filtro:
+                count_q = count_q.filter(CobroPersonal.usuario_id == uid_filtro)
+            cobros_pendientes_count = count_q.count()
+
+            saldo_q = (
                 db.session.query(func.coalesce(func.sum(CobroPersonal.saldo), 0))
                 .filter(CobroPersonal.estado == "pendiente")
-                .scalar()
-                or 0
             )
-            cobros_pagados_count = (
-                CobroPersonal.query.filter_by(estado="pagado").count()
-            )
+            if es_vendedor_filtro:
+                saldo_q = saldo_q.filter(CobroPersonal.usuario_id == uid_filtro)
+            saldo_total = saldo_q.scalar() or 0
+
+            pagados_q = CobroPersonal.query.filter_by(estado="pagado")
+            if es_vendedor_filtro:
+                pagados_q = pagados_q.filter(CobroPersonal.usuario_id == uid_filtro)
+            cobros_pagados_count = pagados_q.count()
             detail_rows = CobroPersonalDetalle.query.order_by(
                 CobroPersonalDetalle.id.asc()
             ).all()
@@ -2165,6 +2197,10 @@ def create_app():
             session.permanent = remember
             session["user"] = user.username
             session["portal_target"] = portal_target
+            # Guardar id y rol para control de acceso (auth_helpers)
+            if portal_target != "aves":
+                session["user_id"] = user.id
+                session["rol"] = getattr(user, "rol", "admin") or "admin"
             if portal_target == "aves":
                 return redirect(url_for("aves_dashboard"))
             return redirect(url_for("dashboard"))
@@ -3352,6 +3388,160 @@ def create_app():
         session.clear()
         return redirect(url_for("login"))
 
+    # =========================================================
+    # GESTIÓN DE USUARIOS (solo admin)
+    # =========================================================
+    @app.get("/usuarios")
+    @admin_required
+    def usuarios():
+        try:
+            usuarios_list = User.query.order_by(
+                User.activo.desc(), User.rol.asc(), User.username.asc()
+            ).all()
+        except SQLAlchemyError:
+            db.session.rollback()
+            usuarios_list = []
+        return render_template(
+            "usuarios.html",
+            user=session["user"],
+            usuarios=usuarios_list,
+        )
+
+    @app.route("/usuarios/nuevo", methods=["GET", "POST"])
+    @admin_required
+    def crear_usuario():
+        error = None
+        if request.method == "POST":
+            username = request.form.get("username", "").strip().lower()
+            password = request.form.get("password", "")
+            password2 = request.form.get("password2", "")
+            nombre_completo = request.form.get("nombre_completo", "").strip() or None
+            email = request.form.get("email", "").strip().lower() or None
+            rol = (request.form.get("rol") or "vendedor").strip().lower()
+            activo = request.form.get("activo") == "on" or request.method == "POST"
+
+            if rol not in ("admin", "vendedor", "contador"):
+                rol = "vendedor"
+
+            if not username or not password:
+                error = "Usuario y contraseña son obligatorios."
+            elif len(password) < 6:
+                error = "La contraseña debe tener al menos 6 caracteres."
+            elif password != password2:
+                error = "Las contraseñas no coinciden."
+            elif User.query.filter_by(username=username).first():
+                error = "Ya existe un usuario con ese nombre."
+            else:
+                try:
+                    nuevo = User(
+                        username=username,
+                        password=generate_password_hash(password),
+                        nombre_completo=nombre_completo,
+                        email=email,
+                        rol=rol,
+                        activo=True,
+                        fecha_creacion=datetime.utcnow(),
+                    )
+                    db.session.add(nuevo)
+                    db.session.commit()
+                    return redirect(url_for("usuarios"))
+                except SQLAlchemyError as exc:
+                    db.session.rollback()
+                    error = f"No se pudo crear el usuario: {exc}"
+
+        return render_template(
+            "usuario_form.html",
+            user=session["user"],
+            usuario=None,
+            error=error,
+            modo="nuevo",
+        )
+
+    @app.route("/usuarios/<int:usuario_id>/editar", methods=["GET", "POST"])
+    @admin_required
+    def editar_usuario(usuario_id):
+        usuario = User.query.get_or_404(usuario_id)
+        error = None
+        if request.method == "POST":
+            nombre_completo = request.form.get("nombre_completo", "").strip() or None
+            email = request.form.get("email", "").strip().lower() or None
+            rol = (request.form.get("rol") or usuario.rol or "vendedor").strip().lower()
+            activo = request.form.get("activo") == "on"
+
+            if rol not in ("admin", "vendedor", "contador"):
+                rol = "vendedor"
+
+            # Red de seguridad: no permitir que el último admin pierda el rol o se desactive
+            if usuario.rol == "admin" and (rol != "admin" or not activo):
+                admins_activos = User.query.filter(
+                    User.rol == "admin",
+                    User.activo == True,  # noqa: E712
+                    User.id != usuario.id,
+                ).count()
+                if admins_activos == 0:
+                    error = (
+                        "No puedes quitar el rol admin o desactivar a este usuario: "
+                        "es el último administrador activo."
+                    )
+
+            if not error:
+                try:
+                    usuario.nombre_completo = nombre_completo
+                    usuario.email = email
+                    usuario.rol = rol
+                    usuario.activo = activo
+                    db.session.commit()
+                    return redirect(url_for("usuarios"))
+                except SQLAlchemyError as exc:
+                    db.session.rollback()
+                    error = f"No se pudo actualizar el usuario: {exc}"
+
+        return render_template(
+            "usuario_form.html",
+            user=session["user"],
+            usuario=usuario,
+            error=error,
+            modo="editar",
+        )
+
+    @app.post("/usuarios/<int:usuario_id>/password")
+    @admin_required
+    def cambiar_password_usuario(usuario_id):
+        usuario = User.query.get_or_404(usuario_id)
+        nueva = request.form.get("password", "")
+        nueva2 = request.form.get("password2", "")
+        if not nueva or len(nueva) < 6 or nueva != nueva2:
+            return redirect(url_for("editar_usuario", usuario_id=usuario_id))
+        try:
+            usuario.password = generate_password_hash(nueva)
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+        return redirect(url_for("usuarios"))
+
+    @app.post("/usuarios/<int:usuario_id>/delete")
+    @admin_required
+    def eliminar_usuario(usuario_id):
+        usuario = User.query.get_or_404(usuario_id)
+        # No permitir auto-eliminación
+        if usuario.username == session.get("user"):
+            return redirect(url_for("usuarios"))
+        # No permitir quedarse sin admin
+        if usuario.rol == "admin":
+            admins_activos = User.query.filter(
+                User.rol == "admin",
+                User.activo == True,  # noqa: E712
+                User.id != usuario.id,
+            ).count()
+            if admins_activos == 0:
+                return redirect(url_for("usuarios"))
+        try:
+            usuario.activo = False
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+        return redirect(url_for("usuarios"))
+
     @app.route("/clientes", methods=["GET", "POST"])
     def clientes():
         if not session.get("user"):
@@ -3392,10 +3582,8 @@ def create_app():
         )
 
     @app.get("/facturacion")
+    @admin_required
     def facturacion():
-        if not session.get("user"):
-            return redirect(url_for("login"))
-
         clientes_list = Cliente.query.order_by(Cliente.nombre.asc()).all()
         clientes_map = {cliente.id: cliente.nombre for cliente in clientes_list}
         categorias_list = Categoria.query.filter_by(activo=True).order_by(
@@ -3418,17 +3606,19 @@ def create_app():
         )
 
     @app.get("/pedidos")
+    @login_required
     def pedidos():
-        if not session.get("user"):
-            return redirect(url_for("login"))
-
         clientes_list = Cliente.query.order_by(Cliente.nombre.asc()).all()
         clientes_map = {cliente.id: cliente.nombre for cliente in clientes_list}
-        pedidos_list = (
-            Pedido.query.filter(or_(Pedido.estado.is_(None), Pedido.estado != "facturado"))
-            .order_by(Pedido.fecha.desc())
-            .all()
+
+        # Vendedor solo ve SUS pedidos; admin/contador ven todos
+        base_query = Pedido.query.filter(
+            or_(Pedido.estado.is_(None), Pedido.estado != "facturado")
         )
+        if current_user_is_vendedor():
+            base_query = base_query.filter(Pedido.usuario_id == current_user_id())
+
+        pedidos_list = base_query.order_by(Pedido.fecha.desc()).all()
         pedidos_view = []
         for pedido in pedidos_list:
             fecha_label = pedido.fecha.strftime("%d/%m/%Y") if pedido.fecha else "-"
@@ -3581,12 +3771,18 @@ def create_app():
             }
         )
 
-    @app.post("/pedidos/<int:pedido_id>/listo")
-    def marcar_pedido_listo(pedido_id):
-        if not session.get("user"):
-            return redirect(url_for("login"))
+    def _pedido_pertenece_al_usuario(pedido):
+        """Vendedor solo puede actuar sobre SUS pedidos; admin/contador sobre todos."""
+        if current_user_is_vendedor():
+            return pedido.usuario_id == current_user_id()
+        return True
 
+    @app.post("/pedidos/<int:pedido_id>/listo")
+    @login_required
+    def marcar_pedido_listo(pedido_id):
         pedido = Pedido.query.get_or_404(pedido_id)
+        if not _pedido_pertenece_al_usuario(pedido):
+            abort(403)
         if pedido.estado not in {"facturado", "anulado"}:
             pedido.estado = "listo"
             try:
@@ -3596,11 +3792,11 @@ def create_app():
         return redirect(url_for("pedidos"))
 
     @app.post("/pedidos/<int:pedido_id>/anular")
+    @login_required
     def anular_pedido(pedido_id):
-        if not session.get("user"):
-            return redirect(url_for("login"))
-
         pedido = Pedido.query.get_or_404(pedido_id)
+        if not _pedido_pertenece_al_usuario(pedido):
+            abort(403)
         pedido.estado = "anulado"
         try:
             db.session.commit()
@@ -3609,11 +3805,11 @@ def create_app():
         return redirect(url_for("pedidos"))
 
     @app.post("/pedidos/<int:pedido_id>/delete")
+    @login_required
     def eliminar_pedido(pedido_id):
-        if not session.get("user"):
-            return redirect(url_for("login"))
-
         pedido = Pedido.query.get_or_404(pedido_id)
+        if not _pedido_pertenece_al_usuario(pedido):
+            abort(403)
         if pedido.estado == "facturado":
             return redirect(url_for("pedidos"))
         try:
@@ -3624,9 +3820,11 @@ def create_app():
         return redirect(url_for("pedidos"))
 
     @app.route("/productos", methods=["GET", "POST"])
+    @login_required
     def productos():
-        if not session.get("user"):
-            return redirect(url_for("login"))
+        # Vendedor solo puede VER el catálogo, no crear productos
+        if request.method == "POST" and current_user_role() != "admin":
+            abort(403)
 
         error = None
         if request.method == "POST":
@@ -3678,10 +3876,8 @@ def create_app():
         )
 
     @app.get("/reportes")
+    @admin_required
     def reportes():
-        if not session.get("user"):
-            return redirect(url_for("login"))
-
         try:
             clientes_data = [
                 {
@@ -4496,10 +4692,8 @@ def create_app():
         return jsonify({"pdf_url": pdf_url})
 
     @app.route("/ajustes", methods=["GET", "POST"])
+    @admin_required
     def ajustes():
-        if not session.get("user"):
-            return redirect(url_for("login"))
-
         settings = AjustesNegocio.query.first()
         if not settings:
             settings = AjustesNegocio(nombre="Invagro")
@@ -4528,10 +4722,8 @@ def create_app():
         return render_template("ajustes.html", user=session["user"], settings=settings)
 
     @app.get("/facturas/credito")
+    @admin_required
     def facturas_credito():
-        if not session.get("user"):
-            return redirect(url_for("login"))
-
         try:
             facturas_raw = FacturaContado.query.filter_by(estado="credito").order_by(
                 FacturaContado.fecha.desc()
@@ -4580,10 +4772,8 @@ def create_app():
         )
 
     @app.get("/pagos")
+    @admin_required
     def pagos():
-        if not session.get("user"):
-            return redirect(url_for("login"))
-
         try:
             pagos_raw = (
                 db.session.query(AbonoFactura, FacturaContado, Cliente, User)
@@ -4982,10 +5172,8 @@ def create_app():
         return redirect(url_for("facturas_credito"))
 
     @app.get("/facturas/historial")
+    @admin_required
     def facturas_historial():
-        if not session.get("user"):
-            return redirect(url_for("login"))
-
         try:
             facturas_contado = FacturaContado.query.order_by(
                 FacturaContado.fecha.desc()
@@ -5151,10 +5339,8 @@ def create_app():
         return redirect(url_for("clientes"))
 
     @app.route("/productos/<int:producto_id>/edit", methods=["GET", "POST"])
+    @admin_required
     def editar_producto(producto_id):
-        if not session.get("user"):
-            return redirect(url_for("login"))
-
         producto = Producto.query.get_or_404(producto_id)
         categorias_list = Categoria.query.filter_by(activo=True).order_by(
             Categoria.nombre.asc()
@@ -5210,10 +5396,8 @@ def create_app():
         )
 
     @app.post("/productos/<int:producto_id>/delete")
+    @admin_required
     def eliminar_producto(producto_id):
-        if not session.get("user"):
-            return redirect(url_for("login"))
-
         producto = Producto.query.get_or_404(producto_id)
         try:
             producto.activo = False
@@ -5223,10 +5407,8 @@ def create_app():
         return redirect(url_for("productos"))
 
     @app.post("/categorias")
+    @admin_required
     def crear_categoria():
-        if not session.get("user"):
-            return redirect(url_for("login"))
-
         nombre = request.form.get("nombre", "").strip()
         if not nombre:
             return redirect(url_for("productos"))
@@ -5240,10 +5422,8 @@ def create_app():
         return redirect(url_for("productos"))
 
     @app.post("/categorias/<int:categoria_id>/delete")
+    @admin_required
     def eliminar_categoria(categoria_id):
-        if not session.get("user"):
-            return redirect(url_for("login"))
-
         categoria = Categoria.query.get_or_404(categoria_id)
         try:
             categoria.activo = False
@@ -5256,6 +5436,8 @@ def create_app():
     def crear_factura():
         if not session.get("user"):
             return jsonify({"error": "No autorizado."}), 401
+        if current_user_role() != "admin":
+            return jsonify({"error": "Solo administradores pueden facturar."}), 403
 
         data = request.get_json(silent=True) or {}
         tipo = (data.get("tipo") or "").strip().lower()

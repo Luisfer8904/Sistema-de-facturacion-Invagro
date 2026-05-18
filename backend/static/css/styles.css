@@ -4415,3 +4415,46 @@ body.sidebar-open .mobile-sidebar-backdrop {
     width: var(--sidebar-collapsed, 76px);
   }
 }
+
+/* ============================================================
+   CAPA DE ROLES · Mostrar/ocultar opciones según rol del usuario
+   El body lleva la clase role-admin | role-vendedor | role-contador
+   ============================================================ */
+
+/* Vendedor: ocultar todas las opciones administrativas del sidebar */
+body.role-vendedor .sidebar-nav a[href="/facturacion"],
+body.role-vendedor .sidebar-nav a[href="/facturas/credito"],
+body.role-vendedor .sidebar-nav a[href="/pagos"],
+body.role-vendedor .sidebar-nav a[href="/facturas/historial"],
+body.role-vendedor .sidebar-nav a[href="/reportes"],
+body.role-vendedor .sidebar-nav a[href="/ajustes"],
+body.role-vendedor .sidebar-nav a[href="/usuarios"] {
+  display: none !important;
+}
+
+/* Vendedor: ocultar acciones admin dentro de páginas compartidas
+   (botones marcados con clase .admin-only se esconden) */
+body.role-vendedor .admin-only,
+body.role-vendedor [data-admin-only] {
+  display: none !important;
+}
+
+/* Vendedor: en productos, ocultar formularios de creación/edición */
+body.role-vendedor .module-form[data-create-product],
+body.role-vendedor form[action*="/categorias"],
+body.role-vendedor form[action*="/productos/"][action*="delete"],
+body.role-vendedor a[href*="/productos/"][href*="/edit"] {
+  display: none !important;
+}
+
+/* Pista visual: badge de rol en topbar (opcional, agrega user-pill secundario) */
+body.role-vendedor .user-pill::before {
+  content: "👤 Vendedor · ";
+  font-weight: 700;
+  color: #1d4ed8;
+}
+body.role-admin .user-pill::before {
+  content: "🛡 Admin · ";
+  font-weight: 700;
+  color: #0f4c3a;
+}

@@ -9,7 +9,8 @@
     <link rel="stylesheet" href="/static/css/styles.css" />
   </head>
   {% set body_class_value = self.body_class() %}
-  <body class="{{ body_class_value }}">
+  {% set role_class = "role-" ~ (current_user_role or "guest") %}
+  <body class="{{ body_class_value }} {{ role_class }}">
     {% if "dashboard-page" not in body_class_value %}
       <header class="site-header">
         <a href="/" class="logo">
