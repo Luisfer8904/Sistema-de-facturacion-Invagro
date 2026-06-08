@@ -40,6 +40,16 @@
       </div>
 
       <main class="content-area">
+        <section class="pos-search">
+          <input
+            type="text"
+            placeholder="Buscar por cliente, factura o vendedor"
+            id="invoice-history-search"
+          />
+          <button class="primary-button" type="button" id="clear-invoice-history-search">
+            Limpiar
+          </button>
+        </section>
         <section class="module-table">
           <div class="table-header table-history">
             <span>Factura</span>
@@ -52,7 +62,12 @@
           </div>
           {% if facturas %}
             {% for factura in facturas %}
-              <div class="table-row table-history">
+              <div
+                class="table-row table-history"
+                data-invoice="{{ factura.numero_factura }}"
+                data-client="{{ clientes_map.get(factura.cliente_id, 'N/A') }}"
+                data-vendor="{{ factura.vendedor }}"
+              >
                 <span>{{ factura.numero_factura }}</span>
                 <span>{{ clientes_map.get(factura.cliente_id, 'N/A') }}</span>
                 <span>{{ factura.vendedor }}</span>
@@ -82,10 +97,39 @@
               <span>-</span>
               <span>-</span>
               <span>-</span>
+              <span>-</span>
             </div>
           {% endif %}
         </section>
       </main>
     </div>
   </div>
+  <script>
+    const historySearch = document.getElementById("invoice-history-search");
+    const historyClear = document.getElementById("clear-invoice-history-search");
+    const historyRows = Array.from(document.querySelectorAll(".table-row.table-history"));
+
+    const applyHistoryFilter = () => {
+      const query = historySearch ? historySearch.value.trim().toLowerCase() : "";
+      historyRows.forEach((row) => {
+        const invoice = (row.dataset.invoice || "").toLowerCase();
+        const client = (row.dataset.client || "").toLowerCase();
+        const vendor = (row.dataset.vendor || "").toLowerCase();
+        const matches = !query || invoice.includes(query) || client.includes(query) || vendor.includes(query);
+        row.style.display = matches ? "grid" : "none";
+      });
+    };
+
+    if (historySearch) {
+      historySearch.addEventListener("input", applyHistoryFilter);
+    }
+    if (historyClear) {
+      historyClear.addEventListener("click", () => {
+        if (historySearch) {
+          historySearch.value = "";
+        }
+        applyHistoryFilter();
+      });
+    }
+  </script>
 {% endblock %}

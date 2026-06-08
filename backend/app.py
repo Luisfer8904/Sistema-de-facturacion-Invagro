@@ -1484,6 +1484,21 @@ def create_app():
             return fallback
         return (user.nombre_completo or user.username or fallback).strip() or fallback
 
+    def clean_conflict_artifacts(value, fallback="-"):
+        if value is None:
+            return fallback
+        text_value = str(value)
+        cleaned_lines = []
+        for raw_line in text_value.splitlines():
+            stripped = raw_line.strip()
+            if not stripped:
+                continue
+            if stripped.startswith(("<<<<<<<", "=======", ">>>>>>>")):
+                continue
+            cleaned_lines.append(stripped)
+        cleaned = " ".join(cleaned_lines).strip()
+        return cleaned or fallback
+
     def build_user_name_map(user_ids):
         valid_ids = {int(user_id) for user_id in (user_ids or []) if user_id}
         if not valid_ids:
@@ -5478,14 +5493,19 @@ def create_app():
                 {
                     "id": factura.id,
                     "tipo": "credito" if estado_label == "credito" else "contado",
-                    "numero_factura": factura.numero_factura,
+                    "numero_factura": clean_conflict_artifacts(
+                        factura.numero_factura, fallback="Sin numero"
+                    ),
                     "cliente_id": factura.cliente_id,
                     "fecha": factura.fecha,
                     "fecha_label": fecha_label,
                     "total": factura.total,
                     "estado_label": estado_label,
                     "pdf_filename": factura.pdf_filename,
-                    "vendedor": vendedores_map.get(factura.usuario_id, "General"),
+                    "vendedor": clean_conflict_artifacts(
+                        vendedores_map.get(factura.usuario_id, "General"),
+                        fallback="General",
+                    ),
                 }
             )
         facturas.sort(
