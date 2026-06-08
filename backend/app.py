@@ -5479,6 +5479,11 @@ def create_app():
             [factura.usuario_id for factura in facturas_contado if factura.usuario_id]
         )
         facturas = []
+        clientes = Cliente.query.all()
+        clientes_map = {
+            cliente.id: clean_conflict_artifacts(cliente.nombre, fallback="Cliente sin nombre")
+            for cliente in clientes
+        }
         for factura in facturas_contado:
             fecha_label = factura.fecha.strftime("%d/%m/%Y") if factura.fecha else "-"
             if factura.estado == "credito":
@@ -5497,10 +5502,13 @@ def create_app():
                         factura.numero_factura, fallback="Sin numero"
                     ),
                     "cliente_id": factura.cliente_id,
+                    "cliente": clientes_map.get(factura.cliente_id, "Cliente no disponible"),
                     "fecha": factura.fecha,
                     "fecha_label": fecha_label,
                     "total": factura.total,
-                    "estado_label": estado_label,
+                    "estado_label": clean_conflict_artifacts(
+                        estado_label.upper(), fallback="SIN ESTADO"
+                    ),
                     "pdf_filename": factura.pdf_filename,
                     "vendedor": clean_conflict_artifacts(
                         vendedores_map.get(factura.usuario_id, "General"),
@@ -5512,13 +5520,10 @@ def create_app():
             key=lambda item: item.get("fecha") or datetime.min,
             reverse=True,
         )
-        clientes = Cliente.query.all()
-        clientes_map = {cliente.id: cliente.nombre for cliente in clientes}
         return render_template(
             "facturas_historial.html",
             user=session["user"],
             facturas=facturas,
-            clientes_map=clientes_map,
         )
 
     @app.route("/facturas/<path:factura_ref>/delete", methods=["POST", "GET"])

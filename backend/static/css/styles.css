@@ -1941,6 +1941,83 @@ body {
   grid-template-columns: 1fr 1.2fr 1fr 0.8fr 0.8fr 0.8fr 1fr;
 }
 
+.history-list {
+  display: grid;
+  gap: 16px;
+}
+
+.history-card {
+  background: #ffffff;
+  border: 1px solid rgba(44, 122, 63, 0.08);
+  border-radius: 16px;
+  padding: 18px;
+  box-shadow: 0 10px 24px rgba(12, 32, 28, 0.08);
+  display: grid;
+  gap: 16px;
+}
+
+.history-card-head {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.history-card-head h3 {
+  margin: 4px 0 0;
+  font-size: 1.1rem;
+  color: #20352b;
+  word-break: break-word;
+}
+
+.history-card-label {
+  display: block;
+  color: #7b8a83;
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.history-status-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: rgba(44, 122, 63, 0.12);
+  color: #1f6b36;
+  font-weight: 800;
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.history-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px;
+}
+
+.history-card-grid strong {
+  display: block;
+  margin-top: 4px;
+  color: #243b31;
+  line-height: 1.45;
+  word-break: break-word;
+}
+
+.history-card-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.history-card-muted {
+  color: #7b8a83;
+  font-weight: 600;
+}
+
 .table-payments {
   grid-template-columns: 0.9fr 1fr 1.1fr 1fr 1fr 0.8fr 0.8fr 0.8fr;
 }
@@ -2905,6 +2982,14 @@ body {
 
   .commission-filter-actions {
     display: grid;
+  }
+
+  .history-card {
+    padding: 16px;
+  }
+
+  .history-card-head {
+    flex-direction: column;
   }
 }
 
