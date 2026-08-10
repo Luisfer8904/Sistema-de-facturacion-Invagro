@@ -1934,7 +1934,204 @@ body {
 }
 
 .table-credit {
-  grid-template-columns: 1fr 1.2fr 1fr 0.8fr 0.8fr 0.8fr 0.8fr 1.7fr;
+  grid-template-columns:
+    minmax(108px, 0.72fr)
+    minmax(116px, 0.9fr)
+    minmax(150px, 1.15fr)
+    minmax(140px, 0.95fr)
+    minmax(86px, 0.65fr)
+    minmax(86px, 0.65fr)
+    minmax(86px, 0.65fr)
+    minmax(150px, 0.9fr);
+  align-items: center;
+  column-gap: 12px;
+}
+
+.table-row.table-credit {
+  padding-top: 10px;
+  padding-bottom: 10px;
+  border-top: 1px solid #e4ebe7;
+}
+
+.table-row.table-credit:nth-child(odd) {
+  background: #fbfdfb;
+}
+
+.table-row.table-credit:hover {
+  background: #f1f7f3;
+}
+
+.table-credit > span {
+  min-width: 0;
+}
+
+.invoice-number {
+  overflow-wrap: anywhere;
+}
+
+.cell-nowrap {
+  white-space: nowrap;
+}
+
+.table-credit .table-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.credit-pdf-button {
+  justify-self: start;
+  padding: 8px 14px;
+}
+
+.table-credit .primary-button,
+.table-credit .secondary-button {
+  min-height: 36px;
+  padding: 8px 14px;
+  white-space: nowrap;
+}
+
+.credit-payment-button {
+  padding-inline: 16px;
+}
+
+.credit-payment-modal-card {
+  width: min(620px, 100%);
+}
+
+.modal-eyebrow {
+  display: block;
+  margin-bottom: 3px;
+  color: #2c7a3f;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.credit-payment-modal-card .modal-header h3 {
+  margin: 0;
+}
+
+.credit-payment-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 18px;
+  padding: 14px;
+  border: 1px solid #dce8e0;
+  border-radius: 12px;
+  background: #f5f9f6;
+}
+
+.credit-payment-summary div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.credit-payment-summary span {
+  color: #6b7d73;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.credit-payment-summary strong {
+  color: #263a30;
+  overflow-wrap: anywhere;
+}
+
+.credit-payment-form {
+  display: grid;
+  gap: 14px;
+}
+
+.credit-payment-form label {
+  display: grid;
+  gap: 7px;
+  color: #2c3e50;
+  font-weight: 700;
+}
+
+.credit-payment-form select,
+.credit-payment-form input {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid #ccd8d1;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #2c3e50;
+  font: inherit;
+}
+
+.credit-payment-form select:focus,
+.credit-payment-form input:focus {
+  border-color: #2c7a3f;
+  outline: 3px solid rgba(44, 122, 63, 0.13);
+}
+
+.credit-payment-form input[readonly] {
+  background: #eef3f0;
+  color: #52635a;
+}
+
+.credit-payment-form small {
+  color: #718078;
+  font-weight: 500;
+}
+
+.money-input-wrap {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  border: 1px solid #ccd8d1;
+  border-radius: 10px;
+  background: #ffffff;
+  overflow: hidden;
+}
+
+.money-input-wrap > span {
+  padding-left: 12px;
+  color: #2c7a3f;
+  font-weight: 800;
+}
+
+.money-input-wrap input {
+  border: 0;
+  border-radius: 0;
+}
+
+.money-input-wrap:focus-within {
+  border-color: #2c7a3f;
+  outline: 3px solid rgba(44, 122, 63, 0.13);
+}
+
+.money-input-wrap input:focus {
+  outline: 0;
+}
+
+.credit-payment-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+@media (max-width: 600px) {
+  .credit-payment-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .credit-payment-form-actions {
+    flex-direction: column-reverse;
+  }
+
+  .credit-payment-form-actions button {
+    width: 100%;
+  }
 }
 
 .table-history {

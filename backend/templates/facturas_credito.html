@@ -86,10 +86,10 @@
         </section>
         <section class="module-table">
           <div class="table-header table-credit">
+            <span>Fecha</span>
             <span>Factura</span>
             <span>Cliente</span>
             <span>Vendedor</span>
-            <span>Fecha</span>
             <span>Total</span>
             <span>Abonado</span>
             <span>Saldo</span>
@@ -103,44 +103,32 @@
                 data-invoice="{{ factura.numero_factura }}"
                 data-vendedor="{{ factura.vendedor }}"
               >
-                <span>{{ factura.numero_factura }}</span>
+                <span class="cell-nowrap">{{ factura.fecha_label }}</span>
+                <span class="invoice-number">{{ factura.numero_factura }}</span>
                 <span>{{ clientes_map.get(factura.cliente_id, 'N/A') }}</span>
-                <span>{{ factura.vendedor }}</span>
-                <span>{{ factura.fecha_label }}</span>
-                <span>L {{ "%.2f"|format(factura.total or 0) }}</span>
-                <span>L {{ "%.2f"|format(factura.abonado or 0) }}</span>
-                <span>L {{ "%.2f"|format(factura.saldo or 0) }}</span>
+                <span class="cell-nowrap">{{ factura.vendedor }}</span>
+                <span class="cell-nowrap">L {{ "%.2f"|format(factura.total or 0) }}</span>
+                <span class="cell-nowrap">L {{ "%.2f"|format(factura.abonado or 0) }}</span>
+                <span class="cell-nowrap">L {{ "%.2f"|format(factura.saldo or 0) }}</span>
                 <div class="table-actions">
                   {% if factura.pdf_filename %}
-                    <a class="secondary-button" href="{{ url_for('static', filename='invoices/' ~ factura.pdf_filename) }}" target="_blank">
+                    <a class="secondary-button credit-pdf-button" href="{{ url_for('static', filename='invoices/' ~ factura.pdf_filename) }}" target="_blank">
                       Ver PDF
                     </a>
-                  {% else %}
-                    -
                   {% endif %}
-                  <form method="post" action="/facturas/credito/{{ factura.id }}/abonos">
-                    <select class="inline-select" name="cobrador_id">
-                      <option value="">Cobrador</option>
-                      {% for vendedor in vendedores %}
-                        <option value="{{ vendedor.id }}" {% if factura.vendedor_id == vendedor.id %}selected{% endif %}>
-                          {{ vendedor.nombre_completo or vendedor.username }}
-                        </option>
-                      {% endfor %}
-                    </select>
-                    <input class="amount-input" type="number" name="monto" min="0.01" step="0.01" placeholder="Abono" required />
-                    <button class="secondary-button" type="submit">Registrar</button>
-                  </form>
-                  <form method="post" action="/facturas/credito/{{ factura.id }}/cobrar" onsubmit="return confirm('¿Cobrar esta factura?');">
-                    <select class="inline-select" name="cobrador_id">
-                      <option value="">Cobrador</option>
-                      {% for vendedor in vendedores %}
-                        <option value="{{ vendedor.id }}" {% if factura.vendedor_id == vendedor.id %}selected{% endif %}>
-                          {{ vendedor.nombre_completo or vendedor.username }}
-                        </option>
-                      {% endfor %}
-                    </select>
-                    <button class="primary-button" type="submit">Cobrar factura</button>
-                  </form>
+                  <button
+                    class="primary-button credit-payment-button"
+                    type="button"
+                    data-payment-open
+                    data-id="{{ factura.id }}"
+                    data-invoice="{{ factura.numero_factura }}"
+                    data-client="{{ clientes_map.get(factura.cliente_id, 'N/A') }}"
+                    data-date="{{ factura.fecha_label }}"
+                    data-balance="{{ '%.2f'|format(factura.saldo or 0) }}"
+                    data-collector="{{ factura.vendedor_id or '' }}"
+                  >
+                    Registrar pago
+                  </button>
                 </div>
               </div>
             {% endfor %}
@@ -153,16 +141,143 @@
               <span>-</span>
               <span>-</span>
               <span>-</span>
+              <span>-</span>
             </div>
           {% endif %}
         </section>
+
+        <div class="modal" id="credit-payment-modal" aria-hidden="true">
+          <div class="modal-card credit-payment-modal-card" role="dialog" aria-modal="true" aria-labelledby="credit-payment-title">
+            <div class="modal-header">
+              <div>
+                <span class="modal-eyebrow">Factura a credito</span>
+                <h3 id="credit-payment-title">Registrar abono o pago</h3>
+              </div>
+              <button class="modal-close" type="button" data-payment-close aria-label="Cerrar">×</button>
+            </div>
+
+            <div class="credit-payment-summary">
+              <div>
+                <span>Factura</span>
+                <strong id="payment-invoice">-</strong>
+              </div>
+              <div>
+                <span>Cliente</span>
+                <strong id="payment-client">-</strong>
+              </div>
+              <div>
+                <span>Fecha de factura</span>
+                <strong id="payment-date">-</strong>
+              </div>
+              <div>
+                <span>Saldo pendiente</span>
+                <strong id="payment-balance">L 0.00</strong>
+              </div>
+            </div>
+
+            <form class="credit-payment-form" id="credit-payment-form" method="post">
+              <label>
+                Tipo de registro
+                <select id="payment-type" name="tipo" required>
+                  <option value="abono">Abono</option>
+                  <option value="pago">Pago total</option>
+                </select>
+              </label>
+              <label>
+                Cobrador
+                <select id="payment-collector" name="cobrador_id" required>
+                  <option value="">Seleccionar cobrador</option>
+                  {% for vendedor in vendedores %}
+                    <option value="{{ vendedor.id }}">{{ vendedor.nombre_completo or vendedor.username }}</option>
+                  {% endfor %}
+                </select>
+              </label>
+              <label>
+                Valor recibido
+                <span class="money-input-wrap">
+                  <span>L</span>
+                  <input id="payment-amount" type="number" name="monto" min="0.01" step="0.01" inputmode="decimal" required />
+                </span>
+                <small id="payment-amount-help">Ingrese un valor menor o igual al saldo.</small>
+              </label>
+              <div class="credit-payment-form-actions">
+                <button class="secondary-button" type="button" data-payment-close>Cancelar</button>
+                <button class="primary-button" type="submit" id="payment-submit">Registrar abono</button>
+              </div>
+            </form>
+          </div>
+        </div>
       </main>
     </div>
   </div>
   <script>
     const creditSearch = document.getElementById("credit-invoice-search");
     const clearCreditSearch = document.getElementById("clear-credit-search");
-    const creditRows = Array.from(document.querySelectorAll(".table-row.table-seven"));
+    const creditRows = Array.from(document.querySelectorAll(".table-row.table-credit[data-invoice]"));
+    const paymentModal = document.getElementById("credit-payment-modal");
+    const paymentForm = document.getElementById("credit-payment-form");
+    const paymentType = document.getElementById("payment-type");
+    const paymentCollector = document.getElementById("payment-collector");
+    const paymentAmount = document.getElementById("payment-amount");
+    const paymentAmountHelp = document.getElementById("payment-amount-help");
+    const paymentSubmit = document.getElementById("payment-submit");
+    let activeInvoiceId = "";
+    let activeBalance = "0.00";
+
+    const updatePaymentForm = () => {
+      const isFullPayment = paymentType && paymentType.value === "pago";
+      if (!paymentForm || !paymentAmount || !activeInvoiceId) return;
+      paymentForm.action = isFullPayment
+        ? `/facturas/credito/${activeInvoiceId}/cobrar`
+        : `/facturas/credito/${activeInvoiceId}/abonos`;
+      paymentAmount.value = isFullPayment ? activeBalance : "";
+      paymentAmount.readOnly = isFullPayment;
+      paymentAmount.max = activeBalance;
+      paymentAmountHelp.textContent = isFullPayment
+        ? "El pago total corresponde al saldo pendiente."
+        : "Ingrese un valor menor o igual al saldo.";
+      paymentSubmit.textContent = isFullPayment ? "Registrar pago total" : "Registrar abono";
+    };
+
+    const closePaymentModal = () => {
+      if (!paymentModal) return;
+      paymentModal.classList.remove("open");
+      paymentModal.setAttribute("aria-hidden", "true");
+    };
+
+    document.querySelectorAll("[data-payment-open]").forEach((button) => {
+      button.addEventListener("click", () => {
+        if (!paymentModal || !paymentForm) return;
+        activeInvoiceId = button.dataset.id || "";
+        activeBalance = button.dataset.balance || "0.00";
+        document.getElementById("payment-invoice").textContent = button.dataset.invoice || "-";
+        document.getElementById("payment-client").textContent = button.dataset.client || "-";
+        document.getElementById("payment-date").textContent = button.dataset.date || "-";
+        document.getElementById("payment-balance").textContent = `L ${activeBalance}`;
+        paymentType.value = "abono";
+        paymentCollector.value = button.dataset.collector || "";
+        updatePaymentForm();
+        paymentModal.classList.add("open");
+        paymentModal.setAttribute("aria-hidden", "false");
+        window.setTimeout(() => paymentAmount.focus(), 0);
+      });
+    });
+
+    document.querySelectorAll("[data-payment-close]").forEach((button) => {
+      button.addEventListener("click", closePaymentModal);
+    });
+
+    if (paymentType) paymentType.addEventListener("change", updatePaymentForm);
+    if (paymentModal) {
+      paymentModal.addEventListener("click", (event) => {
+        if (event.target === paymentModal) closePaymentModal();
+      });
+    }
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && paymentModal && paymentModal.classList.contains("open")) {
+        closePaymentModal();
+      }
+    });
 
     const applyCreditFilter = () => {
       const query = creditSearch ? creditSearch.value.trim().toLowerCase() : "";
