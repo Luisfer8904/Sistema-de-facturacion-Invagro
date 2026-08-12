@@ -1538,6 +1538,26 @@ body {
 /* Facturación · selector superior de facturas guardadas */
 .saved-sales-dropdown {
   position: relative;
+  flex: 0 0 auto;
+}
+
+.topbar-left {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.topbar-right {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex: 0 1 auto;
+  flex-wrap: nowrap;
+}
+
+.topbar-right > * {
+  flex: 0 0 auto;
 }
 
 .saved-sales-toggle {
