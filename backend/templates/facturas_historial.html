@@ -54,10 +54,25 @@
           {% if facturas %}
             {% for factura in facturas %}
               <article
-                class="history-card"
+                class="history-card invoice-clickable-row"
                 data-invoice="{{ factura.numero_factura }}"
                 data-client="{{ factura.cliente }}"
                 data-vendor="{{ factura.vendedor }}"
+                data-history-row
+                data-id="{{ factura.id }}"
+                data-date="{{ factura.fecha_label }}"
+                data-status="{{ factura.estado_label }}"
+                data-subtotal="{{ '%.2f'|format(factura.subtotal or 0) }}"
+                data-discount="{{ '%.2f'|format(factura.descuento or 0) }}"
+                data-tax="{{ '%.2f'|format(factura.isv or 0) }}"
+                data-total="{{ '%.2f'|format(factura.total or 0) }}"
+                data-paid="{{ '%.2f'|format(factura.abonado or 0) }}"
+                data-balance="{{ '%.2f'|format(factura.saldo or 0) }}"
+                data-type="{{ factura.tipo }}"
+                data-pdf="{% if factura.pdf_filename %}{{ url_for('static', filename='invoices/' ~ factura.pdf_filename) }}{% endif %}"
+                role="button"
+                tabindex="0"
+                aria-label="Ver detalle de la factura {{ factura.numero_factura }}"
               >
                 <div class="history-card-head">
                   <div>
@@ -84,25 +99,103 @@
                     <strong>L {{ "%.2f"|format(factura.total or 0) }}</strong>
                   </div>
                 </div>
-                <div class="history-card-actions">
-                  {% if factura.pdf_filename %}
-                    <a class="secondary-button" href="{{ url_for('static', filename='invoices/' ~ factura.pdf_filename) }}" target="_blank">
-                      Ver PDF
-                    </a>
+                <template id="history-items-{{ factura.id }}">
+                  {% for item in factura["items"] %}
+                    <div class="invoice-detail-product-row" data-line-total="{{ '%.2f'|format(item.subtotal or 0) }}" data-quantity="{{ item.cantidad }}">
+                      <span><small>{{ item.codigo }}</small><strong>{{ item.nombre }}</strong></span>
+                      <span>{{ item.cantidad }}</span>
+                      <span>L {{ "%.2f"|format(item.precio_unitario or 0) }}</span>
+                      <span>L {{ "%.2f"|format(item.descuento or 0) }}</span>
+                      <span>L {{ "%.2f"|format(item.subtotal or 0) }}</span>
+                    </div>
                   {% else %}
-                    <span class="history-card-muted">Sin PDF</span>
-                  {% endif %}
-                  <form method="post" action="/facturas/{{ factura.id }}/delete" onsubmit="return confirm('¿Eliminar esta factura?');">
-                    <input type="hidden" name="tipo" value="{{ factura.tipo }}" />
-                    <button class="danger-button" type="submit">Eliminar</button>
-                  </form>
-                </div>
+                    <div class="invoice-detail-empty">No hay productos disponibles para esta factura.</div>
+                  {% endfor %}
+                </template>
               </article>
             {% endfor %}
           {% else %}
             <div class="empty-row">No hay facturas registradas.</div>
           {% endif %}
         </section>
+
+        <div class="modal" id="history-detail-modal" aria-hidden="true">
+          <div class="modal-card invoice-detail-modal-card" role="dialog" aria-modal="true" aria-labelledby="history-detail-title">
+            <div class="modal-header">
+              <div>
+                <span class="modal-eyebrow">Historial de facturas</span>
+                <h3 id="history-detail-title">Factura <span id="history-detail-number">-</span></h3>
+              </div>
+              <button class="modal-close" type="button" data-history-close aria-label="Cerrar">×</button>
+            </div>
+
+            <div class="invoice-detail-meta">
+              <div><span>Fecha</span><strong id="history-detail-date">-</strong></div>
+              <div><span>Cliente</span><strong id="history-detail-client">-</strong></div>
+              <div><span>Vendedor</span><strong id="history-detail-vendor">-</strong></div>
+              <div><span>Estado</span><strong id="history-detail-status">-</strong></div>
+            </div>
+
+            <div class="invoice-detail-workspace">
+              <div class="invoice-detail-main">
+                <div class="invoice-detail-products">
+                  <div class="invoice-detail-product-head">
+                    <span>Producto</span><span>Cant.</span><span>Precio</span><span>Desc.</span><span>Subtotal</span>
+                  </div>
+                  <div id="history-detail-products"></div>
+                </div>
+                <div class="invoice-detail-totals">
+                  <div><span>Subtotal</span><strong id="history-detail-subtotal">L 0.00</strong></div>
+                  <div><span>Descuento</span><strong id="history-detail-discount">L 0.00</strong></div>
+                  <div><span>ISV</span><strong id="history-detail-tax">L 0.00</strong></div>
+                  <div class="invoice-detail-total"><span>Total</span><strong id="history-detail-total">L 0.00</strong></div>
+                  <div><span>Pagado</span><strong id="history-detail-paid">L 0.00</strong></div>
+                </div>
+              </div>
+
+              <aside class="invoice-analysis-panel" aria-label="Analisis de factura">
+                <div class="invoice-analysis-heading">
+                  <span class="modal-eyebrow">Análisis</span>
+                  <h4>Estado financiero</h4>
+                </div>
+                <div class="invoice-payment-progress-card">
+                  <div class="invoice-payment-ring" id="history-payment-ring">
+                    <div><strong id="history-payment-percent">0%</strong><span>cobrado</span></div>
+                  </div>
+                  <div class="invoice-payment-legend">
+                    <div><span class="legend-dot paid"></span><span>Pagado</span><strong id="history-chart-paid">L 0.00</strong></div>
+                    <div><span class="legend-dot pending"></span><span>Pendiente</span><strong id="history-chart-balance">L 0.00</strong></div>
+                  </div>
+                </div>
+                <div class="invoice-analysis-metrics">
+                  <div><span>Productos</span><strong id="history-product-count">0</strong></div>
+                  <div><span>Unidades</span><strong id="history-unit-count">0</strong></div>
+                </div>
+                <div class="invoice-product-chart-card">
+                  <div class="invoice-chart-heading">
+                    <h5>Participación por producto</h5>
+                    <span>Sobre el subtotal</span>
+                  </div>
+                  <div class="invoice-product-chart" id="history-product-chart"></div>
+                </div>
+              </aside>
+            </div>
+
+            <div class="invoice-detail-actions">
+              <button class="secondary-button" type="button" data-history-close>Cerrar</button>
+              <div>
+                <a class="secondary-button" id="history-detail-download" href="#" download>
+                  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 20h14"/></svg>
+                  Descargar factura
+                </a>
+                <form id="history-delete-form" method="post" onsubmit="return confirm('¿Eliminar esta factura?');">
+                  <input id="history-delete-type" type="hidden" name="tipo" value="" />
+                  <button class="danger-button" type="submit">Eliminar factura</button>
+                </form>
+              </div>
+            </div>
+          </div>
+        </div>
       </main>
     </div>
   </div>
@@ -110,6 +203,126 @@
     const historySearch = document.getElementById("invoice-history-search");
     const historyClear = document.getElementById("clear-invoice-history-search");
     const historyRows = Array.from(document.querySelectorAll(".history-card"));
+    const historyModal = document.getElementById("history-detail-modal");
+    const historyDownload = document.getElementById("history-detail-download");
+    const historyDeleteForm = document.getElementById("history-delete-form");
+    const historyDeleteType = document.getElementById("history-delete-type");
+    const historyPaymentRing = document.getElementById("history-payment-ring");
+    const historyProductChart = document.getElementById("history-product-chart");
+
+    const closeHistoryDetail = () => {
+      if (!historyModal) return;
+      historyModal.classList.remove("open");
+      historyModal.setAttribute("aria-hidden", "true");
+    };
+
+    const renderHistoryChart = (row, productsContainer) => {
+      const total = Number.parseFloat(row.dataset.total || "0") || 0;
+      const paid = Number.parseFloat(row.dataset.paid || "0") || 0;
+      const balance = Number.parseFloat(row.dataset.balance || "0") || 0;
+      const percent = total > 0 ? Math.min(100, Math.max(0, (paid / total) * 100)) : 0;
+      document.getElementById("history-payment-percent").textContent = `${Math.round(percent)}%`;
+      document.getElementById("history-chart-paid").textContent = `L ${paid.toFixed(2)}`;
+      document.getElementById("history-chart-balance").textContent = `L ${balance.toFixed(2)}`;
+      historyPaymentRing.style.setProperty("--payment-progress", `${percent * 3.6}deg`);
+
+      const productRows = Array.from(productsContainer.querySelectorAll(".invoice-detail-product-row"));
+      const units = productRows.reduce(
+        (sum, productRow) => sum + (Number.parseFloat(productRow.dataset.quantity || "0") || 0),
+        0
+      );
+      document.getElementById("history-product-count").textContent = productRows.length;
+      document.getElementById("history-unit-count").textContent = units.toLocaleString("es-HN");
+      historyProductChart.replaceChildren();
+
+      const chartItems = productRows
+        .map((productRow) => ({
+          name: productRow.querySelector("strong")?.textContent?.trim() || "Producto",
+          value: Number.parseFloat(productRow.dataset.lineTotal || "0") || 0,
+        }))
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 6);
+      const chartTotal = chartItems.reduce((sum, item) => sum + item.value, 0);
+      if (!chartItems.length) {
+        const empty = document.createElement("p");
+        empty.className = "invoice-chart-empty";
+        empty.textContent = "No hay datos de productos para analizar.";
+        historyProductChart.appendChild(empty);
+        return;
+      }
+      chartItems.forEach((item) => {
+        const share = chartTotal > 0 ? (item.value / chartTotal) * 100 : 0;
+        const chartRow = document.createElement("div");
+        chartRow.className = "invoice-chart-row";
+        const heading = document.createElement("div");
+        const name = document.createElement("span");
+        const value = document.createElement("strong");
+        name.textContent = item.name;
+        value.textContent = `${share.toFixed(1)}%`;
+        heading.append(name, value);
+        const track = document.createElement("div");
+        track.className = "invoice-chart-track";
+        const bar = document.createElement("span");
+        bar.style.width = `${Math.max(share, 2)}%`;
+        track.appendChild(bar);
+        chartRow.append(heading, track);
+        historyProductChart.appendChild(chartRow);
+      });
+    };
+
+    const openHistoryDetail = (row) => {
+      if (!row || !historyModal) return;
+      document.getElementById("history-detail-number").textContent = row.dataset.invoice || "-";
+      document.getElementById("history-detail-date").textContent = row.dataset.date || "-";
+      document.getElementById("history-detail-client").textContent = row.dataset.client || "-";
+      document.getElementById("history-detail-vendor").textContent = row.dataset.vendor || "-";
+      document.getElementById("history-detail-status").textContent = row.dataset.status || "-";
+      document.getElementById("history-detail-subtotal").textContent = `L ${row.dataset.subtotal || "0.00"}`;
+      document.getElementById("history-detail-discount").textContent = `L ${row.dataset.discount || "0.00"}`;
+      document.getElementById("history-detail-tax").textContent = `L ${row.dataset.tax || "0.00"}`;
+      document.getElementById("history-detail-total").textContent = `L ${row.dataset.total || "0.00"}`;
+      document.getElementById("history-detail-paid").textContent = `L ${row.dataset.paid || "0.00"}`;
+      const productsContainer = document.getElementById("history-detail-products");
+      const itemsTemplate = document.getElementById(`history-items-${row.dataset.id}`);
+      productsContainer.replaceChildren();
+      if (itemsTemplate) productsContainer.appendChild(itemsTemplate.content.cloneNode(true));
+      renderHistoryChart(row, productsContainer);
+      const hasPdf = Boolean(row.dataset.pdf);
+      historyDownload.hidden = !hasPdf;
+      historyDownload.href = hasPdf ? row.dataset.pdf : "#";
+      historyDeleteForm.action = `/facturas/${row.dataset.id}/delete`;
+      historyDeleteType.value = row.dataset.type || "";
+      historyModal.classList.add("open");
+      historyModal.setAttribute("aria-hidden", "false");
+    };
+
+    document.querySelectorAll("[data-history-row]").forEach((row) => {
+      row.addEventListener("click", (event) => {
+        if (event.target.closest("button, a, input, select, textarea")) return;
+        openHistoryDetail(row);
+      });
+      row.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        openHistoryDetail(row);
+      });
+    });
+
+    document.querySelectorAll("[data-history-close]").forEach((button) => {
+      button.addEventListener("click", closeHistoryDetail);
+    });
+
+    if (historyModal) {
+      historyModal.addEventListener("click", (event) => {
+        if (event.target === historyModal) closeHistoryDetail();
+      });
+    }
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && historyModal && historyModal.classList.contains("open")) {
+        closeHistoryDetail();
+      }
+    });
 
     const applyHistoryFilter = () => {
       const query = historySearch ? historySearch.value.trim().toLowerCase() : "";

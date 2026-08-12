@@ -219,6 +219,7 @@ class CobroPersonal(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     numero_cobro = db.Column(db.String(50), unique=True, nullable=False)
+    cliente_id = db.Column(db.Integer, db.ForeignKey("inva-clientes.id"))
     nombre = db.Column(db.String(120), nullable=False)
     concepto = db.Column(db.String(160), nullable=False)
     telefono = db.Column(db.String(30))

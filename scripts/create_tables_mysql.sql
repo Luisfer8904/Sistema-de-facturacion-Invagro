@@ -221,6 +221,7 @@ CREATE TABLE IF NOT EXISTS `inva-abonos_facturas` (
 CREATE TABLE IF NOT EXISTS `inva-cobros_personales` (
     id INT AUTO_INCREMENT PRIMARY KEY,
     numero_cobro VARCHAR(50) UNIQUE NOT NULL,
+    cliente_id INT NULL,
     nombre VARCHAR(120) NOT NULL,
     concepto VARCHAR(160) NOT NULL,
     telefono VARCHAR(30),
@@ -231,8 +232,10 @@ CREATE TABLE IF NOT EXISTS `inva-cobros_personales` (
     observaciones TEXT,
     usuario_id INT,
     estado ENUM('pendiente', 'pagado', 'anulado') DEFAULT 'pendiente',
+    FOREIGN KEY (cliente_id) REFERENCES `inva-clientes`(id) ON DELETE SET NULL,
     FOREIGN KEY (usuario_id) REFERENCES `inva-usuarios`(id) ON DELETE SET NULL,
     INDEX idx_numero_cobro_personal (numero_cobro),
+    INDEX idx_cliente_cobro_personal (cliente_id),
     INDEX idx_estado_cobro_personal (estado),
     INDEX idx_fecha_cobro_personal (fecha)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

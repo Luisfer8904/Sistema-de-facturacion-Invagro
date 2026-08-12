@@ -74,8 +74,24 @@
             </div>
           </div>
           <form class="module-form" method="post" action="/cobros-personales">
+            <label class="span-2">
+              <span>Cliente registrado</span>
+              <select name="cliente_id" id="personal-charge-client">
+                <option value="">Sin cliente registrado / escribir manual</option>
+                {% for cliente in clientes %}
+                  <option
+                    value="{{ cliente.id }}"
+                    data-nombre="{{ cliente.nombre }}"
+                    data-telefono="{{ cliente.telefono or '' }}"
+                    {% if form_values.cliente_id|string == cliente.id|string %}selected{% endif %}
+                  >
+                    {{ cliente.nombre }}{% if cliente.telefono %} - {{ cliente.telefono }}{% endif %}
+                  </option>
+                {% endfor %}
+              </select>
+            </label>
             <label>
-              <span>Nombre</span>
+              <span>Nombre o persona a cobrar</span>
               <input type="text" name="nombre" value="{{ form_values.nombre }}" required />
             </label>
             <label>
@@ -228,6 +244,18 @@
     const linesContainer = document.getElementById("personal-charge-lines");
     const addLineButton = document.getElementById("add-charge-line");
     const totalInput = document.querySelector('input[name="total"]');
+    const clientSelect = document.getElementById("personal-charge-client");
+    const nameInput = document.querySelector('input[name="nombre"]');
+    const phoneInput = document.querySelector('input[name="telefono"]');
+
+    if (clientSelect && nameInput && phoneInput) {
+      clientSelect.addEventListener("change", () => {
+        const selected = clientSelect.options[clientSelect.selectedIndex];
+        if (!selected || !selected.value) return;
+        nameInput.value = selected.dataset.nombre || "";
+        phoneInput.value = selected.dataset.telefono || "";
+      });
+    }
 
     const createLineRow = () => {
       const row = document.createElement("div");

@@ -447,6 +447,7 @@ def create_app():
 
     def build_personal_charges_context(form_values=None, status_code=None, error=None):
         default_form_values = {
+            "cliente_id": "",
             "nombre": "",
             "concepto": "",
             "telefono": "",
@@ -468,6 +469,7 @@ def create_app():
         uid_filtro = current_user_id() if es_vendedor_filtro else None
 
         try:
+            clientes = Cliente.query.order_by(Cliente.nombre.asc()).all()
             pending_q = (
                 db.session.query(CobroPersonal, User)
                 .outerjoin(User, CobroPersonal.usuario_id == User.id)
@@ -515,6 +517,7 @@ def create_app():
             pending_rows = []
             payment_rows = []
             detail_rows = []
+            clientes = []
             cobros_pendientes_count = 0
             saldo_total = 0
             cobros_pagados_count = 0
@@ -582,6 +585,7 @@ def create_app():
             "form_values": default_form_values,
             "personal_charge_message": message,
             "personal_charge_message_error": is_error,
+            "clientes": clientes,
             "pending_charges": pending_charges,
             "payment_history": payment_history,
             "cobros_pendientes_count": cobros_pendientes_count,
@@ -2394,6 +2398,91 @@ def create_app():
                 .scalar()
                 or 0
             )
+            facturas_pendientes_raw = (
+                FacturaContado.query.filter_by(estado="credito")
+                .order_by(FacturaContado.fecha.asc())
+                .all()
+            )
+            clientes_map = {
+                cliente.id: clean_conflict_artifacts(
+                    cliente.nombre, fallback="Cliente sin nombre"
+                )
+                for cliente in Cliente.query.all()
+            }
+            vendedores_map = build_user_name_map(
+                [
+                    factura.usuario_id
+                    for factura in facturas_pendientes_raw
+                    if factura.usuario_id
+                ]
+            )
+            facturas_pendientes_cobro = []
+            for factura in facturas_pendientes_raw:
+                total = factura.total or Decimal("0")
+                abonado = factura.pago or Decimal("0")
+                saldo = total - abonado
+                if saldo <= 0:
+                    continue
+                facturas_pendientes_cobro.append(
+                    {
+                        "id": factura.id,
+                        "numero_factura": clean_conflict_artifacts(
+                            factura.numero_factura, fallback="Sin numero"
+                        ),
+                        "cliente": clientes_map.get(
+                            factura.cliente_id, "Cliente no disponible"
+                        ),
+                        "fecha_label": (
+                            factura.fecha.strftime("%d/%m/%Y") if factura.fecha else "-"
+                        ),
+                        "total": total,
+                        "abonado": abonado,
+                        "saldo": saldo,
+                        "vendedor": clean_conflict_artifacts(
+                            vendedores_map.get(factura.usuario_id, "General"),
+                            fallback="General",
+                        ),
+                    }
+                )
+            cobros_pendientes_raw = (
+                db.session.query(CobroPersonal, User)
+                .outerjoin(User, CobroPersonal.usuario_id == User.id)
+                .filter(CobroPersonal.estado == "pendiente")
+                .order_by(
+                    CobroPersonal.fecha_vencimiento.is_(None),
+                    CobroPersonal.fecha_vencimiento.asc(),
+                    CobroPersonal.fecha.desc(),
+                )
+                .all()
+            )
+            cobros_personales_pendientes_lista = []
+            for cobro, usuario in cobros_pendientes_raw:
+                responsable = (
+                    usuario.nombre_completo
+                    if usuario and usuario.nombre_completo
+                    else (usuario.username if usuario else "N/A")
+                )
+                cobros_personales_pendientes_lista.append(
+                    {
+                        "id": cobro.id,
+                        "numero_cobro": cobro.numero_cobro,
+                        "nombre": cobro.nombre,
+                        "concepto": cobro.concepto,
+                        "fecha_label": (
+                            cobro.fecha.strftime("%d/%m/%Y") if cobro.fecha else "-"
+                        ),
+                        "vencimiento_label": (
+                            cobro.fecha_vencimiento.strftime("%d/%m/%Y")
+                            if cobro.fecha_vencimiento
+                            else "-"
+                        ),
+                        "total": cobro.total or Decimal("0"),
+                        "saldo": cobro.saldo or Decimal("0"),
+                        "responsable": clean_conflict_artifacts(
+                            responsable, fallback="N/A"
+                        ),
+                    }
+                )
             cartera_total_pendiente = (credito_total or 0) + (cobros_personales_saldo or 0)
             credito_share = 0
             cobros_personales_share = 0
@@ -2413,6 +2502,8 @@ def create_app():
             credito_mayor_30 = 0
             cobros_personales_pendientes = 0
             cobros_personales_saldo = 0
+            facturas_pendientes_cobro = []
+            cobros_personales_pendientes_lista = []
             cartera_total_pendiente = 0
             credito_share = 0
             cobros_personales_share = 0
@@ -2429,6 +2520,8 @@ def create_app():
             credito_mayor_30=credito_mayor_30,
             cobros_personales_pendientes=cobros_personales_pendientes,
             cobros_personales_saldo=cobros_personales_saldo,
+            facturas_pendientes_cobro=facturas_pendientes_cobro,
+            cobros_personales_pendientes_lista=cobros_personales_pendientes_lista,
             cartera_total_pendiente=cartera_total_pendiente,
             credito_share=credito_share,
             cobros_personales_share=cobros_personales_share,
@@ -4876,6 +4969,31 @@ def create_app():
         except SQLAlchemyError:
             db.session.rollback()
             facturas_raw = []
+        detalles_por_factura = {}
+        productos_detalle_map = {}
+        if facturas_raw:
+            try:
+                factura_ids = [factura.id for factura in facturas_raw]
+                detalles_raw = (
+                    DetalleFacturaContado.query
+                    .filter(DetalleFacturaContado.factura_id.in_(factura_ids))
+                    .order_by(DetalleFacturaContado.id.asc())
+                    .all()
+                )
+                producto_ids = list(
+                    {detalle.producto_id for detalle in detalles_raw if detalle.producto_id}
+                )
+                if producto_ids:
+                    productos_detalle_map = {
+                        producto.id: producto
+                        for producto in Producto.query.filter(Producto.id.in_(producto_ids)).all()
+                    }
+                for detalle in detalles_raw:
+                    detalles_por_factura.setdefault(detalle.factura_id, []).append(detalle)
+            except SQLAlchemyError:
+                db.session.rollback()
+                detalles_por_factura = {}
+                productos_detalle_map = {}
         vendedores_map = build_user_name_map(
             [factura.usuario_id for factura in facturas_raw if factura.usuario_id]
         )
@@ -4885,6 +5003,19 @@ def create_app():
             fecha_label = factura.fecha.strftime("%d/%m/%Y") if factura.fecha else "-"
             abonado = factura.pago or Decimal("0")
             saldo = (factura.total or Decimal("0")) - abonado
+            items = []
+            for detalle in detalles_por_factura.get(factura.id, []):
+                producto = productos_detalle_map.get(detalle.producto_id)
+                items.append(
+                    {
+                        "codigo": producto.codigo if producto else "-",
+                        "nombre": producto.nombre if producto else "Producto no disponible",
+                        "cantidad": detalle.cantidad or 0,
+                        "precio_unitario": detalle.precio_unitario or Decimal("0"),
+                        "descuento": detalle.descuento or Decimal("0"),
+                        "subtotal": detalle.subtotal or Decimal("0"),
+                    }
+                )
             facturas.append(
                 {
                     "id": factura.id,
@@ -4899,6 +5030,10 @@ def create_app():
                     "pdf_filename": factura.pdf_filename,
                     "vendedor": vendedores_map.get(factura.usuario_id, "General"),
                     "vendedor_id": factura.usuario_id,
+                    "subtotal": factura.subtotal or Decimal("0"),
+                    "descuento": factura.descuento or Decimal("0"),
+                    "isv": factura.isv or Decimal("0"),
+                    "items": items,
                 }
             )
         clientes = Cliente.query.all()
@@ -5146,6 +5281,7 @@ def create_app():
                 )
 
             form_values = {
+                "cliente_id": (request.form.get("cliente_id") or "").strip(),
                 "nombre": (request.form.get("nombre") or "").strip(),
                 "concepto": (request.form.get("concepto") or "").strip(),
                 "telefono": (request.form.get("telefono") or "").strip(),
@@ -5167,6 +5303,34 @@ def create_app():
                         error=str(exc),
                     ),
                 )
+
+            selected_cliente = None
+            cliente_id = None
+            if form_values["cliente_id"]:
+                try:
+                    cliente_id = int(form_values["cliente_id"])
+                except ValueError:
+                    return render_template(
+                        "cobros_personales.html",
+                        user=session["user"],
+                        **build_personal_charges_context(
+                            form_values=form_values,
+                            error="Selecciona un cliente valido.",
+                        ),
+                    )
+                selected_cliente = Cliente.query.get(cliente_id)
+                if not selected_cliente:
+                    return render_template(
+                        "cobros_personales.html",
+                        user=session["user"],
+                        **build_personal_charges_context(
+                            form_values=form_values,
+                            error="No se encontro el cliente seleccionado.",
+                        ),
+                    )
+                form_values["nombre"] = selected_cliente.nombre
+                if selected_cliente.telefono:
+                    form_values["telefono"] = selected_cliente.telefono
 
             if not form_values["nombre"] or not form_values["total"]:
                 return render_template(
@@ -5209,6 +5373,7 @@ def create_app():
                 concepto_resumen = form_values["concepto"] or parsed_items[0]["descripcion"]
                 cobro = CobroPersonal(
                     numero_cobro=generate_personal_charge_number(),
+                    cliente_id=cliente_id,
                     nombre=form_values["nombre"],
                     concepto=concepto_resumen,
                     telefono=form_values["telefono"] or None,
@@ -5475,6 +5640,39 @@ def create_app():
         except SQLAlchemyError:
             db.session.rollback()
             facturas_contado = []
+        detalles_historial_map = {}
+        productos_historial_map = {}
+        if facturas_contado:
+            try:
+                factura_ids = [factura.id for factura in facturas_contado]
+                detalles_historial = (
+                    DetalleFacturaContado.query
+                    .filter(DetalleFacturaContado.factura_id.in_(factura_ids))
+                    .order_by(DetalleFacturaContado.id.asc())
+                    .all()
+                )
+                producto_ids = list(
+                    {
+                        detalle.producto_id
+                        for detalle in detalles_historial
+                        if detalle.producto_id
+                    }
+                )
+                if producto_ids:
+                    productos_historial_map = {
+                        producto.id: producto
+                        for producto in Producto.query.filter(
+                            Producto.id.in_(producto_ids)
+                        ).all()
+                    }
+                for detalle in detalles_historial:
+                    detalles_historial_map.setdefault(
+                        detalle.factura_id, []
+                    ).append(detalle)
+            except SQLAlchemyError:
+                db.session.rollback()
+                detalles_historial_map = {}
+                productos_historial_map = {}
         vendedores_map = build_user_name_map(
             [factura.usuario_id for factura in facturas_contado if factura.usuario_id]
         )
@@ -5486,6 +5684,23 @@ def create_app():
         }
         for factura in facturas_contado:
             fecha_label = factura.fecha.strftime("%d/%m/%Y") if factura.fecha else "-"
+            total = factura.total or Decimal("0")
+            pagado_raw = factura.pago or Decimal("0")
+            abonado = min(total, pagado_raw)
+            saldo = max(Decimal("0"), total - abonado)
+            items = []
+            for detalle in detalles_historial_map.get(factura.id, []):
+                producto = productos_historial_map.get(detalle.producto_id)
+                items.append(
+                    {
+                        "codigo": producto.codigo if producto else "-",
+                        "nombre": producto.nombre if producto else "Producto no disponible",
+                        "cantidad": detalle.cantidad or 0,
+                        "precio_unitario": detalle.precio_unitario or Decimal("0"),
+                        "descuento": detalle.descuento or Decimal("0"),
+                        "subtotal": detalle.subtotal or Decimal("0"),
+                    }
+                )
             if factura.estado == "credito":
                 estado_label = "credito"
             elif factura.estado == "pagada":
@@ -5505,7 +5720,13 @@ def create_app():
                     "cliente": clientes_map.get(factura.cliente_id, "Cliente no disponible"),
                     "fecha": factura.fecha,
                     "fecha_label": fecha_label,
-                    "total": factura.total,
+                    "subtotal": factura.subtotal or Decimal("0"),
+                    "descuento": factura.descuento or Decimal("0"),
+                    "isv": factura.isv or Decimal("0"),
+                    "total": total,
+                    "abonado": abonado,
+                    "saldo": saldo,
+                    "items": items,
                     "estado_label": clean_conflict_artifacts(
                         estado_label.upper(), fallback="SIN ESTADO"
                     ),

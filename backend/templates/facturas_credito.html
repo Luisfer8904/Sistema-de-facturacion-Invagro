@@ -93,43 +93,61 @@
             <span>Total</span>
             <span>Abonado</span>
             <span>Saldo</span>
-            <span>Acciones</span>
           </div>
           {% if facturas %}
             {% for factura in facturas %}
               <div
-                class="table-row table-credit"
+                class="table-row table-credit invoice-clickable-row"
                 data-name="{{ clientes_map.get(factura.cliente_id, 'N/A') }}"
                 data-invoice="{{ factura.numero_factura }}"
                 data-vendedor="{{ factura.vendedor }}"
+                data-invoice-row="{{ factura.id }}"
+                role="button"
+                tabindex="0"
+                aria-label="Ver detalle de la factura {{ factura.numero_factura }}"
               >
                 <span class="cell-nowrap">{{ factura.fecha_label }}</span>
-                <span class="invoice-number">{{ factura.numero_factura }}</span>
+                <span>
+                  <button
+                    class="invoice-detail-link"
+                    type="button"
+                    data-invoice-detail-open
+                    data-id="{{ factura.id }}"
+                    data-invoice="{{ factura.numero_factura }}"
+                    data-client="{{ clientes_map.get(factura.cliente_id, 'N/A') }}"
+                    data-seller="{{ factura.vendedor }}"
+                    data-date="{{ factura.fecha_label }}"
+                    data-subtotal="{{ '%.2f'|format(factura.subtotal or 0) }}"
+                    data-discount="{{ '%.2f'|format(factura.descuento or 0) }}"
+                    data-tax="{{ '%.2f'|format(factura.isv or 0) }}"
+                    data-total="{{ '%.2f'|format(factura.total or 0) }}"
+                    data-paid="{{ '%.2f'|format(factura.abonado or 0) }}"
+                    data-balance="{{ '%.2f'|format(factura.saldo or 0) }}"
+                    data-collector="{{ factura.vendedor_id or '' }}"
+                    data-pdf="{% if factura.pdf_filename %}{{ url_for('static', filename='invoices/' ~ factura.pdf_filename) }}{% endif %}"
+                  >
+                    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M7 3.75h7.5L19 8.25v12H7z"/><path d="M14.5 3.75v4.5H19M10 13h6m-6 3h6"/></svg>
+                    <span class="invoice-number">{{ factura.numero_factura }}</span>
+                  </button>
+                  <template id="invoice-items-{{ factura.id }}">
+                    {% for item in factura["items"] %}
+                      <div class="invoice-detail-product-row" data-line-total="{{ '%.2f'|format(item.subtotal or 0) }}" data-quantity="{{ item.cantidad }}">
+                        <span><small>{{ item.codigo }}</small><strong>{{ item.nombre }}</strong></span>
+                        <span>{{ item.cantidad }}</span>
+                        <span>L {{ "%.2f"|format(item.precio_unitario or 0) }}</span>
+                        <span>L {{ "%.2f"|format(item.descuento or 0) }}</span>
+                        <span>L {{ "%.2f"|format(item.subtotal or 0) }}</span>
+                      </div>
+                    {% else %}
+                      <div class="invoice-detail-empty">No hay productos disponibles para esta factura.</div>
+                    {% endfor %}
+                  </template>
+                </span>
                 <span>{{ clientes_map.get(factura.cliente_id, 'N/A') }}</span>
                 <span class="cell-nowrap">{{ factura.vendedor }}</span>
                 <span class="cell-nowrap">L {{ "%.2f"|format(factura.total or 0) }}</span>
                 <span class="cell-nowrap">L {{ "%.2f"|format(factura.abonado or 0) }}</span>
                 <span class="cell-nowrap">L {{ "%.2f"|format(factura.saldo or 0) }}</span>
-                <div class="table-actions">
-                  {% if factura.pdf_filename %}
-                    <a class="secondary-button credit-pdf-button" href="{{ url_for('static', filename='invoices/' ~ factura.pdf_filename) }}" target="_blank">
-                      Ver PDF
-                    </a>
-                  {% endif %}
-                  <button
-                    class="primary-button credit-payment-button"
-                    type="button"
-                    data-payment-open
-                    data-id="{{ factura.id }}"
-                    data-invoice="{{ factura.numero_factura }}"
-                    data-client="{{ clientes_map.get(factura.cliente_id, 'N/A') }}"
-                    data-date="{{ factura.fecha_label }}"
-                    data-balance="{{ '%.2f'|format(factura.saldo or 0) }}"
-                    data-collector="{{ factura.vendedor_id or '' }}"
-                  >
-                    Registrar pago
-                  </button>
-                </div>
               </div>
             {% endfor %}
           {% else %}
@@ -141,10 +159,88 @@
               <span>-</span>
               <span>-</span>
               <span>-</span>
-              <span>-</span>
             </div>
           {% endif %}
         </section>
+
+        <div class="modal" id="invoice-detail-modal" aria-hidden="true">
+          <div class="modal-card invoice-detail-modal-card" role="dialog" aria-modal="true" aria-labelledby="invoice-detail-title">
+            <div class="modal-header">
+              <div>
+                <span class="modal-eyebrow">Detalle de factura</span>
+                <h3 id="invoice-detail-title">Factura <span id="detail-invoice-number">-</span></h3>
+              </div>
+              <button class="modal-close" type="button" data-invoice-detail-close aria-label="Cerrar">×</button>
+            </div>
+
+            <div class="invoice-detail-meta">
+              <div><span>Fecha</span><strong id="detail-date">-</strong></div>
+              <div><span>Cliente</span><strong id="detail-client">-</strong></div>
+              <div><span>Vendedor</span><strong id="detail-seller">-</strong></div>
+              <div><span>Saldo pendiente</span><strong id="detail-balance">L 0.00</strong></div>
+            </div>
+
+            <div class="invoice-detail-workspace">
+              <div class="invoice-detail-main">
+                <div class="invoice-detail-products">
+                  <div class="invoice-detail-product-head">
+                    <span>Producto</span><span>Cant.</span><span>Precio</span><span>Desc.</span><span>Subtotal</span>
+                  </div>
+                  <div id="detail-products"></div>
+                </div>
+
+                <div class="invoice-detail-totals">
+                  <div><span>Subtotal</span><strong id="detail-subtotal">L 0.00</strong></div>
+                  <div><span>Descuento</span><strong id="detail-discount">L 0.00</strong></div>
+                  <div><span>ISV</span><strong id="detail-tax">L 0.00</strong></div>
+                  <div class="invoice-detail-total"><span>Total</span><strong id="detail-total">L 0.00</strong></div>
+                  <div><span>Abonado</span><strong id="detail-paid">L 0.00</strong></div>
+                </div>
+              </div>
+
+              <aside class="invoice-analysis-panel" aria-label="Analisis de factura">
+                <div class="invoice-analysis-heading">
+                  <span class="modal-eyebrow">Análisis</span>
+                  <h4>Estado de la factura</h4>
+                </div>
+                <div class="invoice-payment-progress-card">
+                  <div class="invoice-payment-ring" id="detail-payment-ring">
+                    <div><strong id="detail-payment-percent">0%</strong><span>pagado</span></div>
+                  </div>
+                  <div class="invoice-payment-legend">
+                    <div><span class="legend-dot paid"></span><span>Abonado</span><strong id="detail-chart-paid">L 0.00</strong></div>
+                    <div><span class="legend-dot pending"></span><span>Pendiente</span><strong id="detail-chart-balance">L 0.00</strong></div>
+                  </div>
+                </div>
+                <div class="invoice-analysis-metrics">
+                  <div><span>Productos</span><strong id="detail-product-count">0</strong></div>
+                  <div><span>Unidades</span><strong id="detail-unit-count">0</strong></div>
+                </div>
+                <div class="invoice-product-chart-card">
+                  <div class="invoice-chart-heading">
+                    <h5>Participación por producto</h5>
+                    <span>Sobre el subtotal</span>
+                  </div>
+                  <div class="invoice-product-chart" id="detail-product-chart"></div>
+                </div>
+              </aside>
+            </div>
+
+            <div class="invoice-detail-actions">
+              <button class="secondary-button" type="button" data-invoice-detail-close>Cerrar</button>
+              <div>
+                <a class="secondary-button invoice-download-button" id="detail-download" href="#" download>
+                  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 20h14"/></svg>
+                  Descargar factura
+                </a>
+                <button class="primary-button" id="detail-payment-button" type="button">
+                  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16v11H4zM4 10h16M8 15h3"/></svg>
+                  Registrar pago
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
 
         <div class="modal" id="credit-payment-modal" aria-hidden="true">
           <div class="modal-card credit-payment-modal-card" role="dialog" aria-modal="true" aria-labelledby="credit-payment-title">
@@ -221,8 +317,14 @@
     const paymentAmount = document.getElementById("payment-amount");
     const paymentAmountHelp = document.getElementById("payment-amount-help");
     const paymentSubmit = document.getElementById("payment-submit");
+    const invoiceDetailModal = document.getElementById("invoice-detail-modal");
+    const detailPaymentButton = document.getElementById("detail-payment-button");
+    const detailDownload = document.getElementById("detail-download");
+    const detailPaymentRing = document.getElementById("detail-payment-ring");
+    const detailProductChart = document.getElementById("detail-product-chart");
     let activeInvoiceId = "";
     let activeBalance = "0.00";
+    let activeInvoiceButton = null;
 
     const updatePaymentForm = () => {
       const isFullPayment = paymentType && paymentType.value === "pago";
@@ -245,22 +347,135 @@
       paymentModal.setAttribute("aria-hidden", "true");
     };
 
-    document.querySelectorAll("[data-payment-open]").forEach((button) => {
-      button.addEventListener("click", () => {
-        if (!paymentModal || !paymentForm) return;
-        activeInvoiceId = button.dataset.id || "";
-        activeBalance = button.dataset.balance || "0.00";
-        document.getElementById("payment-invoice").textContent = button.dataset.invoice || "-";
-        document.getElementById("payment-client").textContent = button.dataset.client || "-";
-        document.getElementById("payment-date").textContent = button.dataset.date || "-";
-        document.getElementById("payment-balance").textContent = `L ${activeBalance}`;
-        paymentType.value = "abono";
-        paymentCollector.value = button.dataset.collector || "";
-        updatePaymentForm();
-        paymentModal.classList.add("open");
-        paymentModal.setAttribute("aria-hidden", "false");
-        window.setTimeout(() => paymentAmount.focus(), 0);
+    const closeInvoiceDetailModal = () => {
+      if (!invoiceDetailModal) return;
+      invoiceDetailModal.classList.remove("open");
+      invoiceDetailModal.setAttribute("aria-hidden", "true");
+    };
+
+    const openPaymentFromButton = (button) => {
+      if (!button || !paymentModal || !paymentForm) return;
+      activeInvoiceId = button.dataset.id || "";
+      activeBalance = button.dataset.balance || "0.00";
+      document.getElementById("payment-invoice").textContent = button.dataset.invoice || "-";
+      document.getElementById("payment-client").textContent = button.dataset.client || "-";
+      document.getElementById("payment-date").textContent = button.dataset.date || "-";
+      document.getElementById("payment-balance").textContent = `L ${activeBalance}`;
+      paymentType.value = "abono";
+      paymentCollector.value = button.dataset.collector || "";
+      updatePaymentForm();
+      closeInvoiceDetailModal();
+      paymentModal.classList.add("open");
+      paymentModal.setAttribute("aria-hidden", "false");
+      window.setTimeout(() => paymentAmount.focus(), 0);
+    };
+
+    const renderInvoiceAnalysis = (button, productsContainer) => {
+      const total = Number.parseFloat(button.dataset.total || "0") || 0;
+      const paid = Number.parseFloat(button.dataset.paid || "0") || 0;
+      const balance = Number.parseFloat(button.dataset.balance || "0") || 0;
+      const paymentPercent = total > 0 ? Math.min(100, Math.max(0, (paid / total) * 100)) : 0;
+      document.getElementById("detail-payment-percent").textContent = `${Math.round(paymentPercent)}%`;
+      document.getElementById("detail-chart-paid").textContent = `L ${paid.toFixed(2)}`;
+      document.getElementById("detail-chart-balance").textContent = `L ${balance.toFixed(2)}`;
+      detailPaymentRing.style.setProperty("--payment-progress", `${paymentPercent * 3.6}deg`);
+
+      const productRows = Array.from(productsContainer.querySelectorAll(".invoice-detail-product-row"));
+      const unitCount = productRows.reduce(
+        (sum, row) => sum + (Number.parseFloat(row.dataset.quantity || "0") || 0),
+        0
+      );
+      document.getElementById("detail-product-count").textContent = productRows.length;
+      document.getElementById("detail-unit-count").textContent = unitCount.toLocaleString("es-HN");
+      detailProductChart.replaceChildren();
+
+      const chartItems = productRows
+        .map((row) => ({
+          name: row.querySelector("strong")?.textContent?.trim() || "Producto",
+          value: Number.parseFloat(row.dataset.lineTotal || "0") || 0,
+        }))
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 6);
+      const chartTotal = chartItems.reduce((sum, item) => sum + item.value, 0);
+      if (!chartItems.length) {
+        const empty = document.createElement("p");
+        empty.className = "invoice-chart-empty";
+        empty.textContent = "No hay datos de productos para analizar.";
+        detailProductChart.appendChild(empty);
+        return;
+      }
+      chartItems.forEach((item) => {
+        const percent = chartTotal > 0 ? (item.value / chartTotal) * 100 : 0;
+        const row = document.createElement("div");
+        row.className = "invoice-chart-row";
+        const header = document.createElement("div");
+        const name = document.createElement("span");
+        const value = document.createElement("strong");
+        name.textContent = item.name;
+        value.textContent = `${percent.toFixed(1)}%`;
+        header.append(name, value);
+        const track = document.createElement("div");
+        track.className = "invoice-chart-track";
+        const bar = document.createElement("span");
+        bar.style.width = `${Math.max(percent, 2)}%`;
+        track.appendChild(bar);
+        row.append(header, track);
+        detailProductChart.appendChild(row);
       });
+    };
+
+    const openInvoiceDetail = (button) => {
+      if (!button || !invoiceDetailModal) return;
+      activeInvoiceButton = button;
+      document.getElementById("detail-invoice-number").textContent = button.dataset.invoice || "-";
+      document.getElementById("detail-date").textContent = button.dataset.date || "-";
+      document.getElementById("detail-client").textContent = button.dataset.client || "-";
+      document.getElementById("detail-seller").textContent = button.dataset.seller || "-";
+      document.getElementById("detail-balance").textContent = `L ${button.dataset.balance || "0.00"}`;
+      document.getElementById("detail-subtotal").textContent = `L ${button.dataset.subtotal || "0.00"}`;
+      document.getElementById("detail-discount").textContent = `L ${button.dataset.discount || "0.00"}`;
+      document.getElementById("detail-tax").textContent = `L ${button.dataset.tax || "0.00"}`;
+      document.getElementById("detail-total").textContent = `L ${button.dataset.total || "0.00"}`;
+      document.getElementById("detail-paid").textContent = `L ${button.dataset.paid || "0.00"}`;
+      const itemsTemplate = document.getElementById(`invoice-items-${button.dataset.id}`);
+      const productsContainer = document.getElementById("detail-products");
+      productsContainer.replaceChildren();
+      if (itemsTemplate) productsContainer.appendChild(itemsTemplate.content.cloneNode(true));
+      renderInvoiceAnalysis(button, productsContainer);
+      const hasPdf = Boolean(button.dataset.pdf);
+      detailDownload.hidden = !hasPdf;
+      detailDownload.href = hasPdf ? button.dataset.pdf : "#";
+      invoiceDetailModal.classList.add("open");
+      invoiceDetailModal.setAttribute("aria-hidden", "false");
+    };
+
+    document.querySelectorAll("[data-invoice-detail-open]").forEach((button) => {
+      button.addEventListener("click", () => openInvoiceDetail(button));
+    });
+
+    document.querySelectorAll("[data-invoice-row]").forEach((row) => {
+      const invoiceButton = row.querySelector("[data-invoice-detail-open]");
+      row.addEventListener("click", (event) => {
+        if (event.target.closest("button, a, input, select, textarea")) return;
+        openInvoiceDetail(invoiceButton);
+      });
+      row.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        openInvoiceDetail(invoiceButton);
+      });
+    });
+
+    document.querySelectorAll("[data-invoice-detail-close]").forEach((button) => {
+      button.addEventListener("click", closeInvoiceDetailModal);
+    });
+
+    if (detailPaymentButton) {
+      detailPaymentButton.addEventListener("click", () => openPaymentFromButton(activeInvoiceButton));
+    }
+
+    document.querySelectorAll("[data-payment-open]").forEach((button) => {
+      button.addEventListener("click", () => openPaymentFromButton(button));
     });
 
     document.querySelectorAll("[data-payment-close]").forEach((button) => {
@@ -273,9 +488,16 @@
         if (event.target === paymentModal) closePaymentModal();
       });
     }
+    if (invoiceDetailModal) {
+      invoiceDetailModal.addEventListener("click", (event) => {
+        if (event.target === invoiceDetailModal) closeInvoiceDetailModal();
+      });
+    }
     document.addEventListener("keydown", (event) => {
       if (event.key === "Escape" && paymentModal && paymentModal.classList.contains("open")) {
         closePaymentModal();
+      } else if (event.key === "Escape" && invoiceDetailModal && invoiceDetailModal.classList.contains("open")) {
+        closeInvoiceDetailModal();
       }
     });
 
