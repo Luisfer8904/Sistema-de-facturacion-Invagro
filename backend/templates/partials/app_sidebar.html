@@ -1,0 +1,48 @@
+{% set current_path = request.path %}
+<aside class="sidebar app-sidebar" aria-label="Navegación principal">
+  <div class="app-sidebar-brand">
+    <img class="app-sidebar-logo" src="/static/assets/logo.jpg" alt="Invagro" />
+    <div>
+      <strong>Invagro</strong>
+      <span>Sistema de facturación</span>
+    </div>
+  </div>
+
+  <nav class="sidebar-nav app-sidebar-nav">
+    {% if current_user_role != "vendedor" %}
+      <a class="sidebar-new-sale{% if current_path == '/facturacion' %} active{% endif %}" href="/facturacion">
+        <span class="app-nav-emoji" aria-hidden="true">💰</span>
+        <span class="nav-text">Nueva venta</span>
+      </a>
+    {% endif %}
+
+    <span class="app-nav-section">Principal</span>
+    <a class="nav-item{% if current_path == '/dashboard' %} active{% endif %}" href="/dashboard"><span class="app-nav-emoji" aria-hidden="true">🏠</span><span class="nav-text">{% if current_user_role == "vendedor" %}Mi panel{% else %}Dashboard{% endif %}</span></a>
+    <a class="nav-item{% if current_path.startswith('/pedidos') %} active{% endif %}" href="/pedidos"><span class="app-nav-emoji" aria-hidden="true">🛒</span><span class="nav-text">Pedidos</span></a>
+
+    {% if current_user_role != "vendedor" %}
+      <a class="nav-item{% if current_path.startswith('/facturas/historial') %} active{% endif %}" href="/facturas/historial"><span class="app-nav-emoji" aria-hidden="true">🧾</span><span class="nav-text">Facturas</span></a>
+      <a class="nav-item{% if current_path.startswith('/facturas/credito') %} active{% endif %}" href="/facturas/credito"><span class="app-nav-emoji" aria-hidden="true">💵</span><span class="nav-text">Por cobrar</span></a>
+      <a class="nav-item{% if current_path.startswith('/pagos') %} active{% endif %}" href="/pagos"><span class="app-nav-emoji" aria-hidden="true">🏦</span><span class="nav-text">Pagos</span></a>
+      <a class="nav-item{% if current_path.startswith('/comisiones') %} active{% endif %}" href="/comisiones"><span class="app-nav-emoji" aria-hidden="true">📈</span><span class="nav-text">Comisiones</span></a>
+    {% endif %}
+
+    <a class="nav-item{% if current_path.startswith('/cobros-personales') %} active{% endif %}" href="/cobros-personales"><span class="app-nav-emoji" aria-hidden="true">💲</span><span class="nav-text">Cobros personales</span></a>
+    <a class="nav-item{% if current_path.startswith('/clientes') %} active{% endif %}" href="/clientes"><span class="app-nav-emoji" aria-hidden="true">👥</span><span class="nav-text">Clientes</span></a>
+    <a class="nav-item{% if current_path.startswith('/productos') %} active{% endif %}" href="/productos"><span class="app-nav-emoji" aria-hidden="true">📦</span><span class="nav-text">Productos</span></a>
+
+    {% if current_user_role != "vendedor" %}
+      <span class="app-nav-section">Análisis</span>
+      <a class="nav-item{% if current_path.startswith('/reportes') %} active{% endif %}" href="/reportes"><span class="app-nav-emoji" aria-hidden="true">📊</span><span class="nav-text">Reportes</span></a>
+      <span class="app-nav-section">Configuración</span>
+      {% if current_user_role == "admin" %}
+        <a class="nav-item{% if current_path.startswith('/usuarios') %} active{% endif %}" href="/usuarios"><span class="app-nav-emoji" aria-hidden="true">🧑‍💼</span><span class="nav-text">Usuarios</span></a>
+      {% endif %}
+      <a class="nav-item{% if current_path.startswith('/ajustes') %} active{% endif %}" href="/ajustes"><span class="app-nav-emoji" aria-hidden="true">⚙️</span><span class="nav-text">Configuración</span></a>
+    {% endif %}
+  </nav>
+
+  <div class="app-sidebar-footer">
+    <a class="nav-item" href="/logout"><span class="app-nav-emoji" aria-hidden="true">↪️</span><span class="nav-text">Cerrar sesión</span></a>
+  </div>
+</aside>

@@ -85,7 +85,7 @@
     btn.addEventListener("click", toggle);
     backdrop.addEventListener("click", close);
 
-    // Cerrar al tocar cualquier enlace de navegación dentro del sidebar
+    // En escritorio el menú permanece fijo; en móvil se cierra tras navegar.
     var navLinks = sidebar.querySelectorAll(".nav-item, a[href]");
     for (var i = 0; i < navLinks.length; i++) {
       navLinks[i].addEventListener("click", function () {
