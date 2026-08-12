@@ -1535,6 +1535,152 @@ body {
   }
 }
 
+/* Facturación · selector superior de facturas guardadas */
+.saved-sales-dropdown {
+  position: relative;
+}
+
+.saved-sales-toggle {
+  min-height: 44px;
+  padding: 9px 13px;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  color: #5145cd;
+  background: #eef0ff;
+  border: 1px solid #d9dcff;
+  border-radius: 11px;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.saved-sales-toggle strong {
+  min-width: 24px;
+  height: 24px;
+  padding: 0 7px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #5145cd;
+  background: #ffffff;
+  border-radius: 999px;
+  font-size: 0.78rem;
+}
+
+.saved-sales-chevron {
+  color: #8690aa;
+  transition: transform 0.18s ease;
+}
+
+.saved-sales-toggle[aria-expanded="true"] .saved-sales-chevron {
+  transform: rotate(180deg);
+}
+
+.saved-sales-panel {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  width: min(390px, calc(100vw - 32px));
+  overflow: hidden;
+  color: #172033;
+  background: #ffffff;
+  border: 1px solid #e3e7ee;
+  border-radius: 14px;
+  box-shadow: 0 18px 44px rgba(26, 35, 52, 0.2);
+  z-index: 120;
+}
+
+.saved-sales-panel[hidden] {
+  display: none;
+}
+
+.saved-sales-heading {
+  padding: 16px 18px 13px;
+  display: grid;
+  gap: 3px;
+  border-bottom: 1px solid #edf0f4;
+}
+
+.saved-sales-heading span {
+  color: #718098;
+  font-size: 0.82rem;
+}
+
+.saved-sales-list {
+  max-height: 330px;
+  overflow-y: auto;
+  padding: 7px;
+}
+
+.saved-sale-option {
+  width: 100%;
+  padding: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  color: #27334a;
+  background: transparent;
+  border: 0;
+  border-radius: 10px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.saved-sale-option:hover,
+.saved-sale-option:focus-visible {
+  background: #f1f4ff;
+  outline: none;
+}
+
+.saved-sale-option > span:first-child {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.saved-sale-option small {
+  overflow: hidden;
+  color: #7b879c;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.saved-sale-total {
+  flex: 0 0 auto;
+  color: #138b4b;
+  font-weight: 800;
+}
+
+.saved-sales-empty {
+  padding: 28px 16px;
+  color: #8390a5;
+  text-align: center;
+}
+
+.saved-sales-footer {
+  padding: 12px 18px;
+  display: block;
+  color: #5145cd;
+  background: #fafbff;
+  border-top: 1px solid #edf0f4;
+  font-size: 0.84rem;
+  font-weight: 800;
+  text-align: center;
+  text-decoration: none;
+}
+
+@media (max-width: 700px) {
+  .saved-sales-toggle > span:first-child {
+    display: none;
+  }
+
+  .saved-sales-panel {
+    right: -92px;
+  }
+}
+
 @media (max-width: 720px) {
   .aves-complete-editor {
     grid-template-columns: 1fr;

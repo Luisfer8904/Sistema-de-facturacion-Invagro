@@ -38,7 +38,35 @@
           <h2>Facturacion</h2>
         </div>
         <div class="topbar-right">
-          <a class="secondary-button" href="/pedidos">Facturas guardadas</a>
+          <div class="saved-sales-dropdown" id="saved-sales-dropdown">
+            <button class="saved-sales-toggle" id="saved-sales-toggle" type="button" aria-expanded="false" aria-controls="saved-sales-panel">
+              <span>Facturas guardadas</span>
+              <strong>{{ pedidos_listos|length }}</strong>
+              <span class="saved-sales-chevron" aria-hidden="true">⌄</span>
+            </button>
+            <div class="saved-sales-panel" id="saved-sales-panel" hidden>
+              <div class="saved-sales-heading">
+                <strong>Facturas guardadas</strong>
+                <span>Selecciona una para cargarla en la venta.</span>
+              </div>
+              <div class="saved-sales-list">
+                {% if pedidos_listos %}
+                  {% for pedido in pedidos_listos %}
+                    <button class="saved-sale-option" type="button" data-saved-sale-id="{{ pedido.id }}">
+                      <span>
+                        <strong>{{ pedido.numero_pedido }}</strong>
+                        <small>{{ clientes_map.get(pedido.cliente_id, 'Consumidor final') }}</small>
+                      </span>
+                      <span class="saved-sale-total">L {{ "%.2f"|format(pedido.total or 0) }}</span>
+                    </button>
+                  {% endfor %}
+                {% else %}
+                  <div class="saved-sales-empty">No hay facturas guardadas.</div>
+                {% endif %}
+              </div>
+              <a class="saved-sales-footer" href="/pedidos">Administrar facturas guardadas</a>
+            </div>
+          </div>
           <span class="user-pill">Sesion: {{ user }}</span>
         </div>
       </div>
@@ -135,26 +163,6 @@
               <label>RTN</label>
               <input type="text" id="cliente-rtn" placeholder="RTN" />
             </div>
-          </div>
-
-          <div class="pos-pedidos">
-            <div>
-              <label>Facturas guardadas</label>
-              <select id="pedido-select">
-                <option value="">Selecciona una factura guardada</option>
-                {% for pedido in pedidos_listos %}
-                  <option
-                    value="{{ pedido.id }}"
-                    data-cliente="{{ pedido.cliente_id or '' }}"
-                    data-rtn="{{ pedido.rtn or '' }}"
-                    data-numero="{{ pedido.numero_pedido }}"
-                  >
-                    {{ pedido.numero_pedido }} - {{ clientes_map.get(pedido.cliente_id, 'N/A') }}
-                  </option>
-                {% endfor %}
-              </select>
-            </div>
-            <button class="secondary-button" type="button" id="load-order">Abrir guardada</button>
           </div>
 
           <div class="pos-table" id="invoice-table">
@@ -301,8 +309,10 @@
     const clientOptionsContainer = document.getElementById("cliente-options");
     const clientSearch = document.getElementById("cliente-search");
     const clientRtnInput = document.getElementById("cliente-rtn");
-    const pedidoSelect = document.getElementById("pedido-select");
-    const loadOrderButton = document.getElementById("load-order");
+    const savedSalesDropdown = document.getElementById("saved-sales-dropdown");
+    const savedSalesToggle = document.getElementById("saved-sales-toggle");
+    const savedSalesPanel = document.getElementById("saved-sales-panel");
+    const savedSaleOptions = document.querySelectorAll("[data-saved-sale-id]");
     const saveOrderButton = document.getElementById("save-order");
     const emitButton = document.getElementById("emit-invoice");
     const invoiceModal = document.getElementById("invoice-modal");
@@ -484,9 +494,6 @@
       if (currentPedidoId) {
         currentPedidoId = null;
       }
-      if (pedidoSelect && !isLoadingPedido) {
-        pedidoSelect.value = "";
-      }
     };
 
     const clearInvoiceRows = () => {
@@ -607,9 +614,6 @@
       });
       isLoadingPedido = false;
       currentPedidoId = pedidoData.pedido_id;
-      if (pedidoSelect) {
-        pedidoSelect.value = String(pedidoData.pedido_id || "");
-      }
       if (clientSelect) {
         const option = clientSelect.querySelector(
           `option[value="${pedidoData.cliente_id || ""}"]`
@@ -627,26 +631,48 @@
       updateTotals();
     };
 
-    if (loadOrderButton && pedidoSelect) {
-      loadOrderButton.addEventListener("click", async () => {
-        const pedidoId = pedidoSelect.value;
-        if (!pedidoId) {
-          alert("Selecciona una factura guardada.");
+    const closeSavedSales = () => {
+      if (!savedSalesPanel || !savedSalesToggle) return;
+      savedSalesPanel.hidden = true;
+      savedSalesToggle.setAttribute("aria-expanded", "false");
+    };
+
+    const loadSavedSale = async (pedidoId) => {
+      if (!pedidoId) return;
+      try {
+        const response = await fetch(`/pedidos/${pedidoId}/data`);
+        const result = await response.json();
+        if (!response.ok) {
+          alert(result.error || "No se pudo abrir la factura guardada.");
           return;
         }
-        try {
-          const response = await fetch(`/pedidos/${pedidoId}/data`);
-          const result = await response.json();
-          if (!response.ok) {
-            alert(result.error || "No se pudo abrir la factura guardada.");
-            return;
-          }
-          applyPedidoData(result);
-        } catch (error) {
-          alert("No se pudo abrir la factura guardada.");
+        applyPedidoData(result);
+        closeSavedSales();
+      } catch (error) {
+        alert("No se pudo abrir la factura guardada.");
+      }
+    };
+
+    if (savedSalesToggle && savedSalesPanel) {
+      savedSalesToggle.addEventListener("click", (event) => {
+        event.stopPropagation();
+        const willOpen = savedSalesPanel.hidden;
+        savedSalesPanel.hidden = !willOpen;
+        savedSalesToggle.setAttribute("aria-expanded", String(willOpen));
+      });
+      document.addEventListener("click", (event) => {
+        if (savedSalesDropdown && !savedSalesDropdown.contains(event.target)) {
+          closeSavedSales();
         }
       });
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") closeSavedSales();
+      });
     }
+
+    savedSaleOptions.forEach((option) => {
+      option.addEventListener("click", () => loadSavedSale(option.dataset.savedSaleId));
+    });
 
     const getInvoiceType = () => {
       const selected = document.querySelector('input[name="tipo"]:checked');
@@ -920,18 +946,7 @@
     const urlParams = new URLSearchParams(window.location.search);
     const initialPedidoId = urlParams.get("pedido_id");
     if (initialPedidoId) {
-      fetch(`/pedidos/${initialPedidoId}/data`)
-        .then((response) => response.json().then((data) => ({ ok: response.ok, data })))
-        .then(({ ok, data }) => {
-          if (!ok) {
-            alert(data.error || "No se pudo abrir la factura guardada.");
-            return;
-          }
-          applyPedidoData(data);
-        })
-        .catch(() => {
-          alert("No se pudo abrir la factura guardada.");
-        });
+      loadSavedSale(initialPedidoId);
     }
   </script>
 {% endblock %}

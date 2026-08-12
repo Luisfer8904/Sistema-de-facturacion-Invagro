@@ -3824,11 +3824,10 @@ def create_app():
             Categoria.nombre.asc()
         ).all()
         productos_list = Producto.query.filter_by(activo=True).order_by(Producto.nombre.asc()).all()
-        pedidos_listos = (
-            Pedido.query.filter_by(estado="listo")
-            .order_by(Pedido.fecha.desc())
-            .all()
-        )
+        pedidos_query = Pedido.query.filter(Pedido.estado.in_(("pendiente", "listo")))
+        if current_user_is_vendedor():
+            pedidos_query = pedidos_query.filter(Pedido.usuario_id == current_user_id())
+        pedidos_listos = pedidos_query.order_by(Pedido.fecha.desc()).all()
         return render_template(
             "facturacion.html",
             user=session["user"],
@@ -3986,6 +3985,8 @@ def create_app():
             return jsonify({"error": "No autorizado."}), 401
 
         pedido = Pedido.query.get_or_404(pedido_id)
+        if not _pedido_pertenece_al_usuario(pedido):
+            abort(403)
         detalles = (
             DetallePedido.query.filter_by(pedido_id=pedido.id)
             .order_by(DetallePedido.id.asc())
