@@ -42,6 +42,15 @@
       </div>
 
       <main class="content-area">
+        <section class="module-header">
+          <div>
+            <h1>Configuración</h1>
+            <p>Administra los datos del negocio y el acceso al sistema.</p>
+          </div>
+          {% if is_admin %}
+            <a class="secondary-button" href="/usuarios">Administrar usuarios</a>
+          {% endif %}
+        </section>
         <section class="form-card">
           <h3>Informacion del negocio</h3>
           <form class="module-form" method="post">
