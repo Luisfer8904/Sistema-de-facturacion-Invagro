@@ -23,7 +23,7 @@
     {% endif %}
 
     {% if current_user_role != "vendedor" %}
-      <a class="nav-item{% if current_path.startswith('/facturas/historial') %} active{% endif %}" href="/facturas/historial"><span class="app-nav-emoji" aria-hidden="true">🧾</span><span class="nav-text">Facturas</span></a>
+      <a class="nav-item{% if current_path.startswith('/facturas/historial') or (current_path.startswith('/facturas/') and current_path.endswith('/detalle')) %} active{% endif %}" href="/facturas/historial"><span class="app-nav-emoji" aria-hidden="true">🧾</span><span class="nav-text">Facturas</span></a>
       <a class="nav-item{% if current_path.startswith('/facturas/credito') %} active{% endif %}" href="/facturas/credito"><span class="app-nav-emoji" aria-hidden="true">💵</span><span class="nav-text">Por cobrar</span></a>
       <a class="nav-item{% if current_path.startswith('/pagos') %} active{% endif %}" href="/pagos"><span class="app-nav-emoji" aria-hidden="true">🏦</span><span class="nav-text">Pagos</span></a>
     {% endif %}

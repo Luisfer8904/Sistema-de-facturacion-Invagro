@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% block title %}Factura {{ factura.numero_factura }} | Invagro{% endblock %}
+{% block body_class %}page dashboard-page{% endblock %}
+{% block content %}
+  <div class="dashboard-container">
+    <div class="main-content">
+      <div class="topbar">
+        <div class="topbar-left invoice-detail-topbar-title">
+          <a class="invoice-back-link" href="{{ url_for('facturas_historial') }}" aria-label="Volver al historial">←</a>
+          <div><span>Detalle de factura</span><h2>{{ factura.numero_factura }}</h2></div>
+        </div>
+        <div class="topbar-right">
+          {% if factura.pdf_filename %}
+            <a class="secondary-button" href="{{ url_for('static', filename='invoices/' ~ factura.pdf_filename) }}" target="_blank">Ver PDF</a>
+          {% endif %}
+          <span class="user-pill">Sesión: {{ user }}</span>
+        </div>
+      </div>
+
+      <main class="content-area invoice-detail-page">
+        <section class="invoice-detail-hero">
+          <div>
+            <span class="invoice-detail-eyebrow">RECIBO · {{ factura.fecha.strftime('%d %b %Y') if factura.fecha else 'SIN FECHA' }}</span>
+            <h1>{{ factura.numero_factura }}</h1>
+            <p>{{ cliente.nombre if cliente else 'Cliente no disponible' }} · Atendido por {{ vendedor }}</p>
+          </div>
+          <span class="invoice-status invoice-status-{{ estado|lower }}">{{ estado }}</span>
+        </section>
+
+        <section class="invoice-kpi-grid" aria-label="Resumen de la factura">
+          <article><span>Total facturado</span><strong>L {{ "%.2f"|format(total) }}</strong><small>{{ items|length }} productos · {{ unidades }} unidades</small></article>
+          <article><span>Total pagado</span><strong>L {{ "%.2f"|format(pagado) }}</strong><small>{{ "%.0f"|format(porcentaje_pagado) }}% del total</small></article>
+          <article><span>Saldo pendiente</span><strong>L {{ "%.2f"|format(saldo) }}</strong><small>{{ abonos|length }} pagos registrados</small></article>
+          <article><span>Tipo de venta</span><strong>{{ 'Crédito' if factura.estado == 'credito' else 'Contado' }}</strong><small>Fecha: {{ factura.fecha.strftime('%d/%m/%Y') if factura.fecha else '-' }}</small></article>
+        </section>
+
+        <div class="invoice-analysis-grid">
+          <section class="invoice-panel invoice-receipt-data">
+            <header><div><span class="invoice-detail-eyebrow">DATOS DEL RECIBO</span><h2>Información de la venta</h2></div></header>
+            <div class="invoice-info-grid">
+              <div><span>Cliente</span><strong>{{ cliente.nombre if cliente else 'No disponible' }}</strong></div>
+              <div><span>RTN</span><strong>{{ cliente.ruc_dni if cliente and cliente.ruc_dni else (factura.rtn or 'No registrado') }}</strong></div>
+              <div><span>Teléfono</span><strong>{{ cliente.telefono if cliente and cliente.telefono else 'No registrado' }}</strong></div>
+              <div><span>Correo</span><strong>{{ cliente.email if cliente and cliente.email else 'No registrado' }}</strong></div>
+              <div class="invoice-info-wide"><span>Dirección</span><strong>{{ cliente.direccion if cliente and cliente.direccion else 'No registrada' }}</strong></div>
+              <div><span>Vendedor</span><strong>{{ vendedor }}</strong></div>
+            </div>
+            <div class="invoice-total-breakdown">
+              <div><span>Subtotal</span><strong>L {{ "%.2f"|format(factura.subtotal or 0) }}</strong></div>
+              <div><span>Descuento</span><strong>L {{ "%.2f"|format(factura.descuento or 0) }}</strong></div>
+              <div><span>ISV</span><strong>L {{ "%.2f"|format(factura.isv or 0) }}</strong></div>
+              <div class="invoice-total-line"><span>Total</span><strong>L {{ "%.2f"|format(total) }}</strong></div>
+            </div>
+          </section>
+
+          <section class="invoice-panel invoice-payment-analysis">
+            <header><div><span class="invoice-detail-eyebrow">ANÁLISIS</span><h2>Estado del cobro</h2></div></header>
+            <div class="invoice-payment-chart">
+              <div class="invoice-payment-donut" style="--invoice-paid-angle: {{ porcentaje_pagado * 3.6 }}deg"><div><strong>{{ "%.0f"|format(porcentaje_pagado) }}%</strong><span>cobrado</span></div></div>
+              <div class="invoice-payment-chart-legend">
+                <div><i class="paid"></i><span>Pagado</span><strong>L {{ "%.2f"|format(pagado) }}</strong></div>
+                <div><i class="pending"></i><span>Pendiente</span><strong>L {{ "%.2f"|format(saldo) }}</strong></div>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <div class="invoice-analysis-grid invoice-analysis-grid-products">
+          <section class="invoice-panel invoice-products-panel">
+            <header><div><span class="invoice-detail-eyebrow">DETALLE</span><h2>Productos facturados</h2></div></header>
+            <div class="invoice-products-table">
+              <div class="invoice-products-head"><span>Producto</span><span>Cant.</span><span>Precio</span><span>Desc.</span><span>Total</span></div>
+              {% for item in items %}
+                <div class="invoice-products-row">
+                  <span><small>{{ item.codigo }}</small><strong>{{ item.nombre }}</strong></span>
+                  <span>{{ item.cantidad }}</span><span>L {{ "%.2f"|format(item.precio_unitario) }}</span>
+                  <span>L {{ "%.2f"|format(item.descuento) }}</span><strong>L {{ "%.2f"|format(item.subtotal) }}</strong>
+                </div>
+              {% else %}<div class="invoice-history-empty">No hay productos asociados.</div>{% endfor %}
+            </div>
+          </section>
+
+          <section class="invoice-panel invoice-product-analysis">
+            <header><div><span class="invoice-detail-eyebrow">DISTRIBUCIÓN</span><h2>Participación por producto</h2></div></header>
+            <div class="invoice-product-bars">
+              {% for item in items_analisis %}
+                <div class="invoice-product-bar">
+                  <div><span>{{ item.nombre }}</span><strong>{{ "%.1f"|format(item.participacion) }}%</strong></div>
+                  <div class="invoice-product-track"><i style="width: {{ item.participacion }}%"></i></div>
+                  <small>L {{ "%.2f"|format(item.subtotal) }}</small>
+                </div>
+              {% else %}<p>No hay datos para analizar.</p>{% endfor %}
+            </div>
+          </section>
+        </div>
+
+        <section class="invoice-panel invoice-payments-panel">
+          <header><div><span class="invoice-detail-eyebrow">RECIBOS</span><h2>Historial de pagos</h2></div><strong>{{ abonos|length }} registros</strong></header>
+          <div class="invoice-payments-list">
+            {% for abono in abonos %}
+              <div class="invoice-payment-row">
+                <span><strong>{{ abono.fecha.strftime('%d/%m/%Y') if abono.fecha else '-' }}</strong><small>{{ abono.fecha.strftime('%I:%M %p') if abono.fecha else '' }}</small></span>
+                <span><small>Registrado por</small><strong>{{ abono.usuario }}</strong></span>
+                <strong>L {{ "%.2f"|format(abono.monto) }}</strong>
+                {% if abono.recibo_url %}<a class="secondary-button" href="{{ abono.recibo_url }}" target="_blank">Ver recibo</a>{% else %}<span class="invoice-receipt-missing">Sin PDF</span>{% endif %}
+              </div>
+            {% else %}<div class="invoice-history-empty">Esta factura no tiene abonos registrados.</div>{% endfor %}
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+{% endblock %}

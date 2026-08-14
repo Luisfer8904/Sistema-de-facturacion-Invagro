@@ -5747,6 +5747,116 @@ def create_app():
             facturas=facturas,
         )
 
+    @app.get("/facturas/<int:factura_id>/detalle")
+    @admin_required
+    def factura_detalle(factura_id):
+        factura = FacturaContado.query.get_or_404(factura_id)
+        cliente = Cliente.query.get(factura.cliente_id) if factura.cliente_id else None
+        vendedor = User.query.get(factura.usuario_id) if factura.usuario_id else None
+        detalles = (
+            DetalleFacturaContado.query
+            .filter_by(factura_id=factura.id)
+            .order_by(DetalleFacturaContado.id.asc())
+            .all()
+        )
+        producto_ids = [detalle.producto_id for detalle in detalles if detalle.producto_id]
+        productos = {
+            producto.id: producto
+            for producto in Producto.query.filter(Producto.id.in_(producto_ids)).all()
+        } if producto_ids else {}
+
+        items = []
+        unidades = 0
+        total_productos = Decimal("0")
+        for detalle in detalles:
+            producto = productos.get(detalle.producto_id)
+            subtotal_linea = detalle.subtotal or Decimal("0")
+            cantidad = detalle.cantidad or 0
+            unidades += cantidad
+            total_productos += subtotal_linea
+            items.append(
+                {
+                    "codigo": producto.codigo if producto else "-",
+                    "nombre": producto.nombre if producto else "Producto no disponible",
+                    "cantidad": cantidad,
+                    "precio_unitario": detalle.precio_unitario or Decimal("0"),
+                    "descuento": detalle.descuento or Decimal("0"),
+                    "subtotal": subtotal_linea,
+                    "participacion": 0,
+                }
+            )
+        for item in items:
+            item["participacion"] = (
+                float(item["subtotal"] / total_productos * 100)
+                if total_productos > 0 else 0
+            )
+        items_analisis = sorted(
+            items, key=lambda item: item["subtotal"], reverse=True
+        )[:6]
+
+        total = factura.total or Decimal("0")
+        pagado = min(total, factura.pago or Decimal("0"))
+        saldo = max(Decimal("0"), total - pagado)
+        porcentaje_pagado = float(pagado / total * 100) if total > 0 else 0
+        estado = clean_conflict_artifacts(
+            (factura.estado or "contado").upper(), fallback="SIN ESTADO"
+        )
+
+        abonos_db = (
+            AbonoFactura.query
+            .filter_by(factura_id=factura.id)
+            .order_by(AbonoFactura.fecha.asc(), AbonoFactura.id.asc())
+            .all()
+        )
+        usuarios_abono = build_user_name_map(
+            [abono.usuario_id for abono in abonos_db if abono.usuario_id]
+        )
+        receipts_folder = app.config.get("RECEIPT_PDF_FOLDER")
+        abonos = []
+        for abono in abonos_db:
+            recibo_filename = build_receipt_pdf_filename(
+                factura.numero_factura, abono.id
+            )
+            recibo_disponible = bool(
+                receipts_folder
+                and os.path.isfile(os.path.join(receipts_folder, recibo_filename))
+            )
+            abonos.append(
+                {
+                    "id": abono.id,
+                    "fecha": abono.fecha,
+                    "monto": abono.monto or Decimal("0"),
+                    "usuario": clean_conflict_artifacts(
+                        usuarios_abono.get(abono.usuario_id, "General"),
+                        fallback="General",
+                    ),
+                    "recibo_url": url_for(
+                        "receipt_file", filename=recibo_filename
+                    ) if recibo_disponible else None,
+                }
+            )
+
+        vendedor_nombre = clean_conflict_artifacts(
+            (vendedor.nombre_completo or vendedor.username) if vendedor else "General",
+            fallback="General",
+        )
+        return render_template(
+            "factura_detalle.html",
+            user=session["user"],
+            factura=factura,
+            cliente=cliente,
+            vendedor=vendedor_nombre,
+            items=items,
+            items_analisis=items_analisis,
+            unidades=unidades,
+            total=total,
+            pagado=pagado,
+            saldo=saldo,
+            porcentaje_pagado=porcentaje_pagado,
+            estado=estado,
+            abonos=abonos,
+        )
+
     @app.route("/facturas/<path:factura_ref>/delete", methods=["POST", "GET"])
     def eliminar_factura(factura_ref):
         if not session.get("user"):
