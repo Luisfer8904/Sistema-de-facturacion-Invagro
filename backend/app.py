@@ -5798,9 +5798,7 @@ def create_app():
         pagado = min(total, factura.pago or Decimal("0"))
         saldo = max(Decimal("0"), total - pagado)
         porcentaje_pagado = float(pagado / total * 100) if total > 0 else 0
-        estado = clean_conflict_artifacts(
-            (factura.estado or "contado").upper(), fallback="SIN ESTADO"
-        )
+        estado = (factura.estado or "contado").upper()
 
         abonos_db = (
             AbonoFactura.query
@@ -5826,20 +5824,16 @@ def create_app():
                     "id": abono.id,
                     "fecha": abono.fecha,
                     "monto": abono.monto or Decimal("0"),
-                    "usuario": clean_conflict_artifacts(
-                        usuarios_abono.get(abono.usuario_id, "General"),
-                        fallback="General",
-                    ),
+                    "usuario": usuarios_abono.get(abono.usuario_id, "General") or "General",
                     "recibo_url": url_for(
                         "receipt_file", filename=recibo_filename
                     ) if recibo_disponible else None,
                 }
             )
 
-        vendedor_nombre = clean_conflict_artifacts(
-            (vendedor.nombre_completo or vendedor.username) if vendedor else "General",
-            fallback="General",
-        )
+        vendedor_nombre = (
+            (vendedor.nombre_completo or vendedor.username) if vendedor else "General"
+        ) or "General"
         return render_template(
             "factura_detalle.html",
             user=session["user"],
