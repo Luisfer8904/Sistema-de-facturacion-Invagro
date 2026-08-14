@@ -508,6 +508,15 @@ def create_app():
             if es_vendedor_filtro:
                 pagados_q = pagados_q.filter(CobroPersonal.usuario_id == uid_filtro)
             cobros_pagados_count = pagados_q.count()
+            charges_q = (
+                db.session.query(CobroPersonal, User)
+                .outerjoin(User, CobroPersonal.usuario_id == User.id)
+            )
+            if es_vendedor_filtro:
+                charges_q = charges_q.filter(CobroPersonal.usuario_id == uid_filtro)
+            charge_rows = charges_q.order_by(
+                CobroPersonal.fecha.desc(), CobroPersonal.id.desc()
+            ).all()
             detail_rows = CobroPersonalDetalle.query.order_by(
                 CobroPersonalDetalle.id.asc()
             ).all()
@@ -520,6 +529,7 @@ def create_app():
             cobros_pendientes_count = 0
             saldo_total = 0
             cobros_pagados_count = 0
+            charge_rows = []
             if not error:
                 message = "No se pudieron cargar los cobros personales."
                 is_error = True
@@ -580,12 +590,39 @@ def create_app():
                 }
             )
 
+        charges = []
+        for cobro, usuario in charge_rows:
+            responsable = (
+                usuario.nombre_completo
+                if usuario and usuario.nombre_completo
+                else (usuario.username if usuario else "General")
+            )
+            charges.append(
+                {
+                    "id": cobro.id,
+                    "numero_cobro": cobro.numero_cobro,
+                    "nombre": cobro.nombre,
+                    "concepto": cobro.concepto,
+                    "fecha": cobro.fecha,
+                    "fecha_label": cobro.fecha.strftime("%d/%m/%Y") if cobro.fecha else "-",
+                    "vencimiento_label": (
+                        cobro.fecha_vencimiento.strftime("%d/%m/%Y")
+                        if cobro.fecha_vencimiento else "-"
+                    ),
+                    "total": cobro.total or Decimal("0"),
+                    "saldo": cobro.saldo or Decimal("0"),
+                    "estado": (cobro.estado or "pendiente").upper(),
+                    "responsable": responsable or "General",
+                }
+            )
+
         return {
             "form_values": default_form_values,
             "personal_charge_message": message,
             "personal_charge_message_error": is_error,
             "clientes": clientes,
             "pending_charges": pending_charges,
+            "charges": charges,
             "payment_history": payment_history,
             "cobros_pendientes_count": cobros_pendientes_count,
             "cobros_pagados_count": cobros_pagados_count,
@@ -2524,6 +2561,79 @@ def create_app():
             cartera_total_pendiente=cartera_total_pendiente,
             credito_share=credito_share,
             cobros_personales_share=cobros_personales_share,
+        )
+
+    @app.get("/cobros-personales/<int:cobro_id>/detalle")
+    def cobro_personal_detalle(cobro_id):
+        if not session.get("user"):
+            return redirect(url_for("login"))
+        cobro = CobroPersonal.query.get_or_404(cobro_id)
+        if current_user_is_vendedor() and cobro.usuario_id != current_user_id():
+            abort(403)
+        cliente = Cliente.query.get(cobro.cliente_id) if cobro.cliente_id else None
+        responsable = User.query.get(cobro.usuario_id) if cobro.usuario_id else None
+        detalles = (
+            CobroPersonalDetalle.query.filter_by(cobro_id=cobro.id)
+            .order_by(CobroPersonalDetalle.id.asc()).all()
+        )
+        total_detalles = sum(
+            (detalle.subtotal or Decimal("0") for detalle in detalles), Decimal("0")
+        )
+        items = []
+        unidades = Decimal("0")
+        for detalle in detalles:
+            cantidad = detalle.cantidad or Decimal("0")
+            subtotal = detalle.subtotal or Decimal("0")
+            unidades += cantidad
+            items.append(
+                {
+                    "descripcion": detalle.descripcion,
+                    "cantidad": cantidad,
+                    "precio_unitario": detalle.precio_unitario or Decimal("0"),
+                    "subtotal": subtotal,
+                    "participacion": (
+                        float(subtotal / total_detalles * 100)
+                        if total_detalles > 0 else 0
+                    ),
+                }
+            )
+        items_analisis = sorted(
+            items, key=lambda item: item["subtotal"], reverse=True
+        )[:6]
+        abonos_db = (
+            AbonoCobroPersonal.query.filter_by(cobro_id=cobro.id)
+            .order_by(AbonoCobroPersonal.fecha.asc(), AbonoCobroPersonal.id.asc()).all()
+        )
+        usuarios_map = build_user_name_map(
+            [abono.usuario_id for abono in abonos_db if abono.usuario_id]
+        )
+        abonos = [
+            {
+                "fecha": abono.fecha,
+                "monto": abono.monto or Decimal("0"),
+                "comentario": (abono.comentario or "").strip(),
+                "usuario": usuarios_map.get(abono.usuario_id, "General") or "General",
+            }
+            for abono in abonos_db
+        ]
+        total = cobro.total or Decimal("0")
+        saldo = max(Decimal("0"), cobro.saldo or Decimal("0"))
+        pagado = max(Decimal("0"), total - saldo)
+        porcentaje_pagado = float(pagado / total * 100) if total > 0 else 0
+        dias_vencido = 0
+        if cobro.fecha_vencimiento and saldo > 0:
+            dias_vencido = max(0, (datetime.utcnow().date() - cobro.fecha_vencimiento).days)
+        responsable_nombre = (
+            (responsable.nombre_completo or responsable.username)
+            if responsable else "General"
+        ) or "General"
+        return render_template(
+            "cobro_personal_detalle.html", user=session["user"], cobro=cobro,
+            cliente=cliente, responsable=responsable_nombre, items=items,
+            items_analisis=items_analisis, unidades=unidades, abonos=abonos,
+            total=total, saldo=saldo, pagado=pagado,
+            porcentaje_pagado=porcentaje_pagado, dias_vencido=dias_vencido,
+            status_code=(request.args.get("status") or "").strip().lower(),
         )
 
     @app.get("/dashboard-aves")
@@ -5462,7 +5572,9 @@ def create_app():
             db.session.rollback()
             return redirect(url_for("cobros_personales", status="payment_error"))
 
-        return redirect(url_for("cobros_personales", status="payment_recorded"))
+        return redirect(url_for(
+            "cobro_personal_detalle", cobro_id=cobro.id, status="payment_recorded"
+        ))
 
     @app.get("/cobros-personales/<int:cobro_id>/orden")
     def imprimir_orden_cobro_personal(cobro_id):
