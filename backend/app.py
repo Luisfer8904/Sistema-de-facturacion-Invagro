@@ -478,9 +478,8 @@ def create_app():
             if es_vendedor_filtro:
                 pending_q = pending_q.filter(CobroPersonal.usuario_id == uid_filtro)
             pending_rows = pending_q.order_by(
-                CobroPersonal.fecha_vencimiento.is_(None),
-                CobroPersonal.fecha_vencimiento.asc(),
                 CobroPersonal.fecha.desc(),
+                CobroPersonal.id.desc(),
             ).all()
 
             payment_q = (

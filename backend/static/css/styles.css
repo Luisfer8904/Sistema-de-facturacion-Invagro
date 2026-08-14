@@ -2883,7 +2883,62 @@ body {
 }
 
 .personal-charges-table {
-  grid-template-columns: 1fr 1fr 0.7fr 0.7fr 0.8fr 0.9fr 1.3fr;
+  grid-template-columns:
+    132px
+    minmax(210px, 1.25fr)
+    minmax(180px, 1.05fr)
+    105px
+    105px
+    120px
+    170px
+    minmax(230px, 1.25fr);
+  column-gap: 16px;
+}
+
+.personal-charges-module {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.personal-charges-module .personal-charges-table {
+  min-width: 1320px;
+}
+
+.personal-charges-table > span {
+  min-width: 0;
+}
+
+.personal-charge-reference,
+.personal-charge-person {
+  display: grid;
+  align-content: start;
+  gap: 5px;
+  overflow-wrap: anywhere;
+}
+
+.personal-charge-date,
+.personal-charge-money {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.personal-charge-actions {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+}
+
+.personal-charge-actions > *,
+.personal-charge-actions form,
+.personal-charge-actions a,
+.personal-charge-actions button {
+  width: 100%;
+  margin: 0;
+}
+
+.personal-charges-table .personal-payment-form input,
+.personal-charges-table .personal-payment-form button {
+  width: 100%;
 }
 
 .personal-history-table {

@@ -146,34 +146,33 @@
             <p>Cada cobro mantiene su saldo y sus abonos por separado.</p>
           </div>
         </section>
-        <section class="module-table">
+        <section class="module-table personal-charges-module">
           <div class="table-header personal-charges-table">
+            <span>Fecha</span>
             <span>Cobro</span>
             <span>Persona</span>
             <span>Total</span>
             <span>Saldo</span>
             <span>Vence</span>
-            <span>Documento</span>
+            <span>Acciones</span>
             <span>Registrar pago</span>
           </div>
           {% if pending_charges %}
             {% for cobro in pending_charges %}
               <div class="table-row personal-charges-table table-row-top">
-                <span>
+                <span class="personal-charge-date">{{ cobro.fecha_label }}</span>
+                <span class="personal-charge-reference">
                   <strong>{{ cobro.numero_cobro }}</strong>
                   <small>{{ cobro.concepto }}{% if cobro.detail_count %} | {{ cobro.detail_count }} lineas{% endif %}</small>
                 </span>
-                <span>
+                <span class="personal-charge-person">
                   <strong>{{ cobro.nombre }}</strong>
                   <small>{{ cobro.telefono }}</small>
                 </span>
-                <span>L {{ "%.2f"|format(cobro.total or 0) }}</span>
-                <span>L {{ "%.2f"|format(cobro.saldo or 0) }}</span>
-                <span>
-                  <strong>{{ cobro.vencimiento_label }}</strong>
-                  <small>Creado: {{ cobro.fecha_label }}</small>
-                </span>
-                <span class="table-actions">
+                <span class="personal-charge-money">L {{ "%.2f"|format(cobro.total or 0) }}</span>
+                <span class="personal-charge-money"><strong>L {{ "%.2f"|format(cobro.saldo or 0) }}</strong></span>
+                <span class="personal-charge-date">{{ cobro.vencimiento_label }}</span>
+                <span class="table-actions personal-charge-actions">
                   <a class="secondary-button" href="/cobros-personales/{{ cobro.id }}/orden" target="_blank">Orden de entrega</a>
                 </span>
                 <span>
@@ -191,6 +190,7 @@
           {% else %}
             <div class="table-row personal-charges-table">
               <span>Sin cobros</span>
+              <span>-</span>
               <span>-</span>
               <span>-</span>
               <span>-</span>
