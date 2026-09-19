@@ -23,10 +23,13 @@
             <form class="ganaderia-search" method="get"><input type="search" name="q" value="{{ search }}" placeholder="Buscar por arete, nombre o raza" /><button type="submit">Buscar</button></form>
             <div class="ganaderia-animal-table">
               {% for animal in animals %}
+                {% set last_activity = latest_activities.get(animal.id) %}
                 <a class="ganaderia-animal-row" href="/ganaderia/fincas/{{ finca.id }}/animales/{{ animal.id }}">
                   <span class="ganaderia-animal-sex {{ animal.sexo }}">{{ "H" if animal.sexo == "hembra" else "M" }}</span>
                   <div><strong>{{ animal.nombre or animal.codigo }}</strong><small>Arete {{ animal.codigo }} · {{ animal.raza or "Raza pendiente" }}</small></div>
-                  <div><strong>{{ animal.peso_actual or "—" }}{% if animal.peso_actual %} lb{% endif %}</strong><small>{{ paddock_names.get(animal.potrero_id, "Sin potrero") }}</small></div>
+                  <div class="ganaderia-animal-birth"><small>Nacimiento</small><strong>{{ animal.fecha_nacimiento.strftime('%d/%m/%Y') if animal.fecha_nacimiento else "Pendiente" }}</strong></div>
+                  <div class="ganaderia-animal-last"><small>Última acción</small><strong>{{ activity_label(last_activity.tipo) if last_activity else "Sin actividad" }}</strong>{% if last_activity %}<em>{{ last_activity.fecha.strftime('%d/%m/%Y') }}</em>{% endif %}</div>
+                  <div class="ganaderia-animal-location"><strong>{{ animal.peso_actual or "—" }}{% if animal.peso_actual %} lb{% endif %}</strong><small>{{ paddock_names.get(animal.potrero_id, "Sin potrero") }}</small></div>
                   <span class="ganaderia-status {{ 'active' if animal.estado == 'activo' else 'inactive' }}">{{ animal.estado|capitalize }}</span><b>→</b>
                 </a>
               {% else %}<div class="ganaderia-empty-state"><strong>No hay animales registrados</strong><p>Registra el primer animal para iniciar su expediente.</p></div>{% endfor %}

@@ -3028,6 +3028,20 @@ def create_app():
         animals = query.order_by(GanaderiaAnimal.estado.asc(), GanaderiaAnimal.codigo.asc()).all()
         paddocks = GanaderiaPotrero.query.filter_by(finca_id=finca.id, activo=True).order_by(GanaderiaPotrero.nombre.asc()).all()
         paddock_names = {item.id: item.nombre for item in paddocks}
+        animal_ids = [animal.id for animal in animals]
+        latest_activities = {}
+        if animal_ids:
+            activity_rows = (
+                GanaderiaActividad.query.filter(GanaderiaActividad.animal_id.in_(animal_ids))
+                .order_by(
+                    GanaderiaActividad.animal_id.asc(),
+                    GanaderiaActividad.fecha.desc(),
+                    GanaderiaActividad.id.desc(),
+                )
+                .all()
+            )
+            for activity in activity_rows:
+                latest_activities.setdefault(activity.animal_id, activity)
         return render_template(
             "ganaderia_animales.html",
             current=current,
@@ -3035,6 +3049,8 @@ def create_app():
             animals=animals,
             paddocks=paddocks,
             paddock_names=paddock_names,
+            latest_activities=latest_activities,
+            activity_label=ganaderia_activity_label,
             error=error,
             form_values=form_values,
             search=search,
@@ -3049,23 +3065,27 @@ def create_app():
         capacity_raw = request.form.get("capacidad", "").strip()
         if paddock_type not in {"potrero", "lote", "corral"}:
             paddock_type = "potrero"
-        if name and not GanaderiaPotrero.query.filter_by(finca_id=finca.id, nombre=name).first():
-            try:
-                db.session.add(
-                    GanaderiaPotrero(
-                        finca_id=finca.id,
-                        nombre=name,
-                        tipo=paddock_type,
-                        capacidad=int(capacity_raw) if capacity_raw.isdigit() else None,
-                        descripcion=request.form.get("descripcion", "").strip() or None,
-                        activo=True,
-                        fecha_registro=datetime.utcnow(),
-                    )
+        if not name:
+            return redirect(url_for("ganaderia_potreros", finca_id=finca.id, error="El nombre es obligatorio."))
+        if GanaderiaPotrero.query.filter_by(finca_id=finca.id, nombre=name).first():
+            return redirect(url_for("ganaderia_potreros", finca_id=finca.id, error="Ya existe un espacio con ese nombre."))
+        try:
+            db.session.add(
+                GanaderiaPotrero(
+                    finca_id=finca.id,
+                    nombre=name,
+                    tipo=paddock_type,
+                    capacidad=int(capacity_raw) if capacity_raw.isdigit() else None,
+                    descripcion=request.form.get("descripcion", "").strip() or None,
+                    activo=True,
+                    fecha_registro=datetime.utcnow(),
                 )
-                db.session.commit()
-            except SQLAlchemyError:
-                db.session.rollback()
-        return redirect(url_for("ganaderia_potreros", finca_id=finca.id))
+            )
+            db.session.commit()
+            return redirect(url_for("ganaderia_potreros", finca_id=finca.id, created="1"))
+        except SQLAlchemyError:
+            db.session.rollback()
+            return redirect(url_for("ganaderia_potreros", finca_id=finca.id, error="No se pudo crear el espacio."))
 
     @app.get("/ganaderia/fincas/<int:finca_id>/potreros")
     @ganaderia_login_required
@@ -3093,6 +3113,8 @@ def create_app():
             finca=finca,
             paddocks=paddocks,
             animal_counts=animal_counts,
+            created=request.args.get("created") == "1",
+            error=request.args.get("error"),
         )
 
     @app.get("/ganaderia/fincas/<int:finca_id>/partos")
