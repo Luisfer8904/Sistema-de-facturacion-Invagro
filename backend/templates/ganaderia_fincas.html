@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Fincas | Portal de Ganadería{% endblock %}
+{% block body_class %}portal-shell-page ganaderia-app-page no-chat{% endblock %}
+{% block content %}
+  <div class="ganaderia-shell">
+    {% set ganaderia_active = "fincas" %}
+    {% include "partials/ganaderia_sidebar.html" %}
+    <div class="ganaderia-main">
+      <header class="ganaderia-topbar">
+        <button class="ganaderia-menu" type="button" aria-label="Abrir menú" onclick="document.body.classList.toggle('ganaderia-menu-open')">☰</button>
+        <div><small>GESTIÓN GANADERA</small><h1>Fincas</h1></div>
+        <div class="ganaderia-user"><span>{{ current.nombre_completo }}</span><small>{{ "Superadministrador" if current.rol == "superadmin" else "Veterinario" }}</small></div>
+      </header>
+      <main class="ganaderia-content">
+        <section class="ganaderia-users-layout ganaderia-farms-layout{% if current.rol == 'finca' %} read-only{% endif %}">
+          <div class="ganaderia-user-list">
+            <div class="ganaderia-panel-heading"><div><span>FINCAS DISPONIBLES</span><h2>{{ "Todas las fincas" if current.rol == "superadmin" else "Fincas que administras" }}</h2></div><strong>{{ farms|length }}</strong></div>
+            <div class="ganaderia-farm-list">
+              {% for finca in farms %}
+                <a href="/ganaderia/fincas/{{ finca.id }}" class="ganaderia-farm-row">
+                  <span class="ganaderia-farm-mark">F</span>
+                  <div><strong>{{ finca.nombre }}</strong><span>{{ finca.propietario or "Propietario pendiente" }}</span></div>
+                  <div><strong>{{ finca.ubicacion or "Sin ubicación" }}</strong><span>{{ finca.telefono or "Sin teléfono" }}</span></div>
+                  <span class="ganaderia-status {{ 'active' if finca.activa else 'inactive' }}">{{ "Activa" if finca.activa else "Inactiva" }}</span>
+                  <b>→</b>
+                </a>
+              {% else %}
+                <div class="ganaderia-empty-state"><strong>No hay fincas registradas</strong><p>Usa el formulario para crear la primera.</p></div>
+              {% endfor %}
+            </div>
+          </div>
+          {% if current.rol in ["superadmin", "veterinario"] %}<aside class="ganaderia-create-user">
+            <span>NUEVA FINCA</span><h2>Registrar finca</h2>
+            <p>Al crearla quedará disponible en tu panel. Si eres veterinario, serás asignado automáticamente.</p>
+            {% if error %}<div class="form-error">{{ error }}</div>{% endif %}
+            <form method="post">
+              <label>Nombre de la finca<input type="text" name="nombre" value="{{ form_values.nombre }}" required /></label>
+              <label>Propietario<input type="text" name="propietario" value="{{ form_values.propietario }}" /></label>
+              <label>Teléfono<input type="tel" name="telefono" value="{{ form_values.telefono }}" /></label>
+              <label>Municipio o ubicación<input type="text" name="ubicacion" value="{{ form_values.ubicacion }}" /></label>
+              <label>Dirección<textarea name="direccion" rows="3">{{ form_values.direccion }}</textarea></label>
+              <button class="ganaderia-primary" type="submit">Registrar finca</button>
+            </form>
+          </aside>{% endif %}
+        </section>
+      </main>
+    </div>
+  </div>
+{% endblock %}

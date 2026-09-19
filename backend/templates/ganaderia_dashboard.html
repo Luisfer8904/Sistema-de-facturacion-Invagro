@@ -3,25 +3,14 @@
 {% block body_class %}portal-shell-page ganaderia-app-page no-chat{% endblock %}
 {% block content %}
   <div class="ganaderia-shell">
-    <aside class="ganaderia-sidebar">
-      <a class="ganaderia-brand" href="/ganaderia/dashboard">
-        <img src="/static/assets/logo.jpg" alt="Invagro" />
-        <span><strong>Invagro</strong><small>Portal de ganadería</small></span>
-      </a>
-      <nav aria-label="Navegación de ganadería">
-        <a class="active" href="/ganaderia/dashboard"><span>⌂</span> Dashboard</a>
-        {% if session.get('ganaderia_rol') == 'superadmin' %}
-          <a href="/ganaderia/usuarios"><span>♙</span> Usuarios</a>
-        {% endif %}
-      </nav>
-      <a class="ganaderia-logout" href="/logout">Cerrar sesión</a>
-    </aside>
+    {% set ganaderia_active = "dashboard" %}
+    {% include "partials/ganaderia_sidebar.html" %}
 
     <div class="ganaderia-main">
       <header class="ganaderia-topbar">
         <button class="ganaderia-menu" type="button" aria-label="Abrir menú" onclick="document.body.classList.toggle('ganaderia-menu-open')">☰</button>
         <div><small>PORTAL DE GANADERÍA</small><h1>Dashboard</h1></div>
-        <div class="ganaderia-user"><span>{{ current.nombre_completo }}</span><small>{{ current.rol|replace('superadmin', 'Superadministrador')|replace('usuario', 'Usuario') }}</small></div>
+        <div class="ganaderia-user"><span>{{ current.nombre_completo }}</span><small>{{ "Superadministrador" if current.rol == "superadmin" else ("Veterinario" if current.rol == "veterinario" else "Finca") }}</small></div>
       </header>
 
       <main class="ganaderia-content">
@@ -29,27 +18,36 @@
           <div>
             <span class="ganaderia-eyebrow">CONTROL GANADERO</span>
             <h2>Bienvenido, {{ current.nombre_completo.split(' ')[0] }}</h2>
-            <p>Este será el centro de trabajo para organizar la operación ganadera de Invagro.</p>
+            <p>Organiza las fincas, sus responsables y los accesos a la información ganadera.</p>
           </div>
-          {% if current.rol == "superadmin" %}
-            <a class="ganaderia-primary" href="/ganaderia/usuarios">Administrar usuarios</a>
+          {% if current.rol in ["superadmin", "veterinario"] %}
+            <a class="ganaderia-primary" href="/ganaderia/fincas">{{ "Administrar fincas" if farms_total else "Crear primera finca" }}</a>
           {% endif %}
         </section>
 
         <section class="ganaderia-stats" aria-label="Resumen del portal">
-          <article><span>Usuarios registrados</span><strong>{{ users_total }}</strong><small>Accesos creados</small></article>
-          <article><span>Usuarios activos</span><strong>{{ users_active }}</strong><small>Con acceso al portal</small></article>
-          <article><span>Tu perfil</span><strong class="ganaderia-role-value">{{ "Superadmin" if current.rol == "superadmin" else "Usuario" }}</strong><small>Permisos actuales</small></article>
+          <article><span>Fincas disponibles</span><strong>{{ farms_total }}</strong><small>{{ "Todas las fincas" if current.rol == "superadmin" else "Asignadas a tu cuenta" }}</small></article>
+          <article><span>Veterinarios</span><strong>{{ veterinarians_total if current.rol == "superadmin" else (1 if current.rol == "veterinario" else "—") }}</strong><small>{{ "Registrados en el portal" if current.rol == "superadmin" else "Perfil profesional" }}</small></article>
+          <article><span>Tu perfil</span><strong class="ganaderia-role-value">{{ "Superadmin" if current.rol == "superadmin" else ("Veterinario" if current.rol == "veterinario" else "Finca") }}</strong><small>Permisos actuales</small></article>
         </section>
 
         <section class="ganaderia-section-heading">
-          <div><span>PRÓXIMAS ÁREAS</span><h2>Gestión ganadera</h2></div>
-          <p>La base de acceso ya está lista para incorporar los módulos operativos.</p>
+          <div><span>FINCAS</span><h2>{{ "Tus fincas" if current.rol != "superadmin" else "Fincas registradas" }}</h2></div>
+          <p>Cada usuario consulta únicamente las fincas que tiene asignadas.</p>
         </section>
-        <section class="ganaderia-modules">
-          <article><span class="ganaderia-module-icon">G</span><h3>Ganado</h3><p>Registro y seguimiento individual del hato.</p><small>Próximamente</small></article>
-          <article><span class="ganaderia-module-icon">S</span><h3>Sanidad</h3><p>Vacunación, tratamientos y controles sanitarios.</p><small>Próximamente</small></article>
-          <article><span class="ganaderia-module-icon">P</span><h3>Producción</h3><p>Indicadores productivos y control de resultados.</p><small>Próximamente</small></article>
+        <section class="ganaderia-farm-grid">
+          {% for finca in farms[:6] %}
+            <a class="ganaderia-farm-card" href="/ganaderia/fincas/{{ finca.id }}">
+              <span class="ganaderia-module-icon">F</span>
+              <div><h3>{{ finca.nombre }}</h3><p>{{ finca.ubicacion or "Ubicación pendiente" }}</p></div>
+              <strong>Ver finca →</strong>
+            </a>
+          {% else %}
+            <div class="ganaderia-empty-state">
+              <strong>No hay fincas disponibles</strong>
+              <p>{% if current.rol in ["superadmin", "veterinario"] %}Registra una finca para comenzar.{% else %}Solicita a tu veterinario que asigne tu acceso a una finca.{% endif %}</p>
+            </div>
+          {% endfor %}
         </section>
       </main>
     </div>

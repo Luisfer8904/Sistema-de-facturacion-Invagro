@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}{{ finca.nombre }} | Portal de Ganadería{% endblock %}
+{% block body_class %}portal-shell-page ganaderia-app-page no-chat{% endblock %}
+{% block content %}
+  <div class="ganaderia-shell">
+    {% set ganaderia_active = "fincas" %}
+    {% include "partials/ganaderia_sidebar.html" %}
+    <div class="ganaderia-main">
+      <header class="ganaderia-topbar">
+        <button class="ganaderia-menu" type="button" aria-label="Abrir menú" onclick="document.body.classList.toggle('ganaderia-menu-open')">☰</button>
+        <div><small>FINCA</small><h1>{{ finca.nombre }}</h1></div>
+        <a class="ganaderia-back" href="/ganaderia/fincas">Volver a fincas</a>
+      </header>
+      <main class="ganaderia-content">
+        {% if created %}<div class="ganaderia-success">Finca registrada correctamente.</div>{% endif %}
+        {% if user_created %}<div class="ganaderia-success">Acceso de finca creado correctamente.</div>{% endif %}
+        {% if error %}<div class="form-error">{{ error }}</div>{% endif %}
+        <section class="ganaderia-farm-header">
+          <div><span class="ganaderia-eyebrow">EXPEDIENTE DE FINCA</span><h2>{{ finca.nombre }}</h2><p>{{ finca.direccion or finca.ubicacion or "Dirección pendiente" }}</p></div>
+          <span class="ganaderia-status {{ 'active' if finca.activa else 'inactive' }}">{{ "Activa" if finca.activa else "Inactiva" }}</span>
+        </section>
+        <section class="ganaderia-detail-grid">
+          <article><span>Propietario</span><strong>{{ finca.propietario or "Pendiente" }}</strong></article>
+          <article><span>Teléfono</span><strong>{{ finca.telefono or "Pendiente" }}</strong></article>
+          <article><span>Ubicación</span><strong>{{ finca.ubicacion or "Pendiente" }}</strong></article>
+        </section>
+        <section class="ganaderia-farm-management">
+          <div class="ganaderia-user-list">
+            <div class="ganaderia-panel-heading"><div><span>EQUIPO</span><h2>Veterinarios asignados</h2></div><strong>{{ veterinarians|length }}</strong></div>
+            {% for veterinarian, vet_user in veterinarians %}
+              <div class="ganaderia-person-line"><span class="ganaderia-avatar">{{ vet_user.nombre_completo[:1] }}</span><div><strong>{{ vet_user.nombre_completo }}</strong><small>{{ vet_user.email }}</small></div></div>
+            {% else %}<div class="ganaderia-empty-inline">No hay veterinarios asignados.</div>{% endfor %}
+            {% if current.rol == "superadmin" %}
+              <form class="ganaderia-inline-form" method="post" action="/ganaderia/fincas/{{ finca.id }}/veterinarios">
+                <select name="veterinario_id" required><option value="">Asignar veterinario</option>{% for vet, vet_user in available_vets %}{% if vet.id not in assigned_vet_ids %}<option value="{{ vet.id }}">{{ vet_user.nombre_completo }}</option>{% endif %}{% endfor %}</select>
+                <button class="ganaderia-primary" type="submit">Asignar</button>
+              </form>
+            {% endif %}
+          </div>
+          <div class="ganaderia-user-list">
+            <div class="ganaderia-panel-heading"><div><span>ACCESOS</span><h2>Usuarios de la finca</h2></div><strong>{{ farm_users|length }}</strong></div>
+            {% for farm_user in farm_users %}
+              <div class="ganaderia-person-line"><span class="ganaderia-avatar">{{ farm_user.nombre_completo[:1] }}</span><div><strong>{{ farm_user.nombre_completo }}</strong><small>{{ farm_user.email }}</small></div></div>
+            {% else %}<div class="ganaderia-empty-inline">Esta finca todavía no tiene usuarios.</div>{% endfor %}
+            {% if current.rol in ["superadmin", "veterinario"] %}
+              <details class="ganaderia-access-form"><summary>Crear acceso para la finca</summary>
+                <form method="post" action="/ganaderia/fincas/{{ finca.id }}/usuarios">
+                  <label>Nombre<input type="text" name="nombre_completo" required /></label>
+                  <label>Correo<input type="email" name="email" required /></label>
+                  <label>Contraseña<input type="password" name="password" minlength="8" required /></label>
+                  <label>Confirmar contraseña<input type="password" name="password2" minlength="8" required /></label>
+                  <button class="ganaderia-primary" type="submit">Crear acceso</button>
+                </form>
+              </details>
+            {% endif %}
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+{% endblock %}

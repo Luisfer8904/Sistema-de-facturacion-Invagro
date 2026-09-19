@@ -2174,9 +2174,49 @@ body {
 .ganaderia-create-user { position: sticky; top: 112px; }
 .ganaderia-create-user > p { margin: 10px 0 22px; color: #6f7e76; }
 .ganaderia-create-user form { display: grid; gap: 14px; }
+.ganaderia-form-group { display: grid; gap: 14px; }
 .ganaderia-create-user label { display: grid; gap: 7px; color: #46564d; font-size: .82rem; font-weight: 800; }
 .ganaderia-create-user input { width: 100%; min-height: 46px; padding: 10px 12px; border: 1px solid #cfd9d2; border-radius: 7px; font: inherit; }
-.ganaderia-create-user input:focus { border-color: #9a661c; outline: 3px solid rgba(241,178,75,.2); }
+.ganaderia-create-user select,
+.ganaderia-create-user textarea { width: 100%; min-height: 46px; padding: 10px 12px; border: 1px solid #cfd9d2; border-radius: 7px; background: #fff; font: inherit; }
+.ganaderia-create-user input:focus,
+.ganaderia-create-user select:focus,
+.ganaderia-create-user textarea:focus { border-color: #9a661c; outline: 3px solid rgba(241,178,75,.2); }
+
+.ganaderia-farm-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.ganaderia-farm-card { min-height: 170px; padding: 24px; display: grid; grid-template-columns: 44px 1fr; align-content: space-between; gap: 18px; color: #1c3027; background: #fff; border: 1px solid #dfe6e1; border-radius: 8px; text-decoration: none; }
+.ganaderia-farm-card:hover { border-color: #efb24c; box-shadow: 0 10px 24px rgba(42,72,59,.08); }
+.ganaderia-farm-card h3 { margin: 0 0 6px; }
+.ganaderia-farm-card p { margin: 0; color: #74827a; }
+.ganaderia-farm-card > strong { grid-column: 2; color: #8e5e1a; font-size: .84rem; }
+.ganaderia-empty-state { min-height: 150px; padding: 28px; display: grid; place-content: center; grid-column: 1 / -1; color: #697970; background: #fff; border: 1px dashed #cbd6cf; border-radius: 8px; text-align: center; }
+.ganaderia-empty-state p { margin: 8px 0 0; }
+.ganaderia-farms-layout.read-only { grid-template-columns: 1fr; }
+.ganaderia-farm-list { display: grid; }
+.ganaderia-farm-row { min-height: 82px; padding: 14px 4px; display: grid; grid-template-columns: 44px minmax(150px, 1.2fr) minmax(130px, .8fr) auto 22px; align-items: center; gap: 14px; color: #26372f; border-top: 1px solid #e7ece8; text-decoration: none; }
+.ganaderia-farm-row:hover { background: #f7faf8; }
+.ganaderia-farm-mark { width: 38px; height: 38px; display: grid; place-items: center; color: #8d5d19; background: #fff1d6; border-radius: 7px; font-weight: 900; }
+.ganaderia-farm-row > div { min-width: 0; display: grid; gap: 4px; }
+.ganaderia-farm-row > div span { overflow: hidden; color: #7b8981; font-size: .8rem; text-overflow: ellipsis; white-space: nowrap; }
+.ganaderia-farm-header { min-height: 210px; padding: clamp(30px, 5vw, 54px); display: flex; align-items: end; justify-content: space-between; gap: 24px; color: #fff; background: linear-gradient(120deg,#173d2f,#2f654f); border-radius: 8px; }
+.ganaderia-farm-header h2 { margin: 10px 0 8px; color: #fff; font-size: clamp(2rem, 4vw, 3rem); letter-spacing: 0; }
+.ganaderia-farm-header p { margin: 0; color: #dbe7e0; }
+.ganaderia-detail-grid { margin-top: 16px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.ganaderia-detail-grid article { padding: 22px; display: grid; gap: 12px; background: #fff; border: 1px solid #dfe6e1; border-radius: 8px; }
+.ganaderia-detail-grid span { color: #78867e; font-size: .8rem; font-weight: 700; }
+.ganaderia-farm-management { margin-top: 28px; display: grid; grid-template-columns: 1fr 1fr; gap: 18px; align-items: start; }
+.ganaderia-person-line { min-height: 66px; display: flex; align-items: center; gap: 12px; border-top: 1px solid #e8ece9; }
+.ganaderia-person-line > div { display: grid; gap: 3px; }
+.ganaderia-person-line small { color: #7c8a82; }
+.ganaderia-empty-inline { padding: 20px 0; color: #7a8980; border-top: 1px solid #e8ece9; }
+.ganaderia-inline-form { margin-top: 18px; display: flex; gap: 10px; }
+.ganaderia-inline-form select { min-width: 0; flex: 1; min-height: 44px; padding: 9px 11px; border: 1px solid #cfd9d2; border-radius: 7px; background: #fff; }
+.ganaderia-access-form { margin-top: 18px; border-top: 1px solid #e8ece9; }
+.ganaderia-access-form summary { padding: 16px 0 2px; color: #875916; font-weight: 800; cursor: pointer; }
+.ganaderia-access-form form { margin-top: 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.ganaderia-access-form label { display: grid; gap: 6px; color: #53635a; font-size: .8rem; font-weight: 700; }
+.ganaderia-access-form input { min-width: 0; min-height: 42px; padding: 9px 10px; border: 1px solid #cfd9d2; border-radius: 7px; }
+.ganaderia-access-form button { grid-column: 1 / -1; }
 
 @media (max-width: 980px) {
   .ganaderia-shell { grid-template-columns: 1fr; }
@@ -2185,6 +2225,8 @@ body {
   .ganaderia-menu { display: block; }
   .ganaderia-users-layout { grid-template-columns: 1fr; }
   .ganaderia-create-user { position: static; }
+  .ganaderia-farm-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ganaderia-farm-management { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 700px) {
@@ -2194,7 +2236,9 @@ body {
   .ganaderia-hero { min-height: 300px; padding: 28px 22px; align-items: flex-start; flex-direction: column; justify-content: center; }
   .ganaderia-hero h2 { font-size: 2.2rem; }
   .ganaderia-stats,
-  .ganaderia-modules { grid-template-columns: 1fr; }
+  .ganaderia-modules,
+  .ganaderia-farm-grid,
+  .ganaderia-detail-grid { grid-template-columns: 1fr; }
   .ganaderia-section-heading { align-items: start; flex-direction: column; }
   .ganaderia-section-heading p { text-align: left; }
   .ganaderia-user-list,
@@ -2204,6 +2248,11 @@ body {
   .ganaderia-user-row form,
   .ganaderia-user-row > span:last-child { grid-column: 2 / -1; }
   .ganaderia-back { font-size: .78rem; }
+  .ganaderia-farm-row { grid-template-columns: 40px 1fr auto; }
+  .ganaderia-farm-row > div:nth-of-type(2),
+  .ganaderia-farm-row > b { display: none; }
+  .ganaderia-farm-header { min-height: 230px; padding: 26px 22px; align-items: flex-start; flex-direction: column; justify-content: center; }
+  .ganaderia-access-form form { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 720px) {

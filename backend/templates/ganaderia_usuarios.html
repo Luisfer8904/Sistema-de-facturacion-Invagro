@@ -3,17 +3,8 @@
 {% block body_class %}portal-shell-page ganaderia-app-page no-chat{% endblock %}
 {% block content %}
   <div class="ganaderia-shell">
-    <aside class="ganaderia-sidebar">
-      <a class="ganaderia-brand" href="/ganaderia/dashboard">
-        <img src="/static/assets/logo.jpg" alt="Invagro" />
-        <span><strong>Invagro</strong><small>Portal de ganadería</small></span>
-      </a>
-      <nav aria-label="Navegación de ganadería">
-        <a href="/ganaderia/dashboard"><span>⌂</span> Dashboard</a>
-        <a class="active" href="/ganaderia/usuarios"><span>♙</span> Usuarios</a>
-      </nav>
-      <a class="ganaderia-logout" href="/logout">Cerrar sesión</a>
-    </aside>
+    {% set ganaderia_active = "usuarios" %}
+    {% include "partials/ganaderia_sidebar.html" %}
 
     <div class="ganaderia-main">
       <header class="ganaderia-topbar">
@@ -31,8 +22,8 @@
               {% for item in users %}
                 <article class="ganaderia-user-row{% if not item.activo %} inactive{% endif %}">
                   <div class="ganaderia-avatar">{{ item.nombre_completo[:1]|upper }}</div>
-                  <div><strong>{{ item.nombre_completo }}</strong><span>{{ item.email }}</span></div>
-                  <span class="ganaderia-role">{{ "Superadmin" if item.rol == "superadmin" else "Usuario" }}</span>
+                  <div><strong>{{ item.nombre_completo }}</strong><span>{{ item.email }}{% if veterinarian_profiles.get(item.id) and veterinarian_profiles[item.id].numero_colegiado %} · Colegiado {{ veterinarian_profiles[item.id].numero_colegiado }}{% endif %}</span></div>
+                  <span class="ganaderia-role">{{ "Superadmin" if item.rol == "superadmin" else ("Veterinario" if item.rol == "veterinario" else "Finca") }}</span>
                   <span class="ganaderia-status {{ 'active' if item.activo else 'inactive' }}">{{ "Activo" if item.activo else "Inactivo" }}</span>
                   {% if item.id != current_user_id and item.rol != "superadmin" %}
                     <form method="post" action="/ganaderia/usuarios/{{ item.id }}/estado">
@@ -51,6 +42,23 @@
             <form method="post">
               <label>Nombre completo<input type="text" name="nombre_completo" value="{{ form_values.nombre_completo }}" required autocomplete="name" /></label>
               <label>Correo electrónico<input type="email" name="email" value="{{ form_values.email }}" required autocomplete="email" /></label>
+              <label>Tipo de usuario
+                <select name="rol" id="ganaderiaUserRole" required>
+                  <option value="veterinario" {% if form_values.rol == "veterinario" %}selected{% endif %}>Veterinario</option>
+                  <option value="finca" {% if form_values.rol == "finca" %}selected{% endif %}>Usuario de finca</option>
+                </select>
+              </label>
+              <label id="ganaderiaFarmField">Finca
+                <select name="finca_id">
+                  <option value="">Selecciona una finca</option>
+                  {% for finca in farms %}<option value="{{ finca.id }}" {% if form_values.finca_id|string == finca.id|string %}selected{% endif %}>{{ finca.nombre }}</option>{% endfor %}
+                </select>
+              </label>
+              <div id="ganaderiaVetFields" class="ganaderia-form-group">
+                <label>Número de colegiado<input type="text" name="numero_colegiado" value="{{ form_values.numero_colegiado }}" /></label>
+                <label>Teléfono<input type="tel" name="telefono" value="{{ form_values.telefono }}" /></label>
+                <label>Especialidad<input type="text" name="especialidad" value="{{ form_values.especialidad }}" placeholder="Ej. reproducción bovina" /></label>
+              </div>
               <label>Contraseña<input type="password" name="password" minlength="8" required autocomplete="new-password" /></label>
               <label>Confirmar contraseña<input type="password" name="password2" minlength="8" required autocomplete="new-password" /></label>
               <button class="ganaderia-primary" type="submit">Crear usuario</button>
@@ -60,4 +68,17 @@
       </main>
     </div>
   </div>
+  <script>
+    (() => {
+      const role = document.getElementById("ganaderiaUserRole");
+      const farmField = document.getElementById("ganaderiaFarmField");
+      const vetFields = document.getElementById("ganaderiaVetFields");
+      const update = () => {
+        farmField.hidden = role.value !== "finca";
+        vetFields.hidden = role.value !== "veterinario";
+      };
+      role.addEventListener("change", update);
+      update();
+    })();
+  </script>
 {% endblock %}

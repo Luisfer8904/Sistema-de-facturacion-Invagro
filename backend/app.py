@@ -66,7 +66,11 @@ from models import (
     DetallePedido,
     FacturaContado,
     FacturaCredito,
+    GanaderiaFinca,
+    GanaderiaFincaUsuario,
     GanaderiaUser,
+    GanaderiaVeterinario,
+    GanaderiaVeterinarioFinca,
     Pedido,
     Producto,
     User,
@@ -2224,6 +2228,48 @@ def create_app():
 
         return wrapper
 
+    def ganaderia_operador_required(view_func):
+        @wraps(view_func)
+        @ganaderia_login_required
+        def wrapper(*args, **kwargs):
+            if session.get("ganaderia_rol") not in {"superadmin", "veterinario"}:
+                abort(403)
+            return view_func(*args, **kwargs)
+
+        return wrapper
+
+    def ganaderia_current_user():
+        user_id = session.get("ganaderia_user_id")
+        return GanaderiaUser.query.get(user_id) if user_id else None
+
+    def ganaderia_accessible_farm_ids(user):
+        if not user:
+            return []
+        if user.rol == "superadmin":
+            return [row[0] for row in db.session.query(GanaderiaFinca.id).all()]
+        if user.rol == "veterinario":
+            veterinarian = GanaderiaVeterinario.query.filter_by(user_id=user.id).first()
+            if not veterinarian:
+                return []
+            return [
+                row[0]
+                for row in db.session.query(GanaderiaVeterinarioFinca.finca_id)
+                .filter_by(veterinario_id=veterinarian.id)
+                .all()
+            ]
+        return [
+            row[0]
+            for row in db.session.query(GanaderiaFincaUsuario.finca_id)
+            .filter_by(user_id=user.id)
+            .all()
+        ]
+
+    def ganaderia_get_accessible_farm_or_404(finca_id):
+        current = ganaderia_current_user()
+        if finca_id not in ganaderia_accessible_farm_ids(current):
+            abort(404)
+        return GanaderiaFinca.query.get_or_404(finca_id)
+
     def normalize_aves_plan_type(raw_value):
         value = (raw_value or "").strip().lower()
         allowed = {"vacunacion", "despique", "desparasitacion"}
@@ -2507,17 +2553,27 @@ def create_app():
     @app.get("/ganaderia/dashboard")
     @ganaderia_login_required
     def ganaderia_dashboard():
-        current = GanaderiaUser.query.get(session["ganaderia_user_id"])
+        current = ganaderia_current_user()
         if not current or not current.activo:
             session.clear()
             return redirect(url_for("login", portal="ganaderia"))
 
-        users_total = GanaderiaUser.query.count()
+        farm_ids = ganaderia_accessible_farm_ids(current)
+        farms = (
+            GanaderiaFinca.query.filter(GanaderiaFinca.id.in_(farm_ids))
+            .order_by(GanaderiaFinca.nombre.asc())
+            .all()
+            if farm_ids
+            else []
+        )
+        veterinarians_total = GanaderiaVeterinario.query.count()
         users_active = GanaderiaUser.query.filter_by(activo=True).count()
         return render_template(
             "ganaderia_dashboard.html",
             current=current,
-            users_total=users_total,
+            farms=farms,
+            farms_total=len(farms),
+            veterinarians_total=veterinarians_total,
             users_active=users_active,
         )
 
@@ -2525,16 +2581,32 @@ def create_app():
     @ganaderia_superadmin_required
     def ganaderia_usuarios():
         error = None
-        form_values = {"nombre_completo": "", "email": ""}
+        farms = GanaderiaFinca.query.filter_by(activa=True).order_by(GanaderiaFinca.nombre.asc()).all()
+        form_values = {
+            "nombre_completo": "",
+            "email": "",
+            "rol": "veterinario",
+            "finca_id": "",
+            "numero_colegiado": "",
+            "telefono": "",
+            "especialidad": "",
+        }
         if request.method == "POST":
             form_values = {
                 "nombre_completo": request.form.get("nombre_completo", "").strip(),
                 "email": request.form.get("email", "").strip().lower(),
+                "rol": request.form.get("rol", "veterinario").strip().lower(),
+                "finca_id": request.form.get("finca_id", "").strip(),
+                "numero_colegiado": request.form.get("numero_colegiado", "").strip(),
+                "telefono": request.form.get("telefono", "").strip(),
+                "especialidad": request.form.get("especialidad", "").strip(),
             }
             password = request.form.get("password", "")
             password2 = request.form.get("password2", "")
 
-            if not form_values["nombre_completo"] or not form_values["email"]:
+            if form_values["rol"] not in {"veterinario", "finca"}:
+                error = "Selecciona un tipo de usuario valido."
+            elif not form_values["nombre_completo"] or not form_values["email"]:
                 error = "Nombre y correo son obligatorios."
             elif "@" not in form_values["email"]:
                 error = "Ingresa un correo valido."
@@ -2546,18 +2618,44 @@ def create_app():
                 func.lower(GanaderiaUser.email) == form_values["email"]
             ).first():
                 error = "Ya existe un usuario con ese correo."
+            elif form_values["rol"] == "finca" and (
+                not form_values["finca_id"].isdigit()
+                or not GanaderiaFinca.query.get(int(form_values["finca_id"]))
+            ):
+                error = "Selecciona la finca que podra consultar este usuario."
             else:
                 try:
-                    db.session.add(
-                        GanaderiaUser(
-                            email=form_values["email"],
-                            password=generate_password_hash(password),
-                            nombre_completo=form_values["nombre_completo"],
-                            rol="usuario",
-                            activo=True,
-                            fecha_creacion=datetime.utcnow(),
-                        )
+                    new_user = GanaderiaUser(
+                        email=form_values["email"],
+                        password=generate_password_hash(password),
+                        nombre_completo=form_values["nombre_completo"],
+                        rol=form_values["rol"],
+                        activo=True,
+                        fecha_creacion=datetime.utcnow(),
                     )
+                    db.session.add(new_user)
+                    db.session.flush()
+                    if new_user.rol == "veterinario":
+                        db.session.add(
+                            GanaderiaVeterinario(
+                                user_id=new_user.id,
+                                numero_colegiado=form_values["numero_colegiado"] or None,
+                                telefono=form_values["telefono"] or None,
+                                especialidad=form_values["especialidad"] or None,
+                                fecha_registro=datetime.utcnow(),
+                            )
+                        )
+                    else:
+                        finca = GanaderiaFinca.query.get(int(form_values["finca_id"]))
+                        if not finca:
+                            raise ValueError("Finca no encontrada")
+                        db.session.add(
+                            GanaderiaFincaUsuario(
+                                user_id=new_user.id,
+                                finca_id=finca.id,
+                                fecha_asignacion=datetime.utcnow(),
+                            )
+                        )
                     db.session.commit()
                     return redirect(url_for("ganaderia_usuarios", created="1"))
                 except SQLAlchemyError:
@@ -2567,12 +2665,18 @@ def create_app():
         users = GanaderiaUser.query.order_by(
             GanaderiaUser.activo.desc(), GanaderiaUser.nombre_completo.asc()
         ).all()
+        veterinarian_profiles = {
+            profile.user_id: profile
+            for profile in GanaderiaVeterinario.query.all()
+        }
         return render_template(
             "ganaderia_usuarios.html",
             users=users,
             error=error,
             created=request.args.get("created") == "1",
             form_values=form_values,
+            farms=farms,
+            veterinarian_profiles=veterinarian_profiles,
             current_user_id=session.get("ganaderia_user_id"),
         )
 
@@ -2587,6 +2691,185 @@ def create_app():
             except SQLAlchemyError:
                 db.session.rollback()
         return redirect(url_for("ganaderia_usuarios"))
+
+    @app.route("/ganaderia/fincas", methods=["GET", "POST"])
+    @ganaderia_login_required
+    def ganaderia_fincas():
+        current = ganaderia_current_user()
+        error = None
+        form_values = {
+            "nombre": "",
+            "propietario": "",
+            "telefono": "",
+            "ubicacion": "",
+            "direccion": "",
+        }
+        if request.method == "POST":
+            if current.rol not in {"superadmin", "veterinario"}:
+                abort(403)
+            form_values = {
+                key: request.form.get(key, "").strip()
+                for key in form_values
+            }
+            if not form_values["nombre"]:
+                error = "El nombre de la finca es obligatorio."
+            else:
+                try:
+                    finca = GanaderiaFinca(
+                        **form_values,
+                        creada_por_user_id=current.id,
+                        activa=True,
+                        fecha_registro=datetime.utcnow(),
+                    )
+                    db.session.add(finca)
+                    db.session.flush()
+                    if current.rol == "veterinario":
+                        veterinarian = GanaderiaVeterinario.query.filter_by(user_id=current.id).first()
+                        if not veterinarian:
+                            veterinarian = GanaderiaVeterinario(
+                                user_id=current.id,
+                                fecha_registro=datetime.utcnow(),
+                            )
+                            db.session.add(veterinarian)
+                            db.session.flush()
+                        db.session.add(
+                            GanaderiaVeterinarioFinca(
+                                veterinario_id=veterinarian.id,
+                                finca_id=finca.id,
+                                es_responsable=True,
+                                fecha_asignacion=datetime.utcnow(),
+                            )
+                        )
+                    db.session.commit()
+                    return redirect(url_for("ganaderia_finca_detalle", finca_id=finca.id, created="1"))
+                except SQLAlchemyError:
+                    db.session.rollback()
+                    error = "No se pudo registrar la finca. Intenta nuevamente."
+
+        farm_ids = ganaderia_accessible_farm_ids(current)
+        farms = (
+            GanaderiaFinca.query.filter(GanaderiaFinca.id.in_(farm_ids))
+            .order_by(GanaderiaFinca.activa.desc(), GanaderiaFinca.nombre.asc())
+            .all()
+            if farm_ids
+            else []
+        )
+        return render_template(
+            "ganaderia_fincas.html",
+            current=current,
+            farms=farms,
+            error=error,
+            form_values=form_values,
+        )
+
+    @app.get("/ganaderia/fincas/<int:finca_id>")
+    @ganaderia_login_required
+    def ganaderia_finca_detalle(finca_id):
+        current = ganaderia_current_user()
+        finca = ganaderia_get_accessible_farm_or_404(finca_id)
+        vet_links = GanaderiaVeterinarioFinca.query.filter_by(finca_id=finca.id).all()
+        vet_ids = [link.veterinario_id for link in vet_links]
+        veterinarians = (
+            db.session.query(GanaderiaVeterinario, GanaderiaUser)
+            .join(GanaderiaUser, GanaderiaUser.id == GanaderiaVeterinario.user_id)
+            .filter(GanaderiaVeterinario.id.in_(vet_ids))
+            .all()
+            if vet_ids
+            else []
+        )
+        user_links = GanaderiaFincaUsuario.query.filter_by(finca_id=finca.id).all()
+        user_ids = [link.user_id for link in user_links]
+        farm_users = (
+            GanaderiaUser.query.filter(GanaderiaUser.id.in_(user_ids)).order_by(GanaderiaUser.nombre_completo.asc()).all()
+            if user_ids
+            else []
+        )
+        available_vets = []
+        if current.rol == "superadmin":
+            available_vets = (
+                db.session.query(GanaderiaVeterinario, GanaderiaUser)
+                .join(GanaderiaUser, GanaderiaUser.id == GanaderiaVeterinario.user_id)
+                .filter(GanaderiaUser.activo.is_(True))
+                .order_by(GanaderiaUser.nombre_completo.asc())
+                .all()
+            )
+        return render_template(
+            "ganaderia_finca_detalle.html",
+            current=current,
+            finca=finca,
+            veterinarians=veterinarians,
+            farm_users=farm_users,
+            available_vets=available_vets,
+            assigned_vet_ids=set(vet_ids),
+            created=request.args.get("created") == "1",
+            user_created=request.args.get("user_created") == "1",
+            error=request.args.get("error"),
+        )
+
+    @app.post("/ganaderia/fincas/<int:finca_id>/usuarios")
+    @ganaderia_operador_required
+    def ganaderia_finca_crear_usuario(finca_id):
+        finca = ganaderia_get_accessible_farm_or_404(finca_id)
+        name = request.form.get("nombre_completo", "").strip()
+        email = request.form.get("email", "").strip().lower()
+        password = request.form.get("password", "")
+        password2 = request.form.get("password2", "")
+        error = None
+        if not name or not email or "@" not in email:
+            error = "Completa el nombre y un correo valido."
+        elif len(password) < 8:
+            error = "La contrasena debe tener al menos 8 caracteres."
+        elif password != password2:
+            error = "Las contrasenas no coinciden."
+        elif GanaderiaUser.query.filter(func.lower(GanaderiaUser.email) == email).first():
+            error = "Ya existe un usuario con ese correo."
+        if error:
+            return redirect(url_for("ganaderia_finca_detalle", finca_id=finca.id, error=error))
+        try:
+            user = GanaderiaUser(
+                email=email,
+                password=generate_password_hash(password),
+                nombre_completo=name,
+                rol="finca",
+                activo=True,
+                fecha_creacion=datetime.utcnow(),
+            )
+            db.session.add(user)
+            db.session.flush()
+            db.session.add(
+                GanaderiaFincaUsuario(
+                    user_id=user.id,
+                    finca_id=finca.id,
+                    fecha_asignacion=datetime.utcnow(),
+                )
+            )
+            db.session.commit()
+            return redirect(url_for("ganaderia_finca_detalle", finca_id=finca.id, user_created="1"))
+        except SQLAlchemyError:
+            db.session.rollback()
+            return redirect(url_for("ganaderia_finca_detalle", finca_id=finca.id, error="No se pudo crear el acceso."))
+
+    @app.post("/ganaderia/fincas/<int:finca_id>/veterinarios")
+    @ganaderia_superadmin_required
+    def ganaderia_finca_asignar_veterinario(finca_id):
+        finca = GanaderiaFinca.query.get_or_404(finca_id)
+        veterinarian_id = request.form.get("veterinario_id", type=int)
+        veterinarian = GanaderiaVeterinario.query.get_or_404(veterinarian_id)
+        existing = GanaderiaVeterinarioFinca.query.filter_by(
+            veterinario_id=veterinarian.id,
+            finca_id=finca.id,
+        ).first()
+        if not existing:
+            db.session.add(
+                GanaderiaVeterinarioFinca(
+                    veterinario_id=veterinarian.id,
+                    finca_id=finca.id,
+                    es_responsable=False,
+                    fecha_asignacion=datetime.utcnow(),
+                )
+            )
+            db.session.commit()
+        return redirect(url_for("ganaderia_finca_detalle", finca_id=finca.id))
 
     @app.get("/dashboard")
     @login_required
