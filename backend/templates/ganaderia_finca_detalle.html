@@ -20,6 +20,15 @@
           <span class="ganaderia-status {{ 'active' if finca.activa else 'inactive' }}">{{ "Activa" if finca.activa else "Inactiva" }}</span>
         </section>
         <section class="ganaderia-detail-grid">
+          <article><span>Animales activos</span><strong>{{ animals_count }}</strong></article>
+          <article><span>Lotes y potreros</span><strong>{{ paddocks_count }}</strong></article>
+          <article><span>Próximos 30 días</span><strong>{{ pending_count }}</strong></article>
+        </section>
+        <nav class="ganaderia-farm-actions" aria-label="Módulos de la finca">
+          <a href="/ganaderia/fincas/{{ finca.id }}/animales"><span>A</span><div><strong>Animales</strong><small>Inventario y expedientes</small></div><b>→</b></a>
+          <a href="/ganaderia/fincas/{{ finca.id }}/actividades"><span>C</span><div><strong>Actividades</strong><small>Sanidad, reproducción y visitas</small></div><b>→</b></a>
+        </nav>
+        <section class="ganaderia-detail-grid ganaderia-contact-grid">
           <article><span>Propietario</span><strong>{{ finca.propietario or "Pendiente" }}</strong></article>
           <article><span>Teléfono</span><strong>{{ finca.telefono or "Pendiente" }}</strong></article>
           <article><span>Ubicación</span><strong>{{ finca.ubicacion or "Pendiente" }}</strong></article>

@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Actividades de {{ finca.nombre }} | Invagro{% endblock %}
+{% block body_class %}portal-shell-page ganaderia-app-page no-chat{% endblock %}
+{% block content %}
+  <div class="ganaderia-shell">
+    {% set ganaderia_active = "fincas" %}{% include "partials/ganaderia_sidebar.html" %}
+    <div class="ganaderia-main">
+      <header class="ganaderia-topbar"><button class="ganaderia-menu" type="button" aria-label="Abrir menú" onclick="document.body.classList.toggle('ganaderia-menu-open')">☰</button><div><small>{{ finca.nombre|upper }}</small><h1>Actividades</h1></div><a class="ganaderia-back" href="/ganaderia/fincas/{{ finca.id }}">Volver a la finca</a></header>
+      <main class="ganaderia-content">
+        {% if created %}<div class="ganaderia-success">Actividad registrada correctamente.</div>{% endif %}{% if error %}<div class="form-error">{{ error }}</div>{% endif %}
+        <section class="ganaderia-agenda"><div><span>AGENDA</span><h2>Próximas actividades</h2></div><div class="ganaderia-agenda-list">{% for item in upcoming %}<article class="{% if item.proxima_fecha < today %}overdue{% endif %}"><time>{{ item.proxima_fecha.strftime('%d %b') }}</time><div><strong>{{ item.titulo }}</strong><small>{{ activity_label(item.tipo) }} · {{ animal_names.get(item.animal_id, "Actividad de finca") }}</small></div></article>{% else %}<div class="ganaderia-empty-inline">No hay próximas actividades programadas.</div>{% endfor %}</div></section>
+        <section class="ganaderia-record-layout{% if current.rol == 'finca' %} read-only{% endif %}">
+          <div class="ganaderia-user-list"><div class="ganaderia-panel-heading"><div><span>BITÁCORA</span><h2>Actividad reciente</h2></div><strong>{{ activities|length }}</strong></div><div class="ganaderia-activity-table">{% for item in activities %}<article><span class="ganaderia-timeline-dot {{ item.tipo }}"></span><div><strong>{{ item.titulo }}</strong><small>{{ activity_label(item.tipo) }} · {{ animal_names.get(item.animal_id, "Toda la finca") }}</small></div><time>{{ item.fecha.strftime('%d/%m/%Y') }}</time>{% if item.proxima_fecha %}<em class="{% if item.proxima_fecha < today %}overdue{% endif %}">Próxima {{ item.proxima_fecha.strftime('%d/%m/%Y') }}</em>{% else %}<span></span>{% endif %}</article>{% else %}<div class="ganaderia-empty-inline">No hay actividades registradas.</div>{% endfor %}</div></div>
+          {% if current.rol in ["superadmin", "veterinario"] %}<aside class="ganaderia-create-user"><span>NUEVA ACTIVIDAD</span><h2>Registrar actividad</h2><form method="post"><label>Animal<select name="animal_id"><option value="">Actividad general de finca</option>{% for animal in animals %}<option value="{{ animal.id }}">{{ animal.codigo }} · {{ animal.nombre or "Sin nombre" }}</option>{% endfor %}</select></label>{% include "partials/ganaderia_activity_fields.html" %}<button class="ganaderia-primary" type="submit">Guardar actividad</button></form></aside>{% endif %}
+        </section>
+      </main>
+    </div>
+  </div>
+{% endblock %}

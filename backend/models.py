@@ -143,6 +143,87 @@ class GanaderiaFincaUsuario(db.Model):
     fecha_asignacion = db.Column(db.DateTime)
 
 
+class GanaderiaPotrero(db.Model):
+    __tablename__ = "inva_ganaderia_potreros"
+    __table_args__ = (
+        db.UniqueConstraint("finca_id", "nombre", name="uq_gan_finca_potrero"),
+        {"extend_existing": True},
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    finca_id = db.Column(
+        db.Integer,
+        db.ForeignKey("inva_ganaderia_fincas.id"),
+        nullable=False,
+        index=True,
+    )
+    nombre = db.Column(db.String(120), nullable=False)
+    tipo = db.Column(db.String(30), nullable=False, default="potrero")
+    capacidad = db.Column(db.Integer)
+    descripcion = db.Column(db.Text)
+    activo = db.Column(db.Boolean, nullable=False, default=True)
+    fecha_registro = db.Column(db.DateTime)
+
+
+class GanaderiaAnimal(db.Model):
+    __tablename__ = "inva_ganaderia_animales"
+    __table_args__ = (
+        db.UniqueConstraint("finca_id", "codigo", name="uq_gan_finca_animal_codigo"),
+        {"extend_existing": True},
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    finca_id = db.Column(
+        db.Integer,
+        db.ForeignKey("inva_ganaderia_fincas.id"),
+        nullable=False,
+        index=True,
+    )
+    potrero_id = db.Column(db.Integer, db.ForeignKey("inva_ganaderia_potreros.id"), index=True)
+    codigo = db.Column(db.String(60), nullable=False)
+    nombre = db.Column(db.String(120))
+    raza = db.Column(db.String(100))
+    sexo = db.Column(db.String(15), nullable=False)
+    fecha_nacimiento = db.Column(db.Date)
+    peso_actual = db.Column(db.Numeric(10, 2))
+    procedencia = db.Column(db.String(160))
+    madre_codigo = db.Column(db.String(60))
+    padre_codigo = db.Column(db.String(60))
+    estado = db.Column(db.String(30), nullable=False, default="activo")
+    observaciones = db.Column(db.Text)
+    fecha_registro = db.Column(db.DateTime)
+
+
+class GanaderiaActividad(db.Model):
+    __tablename__ = "inva_ganaderia_actividades"
+    __table_args__ = {"extend_existing": True}
+
+    id = db.Column(db.Integer, primary_key=True)
+    finca_id = db.Column(
+        db.Integer,
+        db.ForeignKey("inva_ganaderia_fincas.id"),
+        nullable=False,
+        index=True,
+    )
+    animal_id = db.Column(db.Integer, db.ForeignKey("inva_ganaderia_animales.id"), index=True)
+    tipo = db.Column(db.String(40), nullable=False, index=True)
+    titulo = db.Column(db.String(160), nullable=False)
+    fecha = db.Column(db.Date, nullable=False, index=True)
+    proxima_fecha = db.Column(db.Date, index=True)
+    producto = db.Column(db.String(140))
+    dosis = db.Column(db.String(80))
+    peso = db.Column(db.Numeric(10, 2))
+    resultado = db.Column(db.String(160))
+    observaciones = db.Column(db.Text)
+    realizada_por_user_id = db.Column(
+        db.Integer,
+        db.ForeignKey("inva_ganaderia_usuarios.id"),
+        nullable=False,
+        index=True,
+    )
+    fecha_registro = db.Column(db.DateTime)
+
+
 class AvesGranjaCliente(db.Model):
     __tablename__ = "inva_aves_granja_clientes"
     __table_args__ = {"extend_existing": True}
