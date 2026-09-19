@@ -2174,6 +2174,7 @@ body {
 .ganaderia-create-user { position: sticky; top: 112px; }
 .ganaderia-create-user > p { margin: 10px 0 22px; color: #6f7e76; }
 .ganaderia-create-user form { display: grid; gap: 14px; }
+.ganaderia-create-user [hidden] { display: none !important; }
 .ganaderia-form-group { display: grid; gap: 14px; }
 .ganaderia-create-user label { display: grid; gap: 7px; color: #46564d; font-size: .82rem; font-weight: 800; }
 .ganaderia-create-user input { width: 100%; min-height: 46px; padding: 10px 12px; border: 1px solid #cfd9d2; border-radius: 7px; font: inherit; }
