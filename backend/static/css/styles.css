@@ -5479,6 +5479,262 @@ body.sidebar-open .mobile-sidebar-backdrop {
 }
 
 /* ============================================================
+   INGRESO DE PERSONAL · Selector de portales y login contextual
+   ============================================================ */
+.staff-portal-page {
+  min-height: 100vh;
+  background:
+    linear-gradient(120deg, rgba(5, 52, 31, 0.9), rgba(11, 109, 61, 0.66)),
+    url("/static/assets/perro-portada.jpg") center / cover fixed no-repeat;
+  color: #173126;
+  font-family: "Manrope", "Segoe UI", sans-serif;
+}
+
+.staff-portal-shell {
+  width: min(1120px, calc(100% - 40px));
+  margin: 0 auto;
+  padding: 30px 0 56px;
+}
+
+.staff-portal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 12px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.44);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 18px 40px rgba(5, 34, 21, 0.2);
+}
+
+.staff-portal-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #173126;
+  text-decoration: none;
+}
+
+.staff-portal-brand img {
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  object-fit: contain;
+  background: #fff;
+}
+
+.staff-portal-brand span,
+.staff-portal-brand strong,
+.staff-portal-brand small {
+  display: block;
+}
+
+.staff-portal-brand strong {
+  font-size: 1.1rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.staff-portal-brand small {
+  margin-top: 2px;
+  color: #6c7d74;
+}
+
+.staff-portal-back {
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: #edf4ef;
+  color: #0f5e3d;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.staff-portal-intro {
+  max-width: 720px;
+  padding: 82px 0 36px;
+  color: #fff;
+}
+
+.staff-portal-intro p {
+  margin: 0 0 10px;
+  color: #cdebd9;
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.staff-portal-intro h1 {
+  margin: 0 0 12px;
+  font-size: clamp(2.4rem, 6vw, 4.5rem);
+  line-height: 1;
+}
+
+.staff-portal-intro > span {
+  color: rgba(255, 255, 255, 0.84);
+  font-size: 1.05rem;
+  line-height: 1.6;
+}
+
+.staff-portal-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.staff-portal-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 18px;
+  min-height: 290px;
+  padding: 30px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.95);
+  color: #173126;
+  text-decoration: none;
+  box-shadow: 0 22px 52px rgba(5, 34, 21, 0.24);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.staff-portal-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 28px 60px rgba(5, 34, 21, 0.3);
+}
+
+.staff-portal-card::after {
+  content: "";
+  position: absolute;
+  right: -55px;
+  bottom: -75px;
+  width: 190px;
+  height: 190px;
+  border-radius: 50%;
+  background: rgba(15, 113, 72, 0.08);
+}
+
+.staff-portal-card.cattle {
+  border-top: 5px solid #dc8b2e;
+}
+
+.staff-portal-card.birds {
+  border-top: 5px solid #15955a;
+}
+
+.staff-portal-icon {
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  border-radius: 14px;
+  background: #e4f3e9;
+  color: #0a6b40;
+  font-size: 1.35rem;
+  font-weight: 900;
+}
+
+.staff-portal-card.cattle .staff-portal-icon {
+  background: #fff0dc;
+  color: #a95d0d;
+}
+
+.staff-portal-card p {
+  margin: 4px 0 8px;
+  color: #74837b;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.staff-portal-card h2 {
+  margin: 0 0 12px;
+  font-size: clamp(1.5rem, 3vw, 2.15rem);
+}
+
+.staff-portal-card div > span {
+  color: #5d6f66;
+  line-height: 1.6;
+}
+
+.staff-portal-card > strong {
+  align-self: end;
+  grid-column: 2;
+  color: #0d6a42;
+}
+
+.staff-portal-card.cattle > strong {
+  color: #a95d0d;
+}
+
+.login-portal-badge {
+  display: inline-flex;
+  margin: 0 0 14px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #e8f3eb;
+  color: #176c45;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.login-portal-aves .login-box {
+  border-top: 5px solid #15955a;
+}
+
+.login-portal-ganaderia .login-box {
+  border-top: 5px solid #dc8b2e;
+}
+
+.login-portal-ganaderia .login-portal-badge {
+  background: #fff0dc;
+  color: #9b560e;
+}
+
+.login-mascot {
+  object-fit: contain;
+  background: #fff;
+}
+
+@media (max-width: 760px) {
+  .staff-portal-shell {
+    width: min(100% - 24px, 560px);
+    padding-top: 12px;
+  }
+
+  .staff-portal-header {
+    padding: 10px;
+  }
+
+  .staff-portal-brand small {
+    display: none;
+  }
+
+  .staff-portal-back {
+    padding: 9px 10px;
+    font-size: 0.85rem;
+  }
+
+  .staff-portal-intro {
+    padding: 54px 4px 26px;
+  }
+
+  .staff-portal-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .staff-portal-card {
+    min-height: 230px;
+    padding: 24px;
+  }
+}
+
+/* ============================================================
    CAPA DE ROLES · Mostrar/ocultar opciones según rol del usuario
    El body lleva la clase role-admin | role-vendedor | role-contador
    ============================================================ */

@@ -1,15 +1,20 @@
 {% extends "base.html" %}
 {% block title %}Login - Invagro{% endblock %}
-{% block body_class %}login-page{% endblock %}
+{% block body_class %}login-page login-portal-{{ portal or 'interno' }}{% endblock %}
 {% block content %}
   <main class="login-container">
     <div class="login-box">
       <div class="login-header">
-        <img class="login-mascot" src="/static/assets/mascota.jpeg" alt="Mascota Invagro" />
+        <img class="login-mascot" src="/static/assets/logo.jpg" alt="Invagro" />
+        {% if portal in ["aves", "ganaderia"] %}
+          <span class="login-portal-badge">Acceso de personal</span>
+        {% endif %}
         <h1>INVAGRO</h1>
         <p class="subtitle">
           {% if portal == "aves" %}
             Invagro Aves
+          {% elif portal == "ganaderia" %}
+            Invagro Ganadería
           {% else %}
             Inversiones Agroindustriales
           {% endif %}
@@ -17,6 +22,8 @@
         <p class="tagline">
           {% if portal == "aves" %}
             Portal de Manejo de Aves
+          {% elif portal == "ganaderia" %}
+            Portal de Ganadería
           {% else %}
             Sistema de Facturacion
           {% endif %}
@@ -57,8 +64,8 @@
         </label>
 
         <button type="submit" class="primary-button">Iniciar sesion</button>
-        {% if portal == "aves" %}
-          <a class="link" href="/aves">Ir al portal aves</a>
+        {% if portal in ["aves", "ganaderia"] %}
+          <a class="link" href="/personal">Volver a portales</a>
         {% else %}
           <a class="link" href="/">Ir al inicio</a>
         {% endif %}
@@ -69,6 +76,8 @@
         <p class="product-line">
           {% if portal == "aves" %}
             Manejo sanitario, lotes y clientes de granja
+          {% elif portal == "ganaderia" %}
+            Gestión comercial y seguimiento de operaciones ganaderas
           {% else %}
             Productos Veterinarios y Shampoo para Perros
           {% endif %}

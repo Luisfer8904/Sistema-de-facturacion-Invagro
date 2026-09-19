@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#0f4c3a" />
+    <title>Ingreso personal | Invagro</title>
+    <link rel="icon" href="/static/assets/logo-cuadrado.png" />
+    <link rel="stylesheet" href="/static/css/styles.css?v=20260918-portales" />
+  </head>
+  <body class="staff-portal-page">
+    <main class="staff-portal-shell">
+      <header class="staff-portal-header">
+        <a class="staff-portal-brand" href="/">
+          <img src="/static/assets/logo.jpg" alt="Invagro" />
+          <span><strong>Invagro</strong><small>Acceso de personal</small></span>
+        </a>
+        <a class="staff-portal-back" href="/">Volver al inicio</a>
+      </header>
+
+      <section class="staff-portal-intro">
+        <p>Operaciones Invagro</p>
+        <h1>Selecciona tu portal</h1>
+        <span>Ingresa al área correspondiente para continuar con tus actividades.</span>
+      </section>
+
+      <section class="staff-portal-grid" aria-label="Portales disponibles">
+        <a class="staff-portal-card birds" href="/login?portal=aves">
+          <span class="staff-portal-icon" aria-hidden="true">A</span>
+          <div>
+            <p>Producción avícola</p>
+            <h2>Portal de aves</h2>
+            <span>Control de lotes, planes sanitarios y clientes de granja.</span>
+          </div>
+          <strong>Ingresar <span aria-hidden="true">→</span></strong>
+        </a>
+
+        <a class="staff-portal-card cattle" href="/login?portal=ganaderia">
+          <span class="staff-portal-icon" aria-hidden="true">G</span>
+          <div>
+            <p>Producción ganadera</p>
+            <h2>Portal de ganadería</h2>
+            <span>Gestión comercial, clientes, productos y seguimiento operativo.</span>
+          </div>
+          <strong>Ingresar <span aria-hidden="true">→</span></strong>
+        </a>
+      </section>
+    </main>
+  </body>
+</html>

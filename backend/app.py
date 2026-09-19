@@ -2027,8 +2027,13 @@ def create_app():
     def aves_landing():
         return redirect(url_for("login", portal="aves"))
 
+    @app.get("/personal")
+    def personal_portal():
+        return render_template("personal_portal.html")
+
     def normalize_portal_target(raw_value):
-        return "aves" if (raw_value or "").strip().lower() == "aves" else "interno"
+        value = (raw_value or "").strip().lower()
+        return value if value in {"aves", "ganaderia"} else "interno"
 
     def normalize_aves_plan_type(raw_value):
         value = (raw_value or "").strip().lower()
@@ -2241,9 +2246,13 @@ def create_app():
     def login():
         portal_target = normalize_portal_target(request.args.get("portal"))
         if session.get("user"):
-            if portal_target == "aves":
-                return redirect(url_for("aves_dashboard"))
-            return redirect(url_for("dashboard"))
+            active_portal = normalize_portal_target(session.get("portal_target"))
+            if active_portal != portal_target:
+                session.clear()
+            else:
+                if portal_target == "aves":
+                    return redirect(url_for("aves_dashboard"))
+                return redirect(url_for("dashboard"))
 
         if request.method == "POST":
             username = request.form.get("username", "").strip()
@@ -3726,7 +3735,10 @@ def create_app():
 
     @app.get("/logout")
     def logout():
+        portal_target = normalize_portal_target(session.get("portal_target"))
         session.clear()
+        if portal_target in {"aves", "ganaderia"}:
+            return redirect(url_for("personal_portal"))
         return redirect(url_for("login"))
 
     # =========================================================
