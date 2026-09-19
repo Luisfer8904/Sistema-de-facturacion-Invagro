@@ -1990,6 +1990,222 @@ body {
   }
 }
 
+/* ============================================================
+   PORTAL DE GANADERIA
+   ============================================================ */
+.ganaderia-app-page {
+  margin: 0;
+  min-height: 100vh;
+  color: #17251f;
+  background: #f2f5f2;
+}
+
+.ganaderia-shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 268px minmax(0, 1fr);
+}
+
+.ganaderia-sidebar {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  padding: 26px 18px 22px;
+  display: flex;
+  flex-direction: column;
+  color: #f8fbf9;
+  background: #183d30;
+}
+
+.ganaderia-brand {
+  padding: 0 8px 26px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: inherit;
+  text-decoration: none;
+  border-bottom: 1px solid rgba(255,255,255,.12);
+}
+
+.ganaderia-brand img {
+  width: 50px;
+  height: 50px;
+  object-fit: cover;
+  border-radius: 12px;
+}
+
+.ganaderia-brand span { display: grid; gap: 3px; }
+.ganaderia-brand strong { font-size: 1.18rem; }
+.ganaderia-brand small { color: #c6d8ce; font-size: .76rem; }
+.ganaderia-sidebar nav { margin-top: 28px; display: grid; gap: 7px; }
+.ganaderia-sidebar nav a {
+  min-height: 48px;
+  padding: 0 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #d7e4dd;
+  border-radius: 8px;
+  font-weight: 700;
+  text-decoration: none;
+}
+.ganaderia-sidebar nav a:hover,
+.ganaderia-sidebar nav a.active { color: #173a2d; background: #f1b24b; }
+.ganaderia-sidebar nav a span { width: 22px; text-align: center; font-size: 1.15rem; }
+.ganaderia-logout {
+  margin-top: auto;
+  padding: 13px 14px;
+  color: #f8d5d5;
+  border-top: 1px solid rgba(255,255,255,.12);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.ganaderia-main { min-width: 0; }
+.ganaderia-topbar {
+  min-height: 92px;
+  padding: 18px clamp(22px, 4vw, 58px);
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  background: #fff;
+  border-bottom: 1px solid #dde5df;
+}
+.ganaderia-topbar > div:first-of-type { margin-right: auto; }
+.ganaderia-topbar small,
+.ganaderia-panel-heading span,
+.ganaderia-create-user > span,
+.ganaderia-section-heading span {
+  color: #84958b;
+  font-size: .7rem;
+  font-weight: 800;
+  letter-spacing: .12em;
+}
+.ganaderia-topbar h1 { margin: 3px 0 0; font-size: 1.35rem; letter-spacing: 0; }
+.ganaderia-user { display: grid; justify-items: end; gap: 3px; }
+.ganaderia-user span { font-weight: 800; }
+.ganaderia-user small { color: #9a661c; letter-spacing: 0; }
+.ganaderia-menu { display: none; width: 42px; height: 42px; border: 1px solid #d8e1db; background: #fff; border-radius: 8px; font-size: 1.25rem; }
+.ganaderia-back { color: #315947; font-weight: 800; text-decoration: none; }
+
+.ganaderia-content { padding: clamp(22px, 4vw, 58px); }
+.ganaderia-hero {
+  min-height: 250px;
+  padding: clamp(30px, 5vw, 64px);
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 30px;
+  color: #fff;
+  background: linear-gradient(115deg, #173c2f 0%, #245743 65%, #9b681e 140%);
+  border-radius: 8px;
+  box-shadow: 0 18px 38px rgba(30,61,49,.15);
+}
+.ganaderia-eyebrow { color: #f4c36f; font-size: .75rem; font-weight: 800; letter-spacing: .13em; }
+.ganaderia-hero h2 { margin: 12px 0 10px; max-width: 680px; color: #fff; font-size: clamp(2rem, 4vw, 3.4rem); letter-spacing: 0; line-height: 1.02; }
+.ganaderia-hero p { max-width: 650px; margin: 0; color: #dbe8e1; font-size: 1rem; }
+.ganaderia-primary {
+  min-height: 46px;
+  padding: 0 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #20362c;
+  background: #f1b24b;
+  border: 0;
+  border-radius: 7px;
+  font: inherit;
+  font-weight: 800;
+  text-decoration: none;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.ganaderia-primary:hover { background: #f5c16c; }
+
+.ganaderia-stats {
+  margin-top: 18px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+.ganaderia-stats article {
+  min-height: 150px;
+  padding: 24px;
+  display: grid;
+  align-content: space-between;
+  background: #fff;
+  border: 1px solid #dfe6e1;
+  border-radius: 8px;
+}
+.ganaderia-stats span { color: #687970; font-weight: 700; }
+.ganaderia-stats strong { font-size: 2.2rem; letter-spacing: 0; }
+.ganaderia-stats strong.ganaderia-role-value { font-size: 1.5rem; }
+.ganaderia-stats small { color: #8b9991; }
+.ganaderia-section-heading { margin: 46px 0 18px; display: flex; align-items: end; justify-content: space-between; gap: 24px; }
+.ganaderia-section-heading h2,
+.ganaderia-panel-heading h2,
+.ganaderia-create-user h2 { margin: 5px 0 0; font-size: 1.55rem; letter-spacing: 0; }
+.ganaderia-section-heading p { max-width: 500px; margin: 0; color: #6f7e76; text-align: right; }
+.ganaderia-modules { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.ganaderia-modules article { padding: 26px; background: #fff; border: 1px solid #dfe6e1; border-radius: 8px; }
+.ganaderia-module-icon { width: 42px; height: 42px; display: grid; place-items: center; color: #875916; background: #fff2d8; border-radius: 7px; font-weight: 900; }
+.ganaderia-modules h3 { margin: 24px 0 8px; }
+.ganaderia-modules p { min-height: 48px; margin: 0 0 24px; color: #6b7a72; }
+.ganaderia-modules small { color: #9a661c; font-weight: 800; }
+
+.ganaderia-users-layout { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(310px, .8fr); gap: 20px; align-items: start; }
+.ganaderia-user-list,
+.ganaderia-create-user { padding: 28px; background: #fff; border: 1px solid #dfe6e1; border-radius: 8px; }
+.ganaderia-panel-heading { margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; }
+.ganaderia-panel-heading > strong { width: 40px; height: 40px; display: grid; place-items: center; color: #fff; background: #214c3b; border-radius: 7px; }
+.ganaderia-success { margin-bottom: 16px; padding: 12px 14px; color: #1b6b43; background: #e9f7ef; border: 1px solid #c7ead5; border-radius: 7px; }
+.ganaderia-user-table { display: grid; border-top: 1px solid #e4e9e5; }
+.ganaderia-user-row { min-height: 78px; display: grid; grid-template-columns: 44px minmax(150px, 1fr) auto auto auto; align-items: center; gap: 14px; border-bottom: 1px solid #e9edea; }
+.ganaderia-user-row.inactive { opacity: .58; }
+.ganaderia-avatar { width: 38px; height: 38px; display: grid; place-items: center; color: #1d4d3a; background: #e5f1eb; border-radius: 50%; font-weight: 900; }
+.ganaderia-user-row > div:nth-child(2) { min-width: 0; display: grid; gap: 4px; }
+.ganaderia-user-row > div:nth-child(2) span { overflow: hidden; color: #7c8a82; font-size: .82rem; text-overflow: ellipsis; }
+.ganaderia-role,
+.ganaderia-status { padding: 6px 9px; border-radius: 999px; font-size: .72rem; font-weight: 800; }
+.ganaderia-role { color: #805314; background: #fff2d8; }
+.ganaderia-status.active { color: #1a6b43; background: #e8f6ee; }
+.ganaderia-status.inactive { color: #8b3d43; background: #fbe9ea; }
+.ganaderia-text-button { padding: 7px; color: #8b3d43; background: transparent; border: 0; font: inherit; font-size: .78rem; font-weight: 800; cursor: pointer; }
+.ganaderia-create-user { position: sticky; top: 112px; }
+.ganaderia-create-user > p { margin: 10px 0 22px; color: #6f7e76; }
+.ganaderia-create-user form { display: grid; gap: 14px; }
+.ganaderia-create-user label { display: grid; gap: 7px; color: #46564d; font-size: .82rem; font-weight: 800; }
+.ganaderia-create-user input { width: 100%; min-height: 46px; padding: 10px 12px; border: 1px solid #cfd9d2; border-radius: 7px; font: inherit; }
+.ganaderia-create-user input:focus { border-color: #9a661c; outline: 3px solid rgba(241,178,75,.2); }
+
+@media (max-width: 980px) {
+  .ganaderia-shell { grid-template-columns: 1fr; }
+  .ganaderia-sidebar { position: fixed; left: 0; z-index: 140; width: 270px; transform: translateX(-100%); transition: transform .2s ease; }
+  .ganaderia-menu-open .ganaderia-sidebar { transform: translateX(0); }
+  .ganaderia-menu { display: block; }
+  .ganaderia-users-layout { grid-template-columns: 1fr; }
+  .ganaderia-create-user { position: static; }
+}
+
+@media (max-width: 700px) {
+  .ganaderia-topbar { min-height: 76px; padding: 14px 16px; }
+  .ganaderia-user { display: none; }
+  .ganaderia-content { padding: 16px; }
+  .ganaderia-hero { min-height: 300px; padding: 28px 22px; align-items: flex-start; flex-direction: column; justify-content: center; }
+  .ganaderia-hero h2 { font-size: 2.2rem; }
+  .ganaderia-stats,
+  .ganaderia-modules { grid-template-columns: 1fr; }
+  .ganaderia-section-heading { align-items: start; flex-direction: column; }
+  .ganaderia-section-heading p { text-align: left; }
+  .ganaderia-user-list,
+  .ganaderia-create-user { padding: 20px 16px; }
+  .ganaderia-user-row { padding: 14px 0; grid-template-columns: 42px 1fr auto; }
+  .ganaderia-user-row .ganaderia-role { display: none; }
+  .ganaderia-user-row form,
+  .ganaderia-user-row > span:last-child { grid-column: 2 / -1; }
+  .ganaderia-back { font-size: .78rem; }
+}
+
 @media (max-width: 720px) {
   .aves-complete-editor {
     grid-template-columns: 1fr;

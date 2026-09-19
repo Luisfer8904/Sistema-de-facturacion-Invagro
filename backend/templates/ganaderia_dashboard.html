@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Dashboard Ganadería | Invagro{% endblock %}
+{% block body_class %}portal-shell-page ganaderia-app-page no-chat{% endblock %}
+{% block content %}
+  <div class="ganaderia-shell">
+    <aside class="ganaderia-sidebar">
+      <a class="ganaderia-brand" href="/ganaderia/dashboard">
+        <img src="/static/assets/logo.jpg" alt="Invagro" />
+        <span><strong>Invagro</strong><small>Portal de ganadería</small></span>
+      </a>
+      <nav aria-label="Navegación de ganadería">
+        <a class="active" href="/ganaderia/dashboard"><span>⌂</span> Dashboard</a>
+        {% if session.get('ganaderia_rol') == 'superadmin' %}
+          <a href="/ganaderia/usuarios"><span>♙</span> Usuarios</a>
+        {% endif %}
+      </nav>
+      <a class="ganaderia-logout" href="/logout">Cerrar sesión</a>
+    </aside>
+
+    <div class="ganaderia-main">
+      <header class="ganaderia-topbar">
+        <button class="ganaderia-menu" type="button" aria-label="Abrir menú" onclick="document.body.classList.toggle('ganaderia-menu-open')">☰</button>
+        <div><small>PORTAL DE GANADERÍA</small><h1>Dashboard</h1></div>
+        <div class="ganaderia-user"><span>{{ current.nombre_completo }}</span><small>{{ current.rol|replace('superadmin', 'Superadministrador')|replace('usuario', 'Usuario') }}</small></div>
+      </header>
+
+      <main class="ganaderia-content">
+        <section class="ganaderia-hero">
+          <div>
+            <span class="ganaderia-eyebrow">CONTROL GANADERO</span>
+            <h2>Bienvenido, {{ current.nombre_completo.split(' ')[0] }}</h2>
+            <p>Este será el centro de trabajo para organizar la operación ganadera de Invagro.</p>
+          </div>
+          {% if current.rol == "superadmin" %}
+            <a class="ganaderia-primary" href="/ganaderia/usuarios">Administrar usuarios</a>
+          {% endif %}
+        </section>
+
+        <section class="ganaderia-stats" aria-label="Resumen del portal">
+          <article><span>Usuarios registrados</span><strong>{{ users_total }}</strong><small>Accesos creados</small></article>
+          <article><span>Usuarios activos</span><strong>{{ users_active }}</strong><small>Con acceso al portal</small></article>
+          <article><span>Tu perfil</span><strong class="ganaderia-role-value">{{ "Superadmin" if current.rol == "superadmin" else "Usuario" }}</strong><small>Permisos actuales</small></article>
+        </section>
+
+        <section class="ganaderia-section-heading">
+          <div><span>PRÓXIMAS ÁREAS</span><h2>Gestión ganadera</h2></div>
+          <p>La base de acceso ya está lista para incorporar los módulos operativos.</p>
+        </section>
+        <section class="ganaderia-modules">
+          <article><span class="ganaderia-module-icon">G</span><h3>Ganado</h3><p>Registro y seguimiento individual del hato.</p><small>Próximamente</small></article>
+          <article><span class="ganaderia-module-icon">S</span><h3>Sanidad</h3><p>Vacunación, tratamientos y controles sanitarios.</p><small>Próximamente</small></article>
+          <article><span class="ganaderia-module-icon">P</span><h3>Producción</h3><p>Indicadores productivos y control de resultados.</p><small>Próximamente</small></article>
+        </section>
+      </main>
+    </div>
+  </div>
+{% endblock %}

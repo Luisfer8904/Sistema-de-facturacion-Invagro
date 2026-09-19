@@ -6,6 +6,7 @@ import time
 import unicodedata
 from datetime import datetime, timedelta
 from decimal import Decimal
+from functools import wraps
 from uuid import uuid4
 
 import pymysql
@@ -65,6 +66,7 @@ from models import (
     DetallePedido,
     FacturaContado,
     FacturaCredito,
+    GanaderiaUser,
     Pedido,
     Producto,
     User,
@@ -2173,6 +2175,55 @@ def create_app():
         value = (raw_value or "").strip().lower()
         return value if value in {"aves", "ganaderia"} else "interno"
 
+    @app.before_request
+    def enforce_portal_boundaries():
+        """Keep each authenticated portal inside its own route namespace."""
+        if not session.get("user"):
+            return None
+
+        portal_target = normalize_portal_target(session.get("portal_target"))
+        path = request.path
+        shared_paths = {"/", "/personal", "/login", "/logout"}
+        if path in shared_paths or path.startswith("/static/"):
+            return None
+
+        if portal_target == "aves" and not (
+            path == "/dashboard-aves" or path.startswith("/aves/")
+        ):
+            return redirect(url_for("aves_dashboard"))
+        if portal_target == "ganaderia" and not path.startswith("/ganaderia/"):
+            return redirect(url_for("ganaderia_dashboard"))
+        if portal_target == "interno" and (
+            path == "/dashboard-aves"
+            or path.startswith("/aves/")
+            or path.startswith("/ganaderia/")
+        ):
+            return redirect(url_for("dashboard"))
+        return None
+
+    def ganaderia_login_required(view_func):
+        @wraps(view_func)
+        def wrapper(*args, **kwargs):
+            if (
+                not session.get("user")
+                or session.get("portal_target") != "ganaderia"
+                or not session.get("ganaderia_user_id")
+            ):
+                return redirect(url_for("login", portal="ganaderia"))
+            return view_func(*args, **kwargs)
+
+        return wrapper
+
+    def ganaderia_superadmin_required(view_func):
+        @wraps(view_func)
+        @ganaderia_login_required
+        def wrapper(*args, **kwargs):
+            if session.get("ganaderia_rol") != "superadmin":
+                abort(403)
+            return view_func(*args, **kwargs)
+
+        return wrapper
+
     def normalize_aves_plan_type(raw_value):
         value = (raw_value or "").strip().lower()
         allowed = {"vacunacion", "despique", "desparasitacion"}
@@ -2390,6 +2441,8 @@ def create_app():
             else:
                 if portal_target == "aves":
                     return redirect(url_for("aves_dashboard"))
+                if portal_target == "ganaderia":
+                    return redirect(url_for("ganaderia_dashboard"))
                 return redirect(url_for("dashboard"))
 
         if request.method == "POST":
@@ -2409,6 +2462,11 @@ def create_app():
             try:
                 if portal_target == "aves":
                     user = AvesUser.query.filter_by(username=username, activo=True).first()
+                elif portal_target == "ganaderia":
+                    user = GanaderiaUser.query.filter(
+                        func.lower(GanaderiaUser.email) == username.lower(),
+                        GanaderiaUser.activo.is_(True),
+                    ).first()
                 else:
                     user = User.query.filter_by(username=username, activo=True).first()
             except SQLAlchemyError:
@@ -2426,9 +2484,17 @@ def create_app():
                 )
 
             session.permanent = remember
-            session["user"] = user.username
+            session["user"] = (
+                user.email if portal_target == "ganaderia" else user.username
+            )
             session["portal_target"] = portal_target
             # Guardar id y rol para control de acceso (auth_helpers)
+            if portal_target == "ganaderia":
+                user.ultimo_acceso = datetime.utcnow()
+                db.session.commit()
+                session["ganaderia_user_id"] = user.id
+                session["ganaderia_rol"] = user.rol
+                return redirect(url_for("ganaderia_dashboard"))
             if portal_target != "aves":
                 session["user_id"] = user.id
                 session["rol"] = getattr(user, "rol", "admin") or "admin"
@@ -2437,6 +2503,90 @@ def create_app():
             return redirect(url_for("dashboard"))
 
         return render_template("login.html", portal=portal_target)
+
+    @app.get("/ganaderia/dashboard")
+    @ganaderia_login_required
+    def ganaderia_dashboard():
+        current = GanaderiaUser.query.get(session["ganaderia_user_id"])
+        if not current or not current.activo:
+            session.clear()
+            return redirect(url_for("login", portal="ganaderia"))
+
+        users_total = GanaderiaUser.query.count()
+        users_active = GanaderiaUser.query.filter_by(activo=True).count()
+        return render_template(
+            "ganaderia_dashboard.html",
+            current=current,
+            users_total=users_total,
+            users_active=users_active,
+        )
+
+    @app.route("/ganaderia/usuarios", methods=["GET", "POST"])
+    @ganaderia_superadmin_required
+    def ganaderia_usuarios():
+        error = None
+        form_values = {"nombre_completo": "", "email": ""}
+        if request.method == "POST":
+            form_values = {
+                "nombre_completo": request.form.get("nombre_completo", "").strip(),
+                "email": request.form.get("email", "").strip().lower(),
+            }
+            password = request.form.get("password", "")
+            password2 = request.form.get("password2", "")
+
+            if not form_values["nombre_completo"] or not form_values["email"]:
+                error = "Nombre y correo son obligatorios."
+            elif "@" not in form_values["email"]:
+                error = "Ingresa un correo valido."
+            elif len(password) < 8:
+                error = "La contrasena debe tener al menos 8 caracteres."
+            elif password != password2:
+                error = "Las contrasenas no coinciden."
+            elif GanaderiaUser.query.filter(
+                func.lower(GanaderiaUser.email) == form_values["email"]
+            ).first():
+                error = "Ya existe un usuario con ese correo."
+            else:
+                try:
+                    db.session.add(
+                        GanaderiaUser(
+                            email=form_values["email"],
+                            password=generate_password_hash(password),
+                            nombre_completo=form_values["nombre_completo"],
+                            rol="usuario",
+                            activo=True,
+                            fecha_creacion=datetime.utcnow(),
+                        )
+                    )
+                    db.session.commit()
+                    return redirect(url_for("ganaderia_usuarios", created="1"))
+                except SQLAlchemyError:
+                    db.session.rollback()
+                    error = "No se pudo crear el usuario. Intenta nuevamente."
+
+        users = GanaderiaUser.query.order_by(
+            GanaderiaUser.activo.desc(), GanaderiaUser.nombre_completo.asc()
+        ).all()
+        return render_template(
+            "ganaderia_usuarios.html",
+            users=users,
+            error=error,
+            created=request.args.get("created") == "1",
+            form_values=form_values,
+            current_user_id=session.get("ganaderia_user_id"),
+        )
+
+    @app.post("/ganaderia/usuarios/<int:user_id>/estado")
+    @ganaderia_superadmin_required
+    def ganaderia_usuario_estado(user_id):
+        user = GanaderiaUser.query.get_or_404(user_id)
+        if user.id != session.get("ganaderia_user_id") and user.rol != "superadmin":
+            try:
+                user.activo = not user.activo
+                db.session.commit()
+            except SQLAlchemyError:
+                db.session.rollback()
+        return redirect(url_for("ganaderia_usuarios"))
 
     @app.get("/dashboard")
     @login_required

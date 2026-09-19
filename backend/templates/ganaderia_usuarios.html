@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Usuarios Ganadería | Invagro{% endblock %}
+{% block body_class %}portal-shell-page ganaderia-app-page no-chat{% endblock %}
+{% block content %}
+  <div class="ganaderia-shell">
+    <aside class="ganaderia-sidebar">
+      <a class="ganaderia-brand" href="/ganaderia/dashboard">
+        <img src="/static/assets/logo.jpg" alt="Invagro" />
+        <span><strong>Invagro</strong><small>Portal de ganadería</small></span>
+      </a>
+      <nav aria-label="Navegación de ganadería">
+        <a href="/ganaderia/dashboard"><span>⌂</span> Dashboard</a>
+        <a class="active" href="/ganaderia/usuarios"><span>♙</span> Usuarios</a>
+      </nav>
+      <a class="ganaderia-logout" href="/logout">Cerrar sesión</a>
+    </aside>
+
+    <div class="ganaderia-main">
+      <header class="ganaderia-topbar">
+        <button class="ganaderia-menu" type="button" aria-label="Abrir menú" onclick="document.body.classList.toggle('ganaderia-menu-open')">☰</button>
+        <div><small>CONFIGURACIÓN</small><h1>Usuarios</h1></div>
+        <a class="ganaderia-back" href="/ganaderia/dashboard">Volver al dashboard</a>
+      </header>
+
+      <main class="ganaderia-content">
+        <section class="ganaderia-users-layout">
+          <div class="ganaderia-user-list">
+            <div class="ganaderia-panel-heading"><div><span>ACCESOS</span><h2>Usuarios del portal</h2></div><strong>{{ users|length }}</strong></div>
+            {% if created %}<div class="ganaderia-success">Usuario creado correctamente.</div>{% endif %}
+            <div class="ganaderia-user-table">
+              {% for item in users %}
+                <article class="ganaderia-user-row{% if not item.activo %} inactive{% endif %}">
+                  <div class="ganaderia-avatar">{{ item.nombre_completo[:1]|upper }}</div>
+                  <div><strong>{{ item.nombre_completo }}</strong><span>{{ item.email }}</span></div>
+                  <span class="ganaderia-role">{{ "Superadmin" if item.rol == "superadmin" else "Usuario" }}</span>
+                  <span class="ganaderia-status {{ 'active' if item.activo else 'inactive' }}">{{ "Activo" if item.activo else "Inactivo" }}</span>
+                  {% if item.id != current_user_id and item.rol != "superadmin" %}
+                    <form method="post" action="/ganaderia/usuarios/{{ item.id }}/estado">
+                      <button type="submit" class="ganaderia-text-button">{{ "Desactivar" if item.activo else "Activar" }}</button>
+                    </form>
+                  {% else %}<span></span>{% endif %}
+                </article>
+              {% endfor %}
+            </div>
+          </div>
+
+          <aside class="ganaderia-create-user">
+            <span>NUEVO ACCESO</span><h2>Crear usuario</h2>
+            <p>El usuario podrá ingresar únicamente al portal de ganadería.</p>
+            {% if error %}<div class="form-error">{{ error }}</div>{% endif %}
+            <form method="post">
+              <label>Nombre completo<input type="text" name="nombre_completo" value="{{ form_values.nombre_completo }}" required autocomplete="name" /></label>
+              <label>Correo electrónico<input type="email" name="email" value="{{ form_values.email }}" required autocomplete="email" /></label>
+              <label>Contraseña<input type="password" name="password" minlength="8" required autocomplete="new-password" /></label>
+              <label>Confirmar contraseña<input type="password" name="password2" minlength="8" required autocomplete="new-password" /></label>
+              <button class="ganaderia-primary" type="submit">Crear usuario</button>
+            </form>
+          </aside>
+        </section>
+      </main>
+    </div>
+  </div>
+{% endblock %}

@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#0f4c3a" />
     <title>{% block title %}Sistema de Facturacion Invagro{% endblock %}</title>
     <link rel="icon" href="/static/assets/logo-cuadrado.png" />
-    <link rel="stylesheet" href="/static/css/styles.css?v=20260918-portales" />
+    <link rel="stylesheet" href="/static/css/styles.css?v=20260918-ganaderia" />
     <link rel="stylesheet" href="/static/css/invoice_analysis.css?v=20260813" />
     <link rel="stylesheet" href="/static/css/personal_charge_analysis.css?v=20260916-filtro" />
   </head>
@@ -16,7 +16,7 @@
     {% if "dashboard-page" in body_class_value and not request.path.startswith("/aves") %}
       {% include "partials/app_sidebar.html" %}
     {% endif %}
-    {% if "dashboard-page" not in body_class_value %}
+    {% if "dashboard-page" not in body_class_value and "portal-shell-page" not in body_class_value %}
       <header class="site-header">
         <a href="/" class="logo">
           <img src="/static/assets/logo.jpg" alt="Logo Invagro" class="logo-image" />

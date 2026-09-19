@@ -43,6 +43,20 @@ class AvesUser(db.Model):
     fecha_creacion = db.Column(db.DateTime)
 
 
+class GanaderiaUser(db.Model):
+    __tablename__ = "inva_ganaderia_usuarios"
+    __table_args__ = {"extend_existing": True}
+
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(120), unique=True, nullable=False, index=True)
+    password = db.Column(db.String(255), nullable=False)
+    nombre_completo = db.Column(db.String(120), nullable=False)
+    rol = db.Column(db.String(20), nullable=False, default="usuario")
+    activo = db.Column(db.Boolean, nullable=False, default=True)
+    fecha_creacion = db.Column(db.DateTime)
+    ultimo_acceso = db.Column(db.DateTime)
+
+
 class AvesGranjaCliente(db.Model):
     __tablename__ = "inva_aves_granja_clientes"
     __table_args__ = {"extend_existing": True}

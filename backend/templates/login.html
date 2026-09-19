@@ -37,11 +37,11 @@
       <form class="login-form" method="post" action="/login">
         <input type="hidden" name="portal" value="{{ portal or 'interno' }}" />
         <label class="field">
-          <span>Usuario</span>
+          <span>{% if portal == "ganaderia" %}Correo electrónico{% else %}Usuario{% endif %}</span>
           <input
-            type="text"
+            type="{% if portal == 'ganaderia' %}email{% else %}text{% endif %}"
             name="username"
-            placeholder="Ingresa tu usuario"
+            placeholder="{% if portal == 'ganaderia' %}nombre@correo.com{% else %}Ingresa tu usuario{% endif %}"
             required
             autocomplete="username"
           />
