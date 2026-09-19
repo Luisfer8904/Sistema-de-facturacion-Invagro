@@ -53,6 +53,18 @@
 
       <script src="/static/js/chat_widget.js"></script>
     {% endif %}
-    <script src="/static/js/mobile_nav.js"></script>
+    <script>
+      document.addEventListener("DOMContentLoaded", () => {
+        document.querySelectorAll(".topbar-right").forEach((topbarRight) => {
+          if (topbarRight.querySelector(".topbar-logout")) return;
+          const logout = document.createElement("a");
+          logout.href = "/logout";
+          logout.className = "topbar-logout";
+          logout.textContent = "Cerrar sesión";
+          topbarRight.appendChild(logout);
+        });
+      });
+    </script>
+    <script src="/static/js/mobile_nav.js?v=20260720-tablet-sidebar"></script>
   </body>
 </html>

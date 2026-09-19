@@ -61,8 +61,10 @@ from models import (
     ChatSession,
     ChatSummary,
     DetalleFacturaContado,
+    DetalleFacturaCredito,
     DetallePedido,
     FacturaContado,
+    FacturaCredito,
     Pedido,
     Producto,
     User,
@@ -386,6 +388,18 @@ def create_app():
             "closed_charge": ("Este cobro ya no admite pagos porque no esta pendiente.", True),
             "save_error": ("No se pudo guardar el cobro personal.", True),
             "payment_error": ("No se pudo registrar el pago del cobro personal.", True),
+            "deleted": ("Cobro personal eliminado correctamente.", False),
+            "delete_has_payments": (
+                "No se puede eliminar un cobro que ya tiene pagos registrados.",
+                True,
+            ),
+            "delete_error": ("No se pudo eliminar el cobro personal.", True),
+            "updated": ("Cobro personal actualizado correctamente.", False),
+            "edit_has_payments": (
+                "No se puede editar un cobro que ya tiene pagos registrados.",
+                True,
+            ),
+            "edit_error": ("No se pudo actualizar el cobro personal.", True),
         }
         return status_map.get(status_code, (None, False))
 
@@ -470,6 +484,11 @@ def create_app():
 
         try:
             clientes = Cliente.query.order_by(Cliente.nombre.asc()).all()
+            usuarios = (
+                User.query.filter_by(activo=True)
+                .order_by(User.nombre_completo.asc(), User.username.asc())
+                .all()
+            )
             pending_q = (
                 db.session.query(CobroPersonal, User)
                 .outerjoin(User, CobroPersonal.usuario_id == User.id)
@@ -526,6 +545,7 @@ def create_app():
             payment_rows = []
             detail_rows = []
             clientes = []
+            usuarios = []
             cobros_pendientes_count = 0
             saldo_total = 0
             cobros_pagados_count = 0
@@ -546,10 +566,19 @@ def create_app():
                 else (usuario.username if usuario else "N/A")
             )
             detail_count = len(detail_map.get(cobro.id, []))
+            detail_items = [
+                {
+                    "descripcion": detail.descripcion,
+                    "cantidad": f"{Decimal(str(detail.cantidad or 0)):.2f}",
+                    "precio_unitario": f"{Decimal(str(detail.precio_unitario or 0)):.2f}",
+                }
+                for detail in detail_map.get(cobro.id, [])
+            ]
             pending_charges.append(
                 {
                     "id": cobro.id,
                     "numero_cobro": cobro.numero_cobro,
+                    "cliente_id": cobro.cliente_id,
                     "nombre": cobro.nombre,
                     "concepto": cobro.concepto,
                     "telefono": cobro.telefono or "-",
@@ -563,9 +592,16 @@ def create_app():
                         if cobro.fecha_vencimiento
                         else "-"
                     ),
+                    "fecha_vencimiento": (
+                        cobro.fecha_vencimiento.isoformat()
+                        if cobro.fecha_vencimiento
+                        else ""
+                    ),
                     "usuario": usuario_nombre,
+                    "usuario_id": cobro.usuario_id,
                     "observaciones": (cobro.observaciones or "").strip(),
                     "detail_count": detail_count,
+                    "detail_items": detail_items or build_default_personal_charge_items(),
                 }
             )
 
@@ -578,6 +614,7 @@ def create_app():
             )
             payment_history.append(
                 {
+                    "id": abono.id,
                     "numero_cobro": cobro.numero_cobro,
                     "nombre": cobro.nombre,
                     "concepto": cobro.concepto,
@@ -597,30 +634,26 @@ def create_app():
                 if usuario and usuario.nombre_completo
                 else (usuario.username if usuario else "General")
             )
-            charges.append(
-                {
-                    "id": cobro.id,
-                    "numero_cobro": cobro.numero_cobro,
-                    "nombre": cobro.nombre,
-                    "concepto": cobro.concepto,
-                    "fecha": cobro.fecha,
-                    "fecha_label": cobro.fecha.strftime("%d/%m/%Y") if cobro.fecha else "-",
-                    "vencimiento_label": (
-                        cobro.fecha_vencimiento.strftime("%d/%m/%Y")
-                        if cobro.fecha_vencimiento else "-"
-                    ),
-                    "total": cobro.total or Decimal("0"),
-                    "saldo": cobro.saldo or Decimal("0"),
-                    "estado": (cobro.estado or "pendiente").upper(),
-                    "responsable": responsable or "General",
-                }
-            )
+            charges.append({
+                "id": cobro.id,
+                "numero_cobro": cobro.numero_cobro,
+                "nombre": cobro.nombre,
+                "concepto": cobro.concepto,
+                "fecha": cobro.fecha,
+                "fecha_label": cobro.fecha.strftime("%d/%m/%Y") if cobro.fecha else "-",
+                "vencimiento_label": (cobro.fecha_vencimiento.strftime("%d/%m/%Y") if cobro.fecha_vencimiento else "-"),
+                "total": cobro.total or Decimal("0"),
+                "saldo": cobro.saldo or Decimal("0"),
+                "estado": (cobro.estado or "pendiente").upper(),
+                "responsable": responsable or "General",
+            })
 
         return {
             "form_values": default_form_values,
             "personal_charge_message": message,
             "personal_charge_message_error": is_error,
             "clientes": clientes,
+            "usuarios": usuarios,
             "pending_charges": pending_charges,
             "charges": charges,
             "payment_history": payment_history,
@@ -1524,21 +1557,6 @@ def create_app():
             return fallback
         return (user.nombre_completo or user.username or fallback).strip() or fallback
 
-    def clean_conflict_artifacts(value, fallback="-"):
-        if value is None:
-            return fallback
-        text_value = str(value)
-        cleaned_lines = []
-        for raw_line in text_value.splitlines():
-            stripped = raw_line.strip()
-            if not stripped:
-                continue
-            if stripped.startswith(("<<<<<<<", "=======", ">>>>>>>")):
-                continue
-            cleaned_lines.append(stripped)
-        cleaned = " ".join(cleaned_lines).strip()
-        return cleaned or fallback
-
     def build_user_name_map(user_ids):
         valid_ids = {int(user_id) for user_id in (user_ids or []) if user_id}
         if not valid_ids:
@@ -2013,6 +2031,126 @@ def create_app():
 
         doc.build(story)
 
+    def create_personal_payment_receipt_pdf(file_path, settings, cobro, abono, usuario):
+        parent_dir = os.path.dirname(file_path)
+        if parent_dir and not os.path.isdir(parent_dir):
+            os.makedirs(parent_dir, exist_ok=True)
+
+        styles = getSampleStyleSheet()
+        doc = SimpleDocTemplate(
+            file_path,
+            pagesize=letter,
+            leftMargin=28,
+            rightMargin=28,
+            topMargin=26,
+            bottomMargin=26,
+        )
+        story = []
+        logo_path = os.path.join(app.static_folder, "assets", "logo.jpg")
+        logo_image = Image(logo_path, width=58, height=58) if os.path.exists(logo_path) else ""
+
+        negocio = settings.nombre if settings and settings.nombre else "Invagro"
+        fecha_pago = abono.fecha.strftime("%d/%m/%Y %I:%M %p") if abono.fecha else "-"
+        header_center = (
+            f"<b>{negocio}</b><br/>"
+            f"{settings.direccion or '' if settings else ''}<br/>"
+            f"TEL: {settings.telefono or '-' if settings else '-'} &nbsp;&nbsp; "
+            f"EMAIL: {settings.email or '-' if settings else '-'}"
+        )
+        header_right = (
+            "<b>RECIBO DE COBRO</b><br/>"
+            f"RECIBO: RCP-{abono.id:06d}<br/>"
+            f"FECHA: {fecha_pago}"
+        )
+        header_table = Table(
+            [[logo_image, Paragraph(header_center, styles["Normal"]), Paragraph(header_right, styles["Normal"])]],
+            colWidths=[82, 292, 138],
+        )
+        header_table.setStyle(
+            TableStyle(
+                [
+                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                    ("ALIGN", (2, 0), (2, 0), "RIGHT"),
+                    ("LINEBELOW", (0, 0), (-1, 0), 0.75, colors.black),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+                ]
+            )
+        )
+        story.append(header_table)
+        story.append(Spacer(1, 12))
+
+        cobrador = usuario.nombre_completo if usuario and usuario.nombre_completo else (usuario.username if usuario else "-")
+        saldo_restante = cobro.saldo or Decimal("0")
+        info_data = [
+            ["Cobro", cobro.numero_cobro or "-"],
+            ["Persona", cobro.nombre or "-"],
+            ["Telefono", cobro.telefono or "-"],
+            ["Concepto", cobro.concepto or "-"],
+            ["Cobrador", cobrador],
+        ]
+        info_table = Table(info_data, colWidths=[110, 402])
+        info_table.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#f3f4f6")),
+                    ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+                    ("BOX", (0, 0), (-1, -1), 0.6, colors.HexColor("#d1d5db")),
+                    ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#e5e7eb")),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 8),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+                    ("TOPPADDING", (0, 0), (-1, -1), 7),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
+                ]
+            )
+        )
+        story.append(info_table)
+        story.append(Spacer(1, 14))
+
+        payment_data = [
+            ["Total del cobro", f"L {float(cobro.total or 0):,.2f}"],
+            ["Monto recibido", f"L {float(abono.monto or 0):,.2f}"],
+            ["Saldo restante", f"L {float(saldo_restante):,.2f}"],
+        ]
+        payment_table = Table(payment_data, colWidths=[180, 150])
+        payment_table.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#f3f4f6")),
+                    ("FONTNAME", (0, 0), (-1, -1), "Helvetica-Bold"),
+                    ("GRID", (0, 0), (-1, -1), 0.6, colors.HexColor("#d1d5db")),
+                    ("ALIGN", (1, 0), (1, -1), "RIGHT"),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 8),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+                    ("TOPPADDING", (0, 0), (-1, -1), 8),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+                ]
+            )
+        )
+        story.append(payment_table)
+        story.append(Spacer(1, 10))
+        story.append(Paragraph(f"<b>Monto en letras:</b> {amount_to_words(abono.monto or 0).upper()}", styles["Normal"]))
+        if abono.comentario:
+            story.append(Spacer(1, 8))
+            story.append(Paragraph(f"<b>Comentario:</b> {abono.comentario}", styles["Normal"]))
+        story.append(Spacer(1, 18))
+        story.append(Paragraph("Recibo interno de pago aplicado a cobro personal. No sustituye una factura fiscal.", styles["Normal"]))
+        story.append(Spacer(1, 34))
+
+        firmas = Table(
+            [["______________________________", "______________________________"], ["Recibido por", "Entregado por"]],
+            colWidths=[256, 256],
+        )
+        firmas.setStyle(
+            TableStyle(
+                [
+                    ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                    ("TOPPADDING", (0, 0), (-1, -1), 10),
+                ]
+            )
+        )
+        story.append(firmas)
+        doc.build(story)
+
     if not app.debug and not app.testing:
         logging.basicConfig(
             level=logging.INFO,
@@ -2449,9 +2587,7 @@ def create_app():
                 .all()
             )
             clientes_map = {
-                cliente.id: clean_conflict_artifacts(
-                    cliente.nombre, fallback="Cliente sin nombre"
-                )
+                cliente.id: (cliente.nombre or "Cliente sin nombre").strip()
                 for cliente in Cliente.query.all()
             }
             vendedores_map = build_user_name_map(
@@ -2471,9 +2607,7 @@ def create_app():
                 facturas_pendientes_cobro.append(
                     {
                         "id": factura.id,
-                        "numero_factura": clean_conflict_artifacts(
-                            factura.numero_factura, fallback="Sin numero"
-                        ),
+                        "numero_factura": (factura.numero_factura or "Sin numero").strip(),
                         "cliente": clientes_map.get(
                             factura.cliente_id, "Cliente no disponible"
                         ),
@@ -2483,10 +2617,9 @@ def create_app():
                         "total": total,
                         "abonado": abonado,
                         "saldo": saldo,
-                        "vendedor": clean_conflict_artifacts(
-                            vendedores_map.get(factura.usuario_id, "General"),
-                            fallback="General",
-                        ),
+                        "vendedor": (
+                            vendedores_map.get(factura.usuario_id, "General") or "General"
+                        ).strip(),
                     }
                 )
             cobros_pendientes_raw = (
@@ -2523,9 +2656,7 @@ def create_app():
                         ),
                         "total": cobro.total or Decimal("0"),
                         "saldo": cobro.saldo or Decimal("0"),
-                        "responsable": clean_conflict_artifacts(
-                            responsable, fallback="N/A"
-                        ),
+                        "responsable": (responsable or "N/A").strip(),
                     }
                 )
             cartera_total_pendiente = (credito_total or 0) + (cobros_personales_saldo or 0)
@@ -2536,6 +2667,77 @@ def create_app():
                 cobros_personales_share = float(
                     (cobros_personales_saldo / cartera_total_pendiente) * 100
                 )
+            month_names = {
+                1: "Ene",
+                2: "Feb",
+                3: "Mar",
+                4: "Abr",
+                5: "May",
+                6: "Jun",
+                7: "Jul",
+                8: "Ago",
+                9: "Sep",
+                10: "Oct",
+                11: "Nov",
+                12: "Dic",
+            }
+
+            def month_start_with_offset(reference, offset):
+                month_index = reference.year * 12 + reference.month - 1 + offset
+                return datetime(month_index // 12, month_index % 12 + 1, 1)
+
+            month_points = []
+            base_month = datetime(now.year, now.month, 1)
+            for index, offset in enumerate(range(-5, 1)):
+                start_month = month_start_with_offset(base_month, offset)
+                end_month = month_start_with_offset(base_month, offset + 1)
+                total_month = (
+                    db.session.query(func.coalesce(func.sum(FacturaContado.total), 0))
+                    .filter(FacturaContado.estado != "anulada")
+                    .filter(FacturaContado.fecha >= start_month)
+                    .filter(FacturaContado.fecha < end_month)
+                    .scalar()
+                    or 0
+                )
+                personal_charges_month = (
+                    db.session.query(func.coalesce(func.sum(CobroPersonal.total), 0))
+                    .filter(CobroPersonal.estado != "anulado")
+                    .filter(CobroPersonal.fecha >= start_month)
+                    .filter(CobroPersonal.fecha < end_month)
+                    .scalar()
+                    or 0
+                )
+                total_month = total_month + personal_charges_month
+                month_points.append(
+                    {
+                        "label": month_names[start_month.month],
+                        "total": float(total_month or 0),
+                        "x": 8 + (index * 16.8),
+                    }
+                )
+            chart_peak = max([point["total"] for point in month_points] or [0])
+            for point in month_points:
+                if chart_peak:
+                    point["y"] = 30 - ((point["total"] / chart_peak) * 24)
+                else:
+                    point["y"] = 30
+            sales_chart_points = " ".join(
+                f"{point['x']:.1f},{point['y']:.1f}" for point in month_points
+            )
+            sales_chart_area = (
+                f"{month_points[0]['x']:.1f},32 {sales_chart_points} {month_points[-1]['x']:.1f},32"
+                if month_points
+                else ""
+            )
+            sales_current_month_total = month_points[-1]["total"] if month_points else 0
+            sales_previous_month_total = month_points[-2]["total"] if len(month_points) > 1 else 0
+            if sales_previous_month_total:
+                sales_month_change = (
+                    (sales_current_month_total - sales_previous_month_total)
+                    / sales_previous_month_total
+                ) * 100
+            else:
+                sales_month_change = 0
         except SQLAlchemyError:
             db.session.rollback()
             clientes_count = 0
@@ -2552,6 +2754,11 @@ def create_app():
             cartera_total_pendiente = 0
             credito_share = 0
             cobros_personales_share = 0
+            month_points = []
+            sales_chart_points = ""
+            sales_chart_area = ""
+            sales_current_month_total = 0
+            sales_month_change = 0
 
         return render_template(
             "dashboard.html",
@@ -2570,79 +2777,11 @@ def create_app():
             cartera_total_pendiente=cartera_total_pendiente,
             credito_share=credito_share,
             cobros_personales_share=cobros_personales_share,
-        )
-
-    @app.get("/cobros-personales/<int:cobro_id>/detalle")
-    def cobro_personal_detalle(cobro_id):
-        if not session.get("user"):
-            return redirect(url_for("login"))
-        cobro = CobroPersonal.query.get_or_404(cobro_id)
-        if current_user_is_vendedor() and cobro.usuario_id != current_user_id():
-            abort(403)
-        cliente = Cliente.query.get(cobro.cliente_id) if cobro.cliente_id else None
-        responsable = User.query.get(cobro.usuario_id) if cobro.usuario_id else None
-        detalles = (
-            CobroPersonalDetalle.query.filter_by(cobro_id=cobro.id)
-            .order_by(CobroPersonalDetalle.id.asc()).all()
-        )
-        total_detalles = sum(
-            (detalle.subtotal or Decimal("0") for detalle in detalles), Decimal("0")
-        )
-        items = []
-        unidades = Decimal("0")
-        for detalle in detalles:
-            cantidad = detalle.cantidad or Decimal("0")
-            subtotal = detalle.subtotal or Decimal("0")
-            unidades += cantidad
-            items.append(
-                {
-                    "descripcion": detalle.descripcion,
-                    "cantidad": cantidad,
-                    "precio_unitario": detalle.precio_unitario or Decimal("0"),
-                    "subtotal": subtotal,
-                    "participacion": (
-                        float(subtotal / total_detalles * 100)
-                        if total_detalles > 0 else 0
-                    ),
-                }
-            )
-        items_analisis = sorted(
-            items, key=lambda item: item["subtotal"], reverse=True
-        )[:6]
-        abonos_db = (
-            AbonoCobroPersonal.query.filter_by(cobro_id=cobro.id)
-            .order_by(AbonoCobroPersonal.fecha.asc(), AbonoCobroPersonal.id.asc()).all()
-        )
-        usuarios_map = build_user_name_map(
-            [abono.usuario_id for abono in abonos_db if abono.usuario_id]
-        )
-        abonos = [
-            {
-                "fecha": abono.fecha,
-                "monto": abono.monto or Decimal("0"),
-                "comentario": (abono.comentario or "").strip(),
-                "usuario": usuarios_map.get(abono.usuario_id, "General") or "General",
-            }
-            for abono in abonos_db
-        ]
-        total = cobro.total or Decimal("0")
-        saldo = max(Decimal("0"), cobro.saldo or Decimal("0"))
-        pagado = max(Decimal("0"), total - saldo)
-        porcentaje_pagado = float(pagado / total * 100) if total > 0 else 0
-        dias_vencido = 0
-        if cobro.fecha_vencimiento and saldo > 0:
-            dias_vencido = max(0, (datetime.utcnow().date() - cobro.fecha_vencimiento).days)
-        responsable_nombre = (
-            (responsable.nombre_completo or responsable.username)
-            if responsable else "General"
-        ) or "General"
-        return render_template(
-            "cobro_personal_detalle.html", user=session["user"], cobro=cobro,
-            cliente=cliente, responsable=responsable_nombre, items=items,
-            items_analisis=items_analisis, unidades=unidades, abonos=abonos,
-            total=total, saldo=saldo, pagado=pagado,
-            porcentaje_pagado=porcentaje_pagado, dias_vencido=dias_vencido,
-            status_code=(request.args.get("status") or "").strip().lower(),
+            month_points=month_points,
+            sales_chart_points=sales_chart_points,
+            sales_chart_area=sales_chart_area,
+            sales_current_month_total=sales_current_month_total,
+            sales_month_change=sales_month_change,
         )
 
     @app.get("/dashboard-aves")
@@ -3927,10 +4066,108 @@ def create_app():
                     error = "No se pudo guardar el cliente."
 
         clientes_list = Cliente.query.order_by(Cliente.id.desc()).all()
+        clientes_ids = [cliente.id for cliente in clientes_list]
+        invoice_stats = {}
+        credit_stats = {}
+        personal_stats = {}
+        if clientes_ids:
+            invoice_rows = (
+                db.session.query(
+                    FacturaContado.cliente_id,
+                    func.count(FacturaContado.id),
+                    func.coalesce(func.sum(FacturaContado.total), 0),
+                    func.max(FacturaContado.fecha),
+                )
+                .filter(FacturaContado.cliente_id.in_(clientes_ids))
+                .filter(FacturaContado.estado != "anulada")
+                .group_by(FacturaContado.cliente_id)
+                .all()
+            )
+            invoice_stats = {
+                cliente_id: {
+                    "facturas": int(cantidad or 0),
+                    "total": total or Decimal("0"),
+                    "ultima": ultima,
+                }
+                for cliente_id, cantidad, total, ultima in invoice_rows
+            }
+            credit_rows = (
+                db.session.query(
+                    FacturaContado.cliente_id,
+                    func.count(FacturaContado.id),
+                    func.coalesce(func.sum(FacturaContado.total), 0),
+                    func.coalesce(func.sum(FacturaContado.pago), 0),
+                )
+                .filter(FacturaContado.cliente_id.in_(clientes_ids))
+                .filter(FacturaContado.estado == "credito")
+                .group_by(FacturaContado.cliente_id)
+                .all()
+            )
+            credit_stats = {
+                cliente_id: {
+                    "facturas": int(cantidad or 0),
+                    "saldo": max(
+                        (total or Decimal("0")) - (pagado or Decimal("0")),
+                        Decimal("0"),
+                    ),
+                }
+                for cliente_id, cantidad, total, pagado in credit_rows
+            }
+            personal_rows = (
+                db.session.query(
+                    CobroPersonal.cliente_id,
+                    func.count(CobroPersonal.id),
+                    func.coalesce(func.sum(CobroPersonal.saldo), 0),
+                    func.max(CobroPersonal.fecha),
+                )
+                .filter(CobroPersonal.cliente_id.in_(clientes_ids))
+                .filter(CobroPersonal.estado == "pendiente")
+                .group_by(CobroPersonal.cliente_id)
+                .all()
+            )
+            personal_stats = {
+                cliente_id: {
+                    "cuentas": int(cantidad or 0),
+                    "saldo": saldo or Decimal("0"),
+                    "ultima": ultima,
+                }
+                for cliente_id, cantidad, saldo, ultima in personal_rows
+            }
+
+        clientes_cards = []
+        for cliente in clientes_list:
+            invoice = invoice_stats.get(cliente.id, {})
+            credit = credit_stats.get(cliente.id, {})
+            personal = personal_stats.get(cliente.id, {})
+            ultima_actividad = max(
+                [fecha for fecha in [invoice.get("ultima"), personal.get("ultima")] if fecha],
+                default=None,
+            )
+            clientes_cards.append(
+                {
+                    "id": cliente.id,
+                    "nombre": cliente.nombre,
+                    "ruc_dni": cliente.ruc_dni,
+                    "telefono": cliente.telefono,
+                    "email": cliente.email,
+                    "direccion": cliente.direccion,
+                    "facturas": invoice.get("facturas", 0),
+                    "total_facturado": invoice.get("total", Decimal("0")),
+                    "facturas_credito": credit.get("facturas", 0),
+                    "saldo_credito": credit.get("saldo", Decimal("0")),
+                    "cobros_personales": personal.get("cuentas", 0),
+                    "saldo_cobros_personales": personal.get("saldo", Decimal("0")),
+                    "ultima_actividad": (
+                        ultima_actividad.strftime("%d/%m/%Y")
+                        if ultima_actividad
+                        else "-"
+                    ),
+                }
+            )
         return render_template(
             "clientes.html",
             user=session["user"],
-            clientes=clientes_list,
+            clientes=clientes_cards,
             error=error,
         )
 
@@ -3958,6 +4195,109 @@ def create_app():
             productos=productos_list,
             pedidos_listos=pedidos_listos,
         )
+
+    @app.get("/facturacion/ultimo-precio")
+    @login_required
+    def facturacion_ultimo_precio():
+        try:
+            cliente_id = int(request.args.get("cliente_id", ""))
+            producto_id = int(request.args.get("producto_id", ""))
+        except (TypeError, ValueError):
+            return jsonify({"found": False, "error": "Cliente o producto invalido."}), 400
+
+        cliente = Cliente.query.get(cliente_id)
+        producto = Producto.query.get(producto_id)
+        if not cliente or not producto:
+            return jsonify({"found": False, "error": "Cliente o producto no encontrado."}), 404
+
+        contado = (
+            db.session.query(FacturaContado, DetalleFacturaContado)
+            .join(
+                DetalleFacturaContado,
+                DetalleFacturaContado.factura_id == FacturaContado.id,
+            )
+            .filter(
+                FacturaContado.cliente_id == cliente_id,
+                DetalleFacturaContado.producto_id == producto_id,
+                FacturaContado.estado != "anulada",
+            )
+            .order_by(FacturaContado.fecha.desc())
+            .first()
+        )
+        credito = (
+            db.session.query(FacturaCredito, DetalleFacturaCredito)
+            .join(
+                DetalleFacturaCredito,
+                DetalleFacturaCredito.factura_id == FacturaCredito.id,
+            )
+            .filter(
+                FacturaCredito.cliente_id == cliente_id,
+                DetalleFacturaCredito.producto_id == producto_id,
+                FacturaCredito.estado != "anulada",
+            )
+            .order_by(FacturaCredito.fecha.desc())
+            .first()
+        )
+
+        candidates = []
+        if contado:
+            candidates.append(("contado", contado[0], contado[1]))
+        if credito:
+            candidates.append(("credito", credito[0], credito[1]))
+
+        if not candidates:
+            return jsonify({"found": False})
+
+        tipo, factura, detalle = max(
+            candidates,
+            key=lambda item: item[1].fecha or datetime.min,
+        )
+        precio = Decimal(str(detalle.precio_unitario or 0)).quantize(Decimal("0.01"))
+        descuento = Decimal(str(detalle.descuento or 0)).quantize(Decimal("0.01"))
+        precio_neto = max(Decimal("0.00"), precio - descuento).quantize(Decimal("0.01"))
+        fecha = factura.fecha.strftime("%d/%m/%Y") if factura.fecha else "-"
+
+        return jsonify(
+            {
+                "found": True,
+                "tipo": tipo,
+                "numero_factura": factura.numero_factura,
+                "fecha": fecha,
+                "precio_unitario": float(precio),
+                "descuento": float(descuento),
+                "precio_neto": float(precio_neto),
+            }
+        )
+
+    def resolve_facturacion_cliente(cliente_id, cliente_nombre, rtn):
+        if cliente_id:
+            try:
+                cliente_id = int(cliente_id)
+            except (TypeError, ValueError):
+                raise ValueError("Cliente invalido.")
+            cliente = Cliente.query.get(cliente_id)
+            if not cliente:
+                raise ValueError("Cliente no encontrado.")
+            return cliente
+
+        cliente_nombre = (cliente_nombre or "").strip()
+        rtn = (rtn or "").strip() or None
+        if not cliente_nombre:
+            return None
+
+        if rtn:
+            cliente = Cliente.query.filter_by(ruc_dni=rtn).first()
+            if cliente:
+                return cliente
+
+        cliente = Cliente(
+            nombre=cliente_nombre[:100],
+            ruc_dni=rtn,
+            fecha_registro=datetime.utcnow(),
+        )
+        db.session.add(cliente)
+        db.session.flush()
+        return cliente
 
     @app.get("/pedidos")
     @login_required
@@ -4006,6 +4346,7 @@ def create_app():
 
         data = request.get_json(silent=True) or {}
         cliente_id = data.get("cliente_id") or None
+        cliente_nombre = (data.get("cliente_nombre") or "").strip()
         rtn = (data.get("rtn") or "").strip() or None
         fecha_raw = (data.get("fecha") or "").strip()
         items = data.get("items") or []
@@ -4067,6 +4408,8 @@ def create_app():
         numero_pedido = generate_order_number()
 
         try:
+            cliente = resolve_facturacion_cliente(cliente_id, cliente_nombre, rtn)
+            cliente_id = cliente.id if cliente else None
             pedido = Pedido(
                 numero_pedido=numero_pedido,
                 cliente_id=cliente_id,
@@ -4094,11 +4437,138 @@ def create_app():
                     )
                 )
             db.session.commit()
+        except ValueError as exc:
+            db.session.rollback()
+            return jsonify({"error": str(exc)}), 400
         except SQLAlchemyError:
             db.session.rollback()
             return jsonify({"error": "No se pudo guardar el pedido."}), 500
 
         return jsonify({"pedido_id": pedido.id, "numero_pedido": numero_pedido})
+
+    @app.post("/cobros-personales/desde-facturacion")
+    def crear_cobro_personal_desde_facturacion():
+        if not session.get("user"):
+            return jsonify({"error": "No autorizado."}), 401
+
+        data = request.get_json(silent=True) or {}
+        cliente_id = data.get("cliente_id") or None
+        cliente_nombre = (data.get("cliente_nombre") or "").strip()
+        rtn = (data.get("rtn") or "").strip() or None
+        items = data.get("items") or []
+
+        if not cliente_id and not cliente_nombre:
+            return jsonify({"error": "Selecciona o escribe un cliente para crear el cobro personal."}), 400
+        if not items:
+            return jsonify({"error": "No hay productos en el cobro personal."}), 400
+
+        producto_ids = []
+        parsed_items = []
+        for item in items:
+            try:
+                producto_id = int(item.get("producto_id"))
+                cantidad = Decimal(str(item.get("cantidad")))
+                descuento = Decimal(str(item.get("descuento", 0) or 0))
+            except (TypeError, ValueError):
+                return jsonify({"error": "Producto o cantidad invalida."}), 400
+            if cantidad <= 0:
+                return jsonify({"error": "Cantidad invalida."}), 400
+            if descuento < 0:
+                return jsonify({"error": "Descuento invalido."}), 400
+            producto_ids.append(producto_id)
+            parsed_items.append((producto_id, cantidad, descuento))
+
+        productos = Producto.query.filter(Producto.id.in_(producto_ids)).all()
+        productos_map = {producto.id: producto for producto in productos}
+        if len(productos_map) != len(set(producto_ids)):
+            return jsonify({"error": "Producto no encontrado."}), 400
+
+        subtotal = Decimal("0")
+        isv = Decimal("0")
+        detalle_items = []
+        for producto_id, cantidad, descuento in parsed_items:
+            producto = productos_map[producto_id]
+            precio = Decimal(str(producto.precio))
+            descuento_unit = min(descuento, precio)
+            precio_neto = max(Decimal("0"), precio - descuento_unit)
+            linea_neta = precio_neto * cantidad
+            subtotal += linea_neta
+            if producto.isv_aplica:
+                isv += linea_neta * Decimal("0.15")
+            detalle_items.append(
+                {
+                    "descripcion": producto.nombre,
+                    "cantidad": cantidad,
+                    "precio_unitario": precio_neto,
+                    "subtotal": linea_neta,
+                }
+            )
+
+        if isv > 0:
+            detalle_items.append(
+                {
+                    "descripcion": "ISV 15%",
+                    "cantidad": Decimal("1"),
+                    "precio_unitario": isv,
+                    "subtotal": isv,
+                }
+            )
+
+        total = (subtotal + isv).quantize(Decimal("0.01"))
+        if total <= 0:
+            return jsonify({"error": "El total del cobro debe ser mayor a cero."}), 400
+
+        usuario = User.query.filter_by(username=session["user"]).first()
+        concepto = (
+            f"Venta personal - {detalle_items[0]['descripcion']}"
+            if len(detalle_items) == 1
+            else f"Venta personal - {detalle_items[0]['descripcion']} y {len(detalle_items) - 1} lineas"
+        )
+
+        try:
+            cliente = resolve_facturacion_cliente(cliente_id, cliente_nombre, rtn)
+            if not cliente:
+                return jsonify({"error": "Cliente invalido."}), 400
+            cobro = CobroPersonal(
+                numero_cobro=generate_personal_charge_number(),
+                cliente_id=cliente.id,
+                nombre=cliente.nombre,
+                concepto=concepto[:160],
+                telefono=cliente.telefono or None,
+                fecha=datetime.utcnow(),
+                total=total,
+                saldo=total,
+                observaciones="Generado desde facturacion como cobro personal.",
+                usuario_id=usuario.id if usuario else None,
+                estado="pendiente",
+            )
+            db.session.add(cobro)
+            db.session.flush()
+            for item in detalle_items:
+                db.session.add(
+                    CobroPersonalDetalle(
+                        cobro_id=cobro.id,
+                        descripcion=item["descripcion"],
+                        cantidad=item["cantidad"],
+                        precio_unitario=item["precio_unitario"],
+                        subtotal=item["subtotal"],
+                    )
+                )
+            db.session.commit()
+        except ValueError as exc:
+            db.session.rollback()
+            return jsonify({"error": str(exc)}), 400
+        except SQLAlchemyError:
+            db.session.rollback()
+            return jsonify({"error": "No se pudo guardar el cobro personal."}), 500
+
+        return jsonify(
+            {
+                "cobro_id": cobro.id,
+                "numero_cobro": cobro.numero_cobro,
+                "total": float(total),
+            }
+        )
 
     @app.get("/pedidos/<int:pedido_id>/data")
     def obtener_pedido(pedido_id):
@@ -4299,6 +4769,86 @@ def create_app():
             raise ValueError("Rango de fechas invalido.")
         end_exclusive = end_date + timedelta(days=1)
         return start_date, end_exclusive
+
+    def query_sales_report(start_date, end_exclusive):
+        rows = (
+            db.session.query(FacturaContado, Cliente.nombre.label("cliente_nombre"))
+            .outerjoin(Cliente, Cliente.id == FacturaContado.cliente_id)
+            .filter(FacturaContado.estado != "anulada")
+            .filter(FacturaContado.fecha >= start_date)
+            .filter(FacturaContado.fecha < end_exclusive)
+            .order_by(FacturaContado.fecha.desc(), FacturaContado.id.desc())
+            .all()
+        )
+        ventas = []
+        total_vendido = Decimal("0")
+        total_abonado = Decimal("0")
+        total_saldo = Decimal("0")
+        for factura, cliente_nombre in rows:
+            total = Decimal(str(factura.total or 0))
+            abonado = Decimal(str(factura.pago or 0))
+            saldo = max(total - abonado, Decimal("0"))
+            total_vendido += total
+            total_abonado += abonado
+            total_saldo += saldo
+            ventas.append(
+                {
+                    "numero_factura": factura.numero_factura,
+                    "fecha": factura.fecha.strftime("%d/%m/%Y") if factura.fecha else "-",
+                    "cliente": cliente_nombre or "Consumidor final",
+                    "estado": factura.estado or "-",
+                    "total": float(total),
+                    "abonado": float(abonado),
+                    "saldo": float(saldo),
+                }
+            )
+        return ventas, {
+            "total": float(total_vendido),
+            "abonado": float(total_abonado),
+            "saldo": float(total_saldo),
+            "cantidad": len(ventas),
+        }
+
+    @app.post("/reportes/ventas")
+    def reportes_ventas():
+        if not session.get("user"):
+            return jsonify({"error": "No autorizado"}), 401
+
+        data = request.get_json(silent=True) or {}
+        start_raw = (data.get("start_date") or "").strip()
+        end_raw = (data.get("end_date") or "").strip()
+        try:
+            start_date, end_exclusive = parse_report_date_range(start_raw, end_raw)
+        except ValueError:
+            return jsonify({"error": "Rango de fechas invalido."}), 400
+
+        ventas, totales = query_sales_report(start_date, end_exclusive)
+        return jsonify({"ventas": ventas, "totales": totales})
+
+    @app.post("/reportes/ventas/pdf")
+    def reportes_ventas_pdf():
+        if not session.get("user"):
+            return jsonify({"error": "No autorizado"}), 401
+
+        data = request.get_json(silent=True) or {}
+        start_raw = (data.get("start_date") or "").strip()
+        end_raw = (data.get("end_date") or "").strip()
+        try:
+            start_date, end_exclusive = parse_report_date_range(start_raw, end_raw)
+        except ValueError:
+            return jsonify({"error": "Rango de fechas invalido."}), 400
+
+        ventas, totales = query_sales_report(start_date, end_exclusive)
+        settings = get_business_settings()
+        safe_base = f"ventas-{datetime.utcnow():%Y%m%d%H%M%S}"
+        filename = build_invoice_pdf_filename(safe_base)
+        file_path = os.path.join(app.config["INVOICE_PDF_FOLDER"], filename)
+        cleanup_old_pdfs(app.config["INVOICE_PDF_FOLDER"], prefix="ventas-")
+        create_sales_report_pdf(
+            file_path, settings, ventas, totales, start_date, end_exclusive
+        )
+        pdf_url = url_for("static", filename=f"invoices/{filename}", _external=True)
+        return jsonify({"pdf_url": pdf_url})
 
     @app.post("/reportes/productos-top")
     def reportes_productos_top():
@@ -4803,6 +5353,107 @@ def create_app():
         story.append(total_table)
         doc.build(story)
 
+    def create_sales_report_pdf(
+        file_path, settings, ventas, totales, start_date, end_exclusive
+    ):
+        styles = getSampleStyleSheet()
+        doc = SimpleDocTemplate(
+            file_path,
+            pagesize=letter,
+            leftMargin=18,
+            rightMargin=18,
+            topMargin=22,
+            bottomMargin=22,
+        )
+        story = []
+        logo_path = os.path.join(app.static_folder, "assets", "logo.jpg")
+        logo_image = None
+        if os.path.exists(logo_path):
+            logo_image = Image(logo_path, width=60, height=60)
+
+        header_center = (
+            f"<b>{settings.nombre}</b><br/>"
+            f"{settings.direccion or ''}<br/>"
+            f"RTN: {settings.rtn or '-'} &nbsp;&nbsp; TEL: {settings.telefono or '-'}<br/>"
+            f"{settings.email or ''}"
+        )
+        rango_texto = (
+            f"{start_date:%d/%m/%Y} - {(end_exclusive - timedelta(days=1)):%d/%m/%Y}"
+        )
+        header_right = f"<b>REPORTE DE VENTAS</b><br/>RANGO: {rango_texto}"
+        header_table = Table(
+            [
+                [
+                    logo_image or "",
+                    Paragraph(header_center, styles["Normal"]),
+                    Paragraph(header_right, styles["Normal"]),
+                ]
+            ],
+            colWidths=[80, 300, 150],
+        )
+        header_table.setStyle(
+            TableStyle(
+                [
+                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                    ("ALIGN", (2, 0), (2, 0), "RIGHT"),
+                    ("LINEBELOW", (0, 0), (-1, 0), 0.75, colors.black),
+                ]
+            )
+        )
+        story.append(header_table)
+        story.append(Spacer(1, 10))
+
+        table_data = [["FACTURA", "FECHA", "CLIENTE", "ESTADO", "TOTAL", "ABONADO", "SALDO"]]
+        for venta in ventas:
+            table_data.append(
+                [
+                    venta["numero_factura"],
+                    venta["fecha"],
+                    venta["cliente"],
+                    venta["estado"],
+                    f"L {venta['total']:.2f}",
+                    f"L {venta['abonado']:.2f}",
+                    f"L {venta['saldo']:.2f}",
+                ]
+            )
+        table = Table(table_data, colWidths=[82, 58, 145, 54, 62, 62, 62])
+        table.setStyle(
+            TableStyle(
+                [
+                    ("BOX", (0, 0), (-1, -1), 0.75, colors.black),
+                    ("LINEBELOW", (0, 0), (-1, 0), 0.6, colors.black),
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.whitesmoke),
+                    ("ALIGN", (4, 1), (-1, -1), "RIGHT"),
+                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("FONTSIZE", (0, 0), (-1, 0), 8),
+                    ("FONTSIZE", (0, 1), (-1, -1), 8),
+                ]
+            )
+        )
+        story.append(table)
+        story.append(Spacer(1, 10))
+
+        total_table = Table(
+            [
+                ["FACTURAS", str(totales["cantidad"])],
+                ["TOTAL VENTAS", f"L {totales['total']:.2f}"],
+                ["TOTAL ABONADO", f"L {totales['abonado']:.2f}"],
+                ["SALDO PENDIENTE", f"L {totales['saldo']:.2f}"],
+            ],
+            colWidths=[150, 120],
+        )
+        total_table.setStyle(
+            TableStyle(
+                [
+                    ("ALIGN", (0, 0), (-1, -1), "RIGHT"),
+                    ("FONTNAME", (0, 0), (-1, -1), "Helvetica-Bold"),
+                    ("FONTSIZE", (0, 0), (-1, -1), 10),
+                ]
+            )
+        )
+        story.append(total_table)
+        doc.build(story)
+
     def create_top_products_pdf(
         file_path, settings, productos, total_vendido, start_date, end_exclusive
     ):
@@ -5048,7 +5699,7 @@ def create_app():
         create_account_statement_pdf(
             file_path, settings, cliente, facturas_credito, total_saldo
         )
-        pdf_url = url_for("static", filename=f"invoices/{filename}")
+        pdf_url = url_for("static", filename=f"invoices/{filename}", _external=True)
         return jsonify({"pdf_url": pdf_url})
 
     @app.route("/ajustes", methods=["GET", "POST"])
@@ -5541,6 +6192,59 @@ def create_app():
             ),
         )
 
+    @app.get("/cobros-personales/<int:cobro_id>/detalle")
+    def cobro_personal_detalle(cobro_id):
+        if not session.get("user"):
+            return redirect(url_for("login"))
+        cobro = CobroPersonal.query.get_or_404(cobro_id)
+        if current_user_is_vendedor() and cobro.usuario_id != current_user_id():
+            abort(403)
+        cliente = Cliente.query.get(cobro.cliente_id) if cobro.cliente_id else None
+        responsable = User.query.get(cobro.usuario_id) if cobro.usuario_id else None
+        detalles = (CobroPersonalDetalle.query.filter_by(cobro_id=cobro.id)
+            .order_by(CobroPersonalDetalle.id.asc()).all())
+        total_detalles = sum((detalle.subtotal or Decimal("0") for detalle in detalles), Decimal("0"))
+        items = []
+        unidades = Decimal("0")
+        for detalle in detalles:
+            cantidad = detalle.cantidad or Decimal("0")
+            subtotal = detalle.subtotal or Decimal("0")
+            unidades += cantidad
+            items.append({
+                "descripcion": detalle.descripcion,
+                "cantidad": cantidad,
+                "precio_unitario": detalle.precio_unitario or Decimal("0"),
+                "subtotal": subtotal,
+                "participacion": float(subtotal / total_detalles * 100) if total_detalles > 0 else 0,
+            })
+        items_analisis = sorted(items, key=lambda item: item["subtotal"], reverse=True)[:6]
+        abonos_db = (AbonoCobroPersonal.query.filter_by(cobro_id=cobro.id)
+            .order_by(AbonoCobroPersonal.fecha.asc(), AbonoCobroPersonal.id.asc()).all())
+        usuarios_map = build_user_name_map([abono.usuario_id for abono in abonos_db if abono.usuario_id])
+        abonos = [{
+            "fecha": abono.fecha,
+            "monto": abono.monto or Decimal("0"),
+            "comentario": (abono.comentario or "").strip(),
+            "usuario": usuarios_map.get(abono.usuario_id, "General") or "General",
+        } for abono in abonos_db]
+        total = cobro.total or Decimal("0")
+        saldo = max(Decimal("0"), cobro.saldo or Decimal("0"))
+        pagado = max(Decimal("0"), total - saldo)
+        porcentaje_pagado = float(pagado / total * 100) if total > 0 else 0
+        dias_vencido = 0
+        if cobro.fecha_vencimiento and saldo > 0:
+            dias_vencido = max(0, (datetime.utcnow().date() - cobro.fecha_vencimiento).days)
+        responsable_nombre = ((responsable.nombre_completo or responsable.username)
+            if responsable else "General") or "General"
+        return render_template(
+            "cobro_personal_detalle.html", user=session["user"], cobro=cobro,
+            cliente=cliente, responsable=responsable_nombre, items=items,
+            items_analisis=items_analisis, unidades=unidades, abonos=abonos,
+            total=total, saldo=saldo, pagado=pagado,
+            porcentaje_pagado=porcentaje_pagado, dias_vencido=dias_vencido,
+            status_code=(request.args.get("status") or "").strip().lower(),
+        )
+
     @app.post("/cobros-personales/<int:cobro_id>/abonos")
     def registrar_abono_cobro_personal(cobro_id):
         if not session.get("user"):
@@ -5587,6 +6291,162 @@ def create_app():
         return redirect(url_for(
             "cobro_personal_detalle", cobro_id=cobro.id, status="payment_recorded"
         ))
+
+    @app.post("/cobros-personales/<int:cobro_id>/edit")
+    def editar_cobro_personal(cobro_id):
+        if not session.get("user"):
+            return redirect(url_for("login"))
+
+        try:
+            cobro = CobroPersonal.query.get_or_404(cobro_id)
+            if current_user_is_vendedor() and cobro.usuario_id != current_user_id():
+                abort(403)
+            has_payments = (
+                AbonoCobroPersonal.query.filter_by(cobro_id=cobro.id).first()
+                is not None
+            )
+            if has_payments:
+                return redirect(url_for("cobros_personales", status="edit_has_payments"))
+            if cobro.estado != "pendiente":
+                return redirect(url_for("cobros_personales", status="closed_charge"))
+
+            _, parsed_items, total = parse_personal_charge_items(request.form)
+            nombre = (request.form.get("nombre") or "").strip()
+            concepto = (request.form.get("concepto") or "").strip()
+            telefono = (request.form.get("telefono") or "").strip() or None
+            observaciones = (request.form.get("observaciones") or "").strip() or None
+            fecha_vencimiento_raw = (
+                request.form.get("fecha_vencimiento") or ""
+            ).strip()
+            usuario_id_raw = (request.form.get("usuario_id") or "").strip()
+            cliente_id_raw = (request.form.get("cliente_id") or "").strip()
+
+            if not nombre:
+                return redirect(url_for("cobros_personales", status="edit_error"))
+
+            cliente_id = None
+            if cliente_id_raw:
+                try:
+                    cliente_id = int(cliente_id_raw)
+                except ValueError:
+                    return redirect(url_for("cobros_personales", status="edit_error"))
+                cliente = Cliente.query.get(cliente_id)
+                if not cliente:
+                    return redirect(url_for("cobros_personales", status="edit_error"))
+                nombre = cliente.nombre
+                if cliente.telefono and not telefono:
+                    telefono = cliente.telefono
+
+            fecha_vencimiento = None
+            if fecha_vencimiento_raw:
+                try:
+                    fecha_vencimiento = datetime.strptime(
+                        fecha_vencimiento_raw, "%Y-%m-%d"
+                    ).date()
+                except ValueError:
+                    return redirect(url_for("cobros_personales", status="edit_error"))
+
+            usuario_id = cobro.usuario_id
+            if current_user_is_vendedor():
+                usuario_id = current_user_id()
+            elif usuario_id_raw:
+                try:
+                    possible_user_id = int(usuario_id_raw)
+                except ValueError:
+                    possible_user_id = None
+                if possible_user_id:
+                    usuario = User.query.filter_by(
+                        id=possible_user_id, activo=True
+                    ).first()
+                    usuario_id = usuario.id if usuario else cobro.usuario_id
+            else:
+                usuario_id = None
+
+            CobroPersonalDetalle.query.filter_by(cobro_id=cobro.id).delete(
+                synchronize_session=False
+            )
+            cobro.cliente_id = cliente_id
+            cobro.nombre = nombre
+            cobro.concepto = concepto or parsed_items[0]["descripcion"]
+            cobro.telefono = telefono
+            cobro.fecha_vencimiento = fecha_vencimiento
+            cobro.total = total
+            cobro.saldo = total
+            cobro.observaciones = observaciones
+            cobro.usuario_id = usuario_id
+            for item in parsed_items:
+                db.session.add(
+                    CobroPersonalDetalle(
+                        cobro_id=cobro.id,
+                        descripcion=item["descripcion"],
+                        cantidad=item["cantidad"],
+                        precio_unitario=item["precio_unitario"],
+                        subtotal=item["subtotal"],
+                    )
+                )
+            db.session.commit()
+        except ValueError:
+            db.session.rollback()
+            return redirect(url_for("cobros_personales", status="edit_error"))
+        except SQLAlchemyError:
+            db.session.rollback()
+            return redirect(url_for("cobros_personales", status="edit_error"))
+
+        return redirect(url_for("cobros_personales", status="updated"))
+
+    @app.get("/cobros-personales/abonos/<int:abono_id>/recibo")
+    def recibo_abono_cobro_personal(abono_id):
+        if not session.get("user"):
+            return redirect(url_for("login"))
+
+        receipts_folder = app.config.get("RECEIPT_PDF_FOLDER")
+        if not receipts_folder:
+            return redirect(url_for("cobros_personales", status="payment_error"))
+
+        try:
+            abono = AbonoCobroPersonal.query.get_or_404(abono_id)
+            cobro = CobroPersonal.query.get_or_404(abono.cobro_id)
+            usuario = User.query.get(abono.usuario_id) if abono.usuario_id else None
+            settings = get_business_settings()
+        except SQLAlchemyError:
+            db.session.rollback()
+            return redirect(url_for("cobros_personales", status="invalid_charge"))
+
+        safe_base = re.sub(r"[\\/\\s]+", "-", cobro.numero_cobro or "cobro").strip("-")
+        filename = f"recibo-cobro-personal-{secure_filename(safe_base) or 'cobro'}-{abono.id}.pdf"
+        file_path = os.path.join(receipts_folder, filename)
+        if not os.path.isfile(file_path):
+            create_personal_payment_receipt_pdf(file_path, settings, cobro, abono, usuario)
+
+        return redirect(url_for("receipt_file", filename=filename))
+
+    @app.post("/cobros-personales/<int:cobro_id>/delete")
+    def eliminar_cobro_personal(cobro_id):
+        if not session.get("user"):
+            return redirect(url_for("login"))
+
+        try:
+            cobro = CobroPersonal.query.get_or_404(cobro_id)
+            if current_user_is_vendedor() and cobro.usuario_id != current_user_id():
+                abort(403)
+            has_payments = (
+                AbonoCobroPersonal.query.filter_by(cobro_id=cobro.id).first()
+                is not None
+            )
+            if has_payments:
+                return redirect(
+                    url_for("cobros_personales", status="delete_has_payments")
+                )
+            CobroPersonalDetalle.query.filter_by(cobro_id=cobro.id).delete(
+                synchronize_session=False
+            )
+            db.session.delete(cobro)
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            return redirect(url_for("cobros_personales", status="delete_error"))
+
+        return redirect(url_for("cobros_personales", status="deleted"))
 
     @app.get("/cobros-personales/<int:cobro_id>/orden")
     def imprimir_orden_cobro_personal(cobro_id):
@@ -5802,10 +6662,7 @@ def create_app():
         )
         facturas = []
         clientes = Cliente.query.all()
-        clientes_map = {
-            cliente.id: clean_conflict_artifacts(cliente.nombre, fallback="Cliente sin nombre")
-            for cliente in clientes
-        }
+        clientes_map = {cliente.id: cliente.nombre for cliente in clientes}
         for factura in facturas_contado:
             fecha_label = factura.fecha.strftime("%d/%m/%Y") if factura.fecha else "-"
             total = factura.total or Decimal("0")
@@ -5837,9 +6694,7 @@ def create_app():
                 {
                     "id": factura.id,
                     "tipo": "credito" if estado_label == "credito" else "contado",
-                    "numero_factura": clean_conflict_artifacts(
-                        factura.numero_factura, fallback="Sin numero"
-                    ),
+                    "numero_factura": factura.numero_factura,
                     "cliente_id": factura.cliente_id,
                     "cliente": clientes_map.get(factura.cliente_id, "Cliente no disponible"),
                     "fecha": factura.fecha,
@@ -5851,14 +6706,9 @@ def create_app():
                     "abonado": abonado,
                     "saldo": saldo,
                     "items": items,
-                    "estado_label": clean_conflict_artifacts(
-                        estado_label.upper(), fallback="SIN ESTADO"
-                    ),
+                    "estado_label": estado_label.upper(),
                     "pdf_filename": factura.pdf_filename,
-                    "vendedor": clean_conflict_artifacts(
-                        vendedores_map.get(factura.usuario_id, "General"),
-                        fallback="General",
-                    ),
+                    "vendedor": vendedores_map.get(factura.usuario_id, "General"),
                 }
             )
         facturas.sort(
@@ -5869,6 +6719,7 @@ def create_app():
             "facturas_historial.html",
             user=session["user"],
             facturas=facturas,
+            clientes_map=clientes_map,
         )
 
     @app.get("/facturas/<int:factura_id>/detalle")
@@ -5877,18 +6728,11 @@ def create_app():
         factura = FacturaContado.query.get_or_404(factura_id)
         cliente = Cliente.query.get(factura.cliente_id) if factura.cliente_id else None
         vendedor = User.query.get(factura.usuario_id) if factura.usuario_id else None
-        detalles = (
-            DetalleFacturaContado.query
-            .filter_by(factura_id=factura.id)
-            .order_by(DetalleFacturaContado.id.asc())
-            .all()
-        )
+        detalles = (DetalleFacturaContado.query.filter_by(factura_id=factura.id)
+            .order_by(DetalleFacturaContado.id.asc()).all())
         producto_ids = [detalle.producto_id for detalle in detalles if detalle.producto_id]
-        productos = {
-            producto.id: producto
-            for producto in Producto.query.filter(Producto.id.in_(producto_ids)).all()
-        } if producto_ids else {}
-
+        productos = {producto.id: producto for producto in
+            Producto.query.filter(Producto.id.in_(producto_ids)).all()} if producto_ids else {}
         items = []
         unidades = 0
         total_productos = Decimal("0")
@@ -5898,81 +6742,47 @@ def create_app():
             cantidad = detalle.cantidad or 0
             unidades += cantidad
             total_productos += subtotal_linea
-            items.append(
-                {
-                    "codigo": producto.codigo if producto else "-",
-                    "nombre": producto.nombre if producto else "Producto no disponible",
-                    "cantidad": cantidad,
-                    "precio_unitario": detalle.precio_unitario or Decimal("0"),
-                    "descuento": detalle.descuento or Decimal("0"),
-                    "subtotal": subtotal_linea,
-                    "participacion": 0,
-                }
-            )
+            items.append({
+                "codigo": producto.codigo if producto else "-",
+                "nombre": producto.nombre if producto else "Producto no disponible",
+                "cantidad": cantidad,
+                "precio_unitario": detalle.precio_unitario or Decimal("0"),
+                "descuento": detalle.descuento or Decimal("0"),
+                "subtotal": subtotal_linea,
+                "participacion": 0,
+            })
         for item in items:
-            item["participacion"] = (
-                float(item["subtotal"] / total_productos * 100)
-                if total_productos > 0 else 0
-            )
-        items_analisis = sorted(
-            items, key=lambda item: item["subtotal"], reverse=True
-        )[:6]
-
+            item["participacion"] = (float(item["subtotal"] / total_productos * 100)
+                if total_productos > 0 else 0)
+        items_analisis = sorted(items, key=lambda item: item["subtotal"], reverse=True)[:6]
         total = factura.total or Decimal("0")
         pagado = min(total, factura.pago or Decimal("0"))
         saldo = max(Decimal("0"), total - pagado)
         porcentaje_pagado = float(pagado / total * 100) if total > 0 else 0
         estado = (factura.estado or "contado").upper()
-
-        abonos_db = (
-            AbonoFactura.query
-            .filter_by(factura_id=factura.id)
-            .order_by(AbonoFactura.fecha.asc(), AbonoFactura.id.asc())
-            .all()
-        )
-        usuarios_abono = build_user_name_map(
-            [abono.usuario_id for abono in abonos_db if abono.usuario_id]
-        )
+        abonos_db = (AbonoFactura.query.filter_by(factura_id=factura.id)
+            .order_by(AbonoFactura.fecha.asc(), AbonoFactura.id.asc()).all())
+        usuarios_abono = build_user_name_map([abono.usuario_id for abono in abonos_db if abono.usuario_id])
         receipts_folder = app.config.get("RECEIPT_PDF_FOLDER")
         abonos = []
         for abono in abonos_db:
-            recibo_filename = build_receipt_pdf_filename(
-                factura.numero_factura, abono.id
-            )
-            recibo_disponible = bool(
-                receipts_folder
-                and os.path.isfile(os.path.join(receipts_folder, recibo_filename))
-            )
-            abonos.append(
-                {
-                    "id": abono.id,
-                    "fecha": abono.fecha,
-                    "monto": abono.monto or Decimal("0"),
-                    "usuario": usuarios_abono.get(abono.usuario_id, "General") or "General",
-                    "recibo_url": url_for(
-                        "receipt_file", filename=recibo_filename
-                    ) if recibo_disponible else None,
-                }
-            )
-
-        vendedor_nombre = (
-            (vendedor.nombre_completo or vendedor.username) if vendedor else "General"
-        ) or "General"
+            recibo_filename = build_receipt_pdf_filename(factura.numero_factura, abono.id)
+            recibo_disponible = bool(receipts_folder and os.path.isfile(os.path.join(receipts_folder, recibo_filename)))
+            abonos.append({
+                "id": abono.id,
+                "fecha": abono.fecha,
+                "monto": abono.monto or Decimal("0"),
+                "usuario": usuarios_abono.get(abono.usuario_id, "General") or "General",
+                "recibo_url": url_for("receipt_file", filename=recibo_filename) if recibo_disponible else None,
+            })
+        vendedor_nombre = ((vendedor.nombre_completo or vendedor.username)
+            if vendedor else "General") or "General"
         return render_template(
-            "factura_detalle.html",
-            user=session["user"],
-            factura=factura,
-            cliente=cliente,
-            vendedor=vendedor_nombre,
-            items=items,
-            items_analisis=items_analisis,
-            unidades=unidades,
-            total=total,
-            pagado=pagado,
-            saldo=saldo,
-            porcentaje_pagado=porcentaje_pagado,
-            estado=estado,
-            abonos=abonos,
+            "factura_detalle.html", user=session["user"], factura=factura,
+            cliente=cliente, vendedor=vendedor_nombre, items=items,
+            items_analisis=items_analisis, unidades=unidades, total=total,
+            pagado=pagado, saldo=saldo, porcentaje_pagado=porcentaje_pagado,
+            estado=estado, abonos=abonos,
         )
 
     @app.route("/facturas/<path:factura_ref>/delete", methods=["POST", "GET"])
@@ -6199,6 +7009,7 @@ def create_app():
         data = request.get_json(silent=True) or {}
         tipo = (data.get("tipo") or "").strip().lower()
         cliente_id = data.get("cliente_id") or None
+        cliente_nombre = (data.get("cliente_nombre") or "").strip()
         rtn = (data.get("rtn") or "").strip() or None
         pago_raw = data.get("pago", 0)
         fecha_raw = (data.get("fecha") or "").strip()
@@ -6273,6 +7084,8 @@ def create_app():
         numero_factura = generate_invoice_number()
 
         try:
+            cliente = resolve_facturacion_cliente(cliente_id, cliente_nombre, rtn)
+            cliente_id = cliente.id if cliente else None
             pedido = None
             if pedido_id:
                 try:
@@ -6346,6 +7159,9 @@ def create_app():
             if pedido:
                 pedido.estado = "facturado"
             db.session.commit()
+        except ValueError as exc:
+            db.session.rollback()
+            return jsonify({"error": str(exc)}), 400
         except SQLAlchemyError:
             db.session.rollback()
             return jsonify({"error": "No se pudo guardar la factura."}), 500
