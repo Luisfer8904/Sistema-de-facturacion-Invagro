@@ -3,7 +3,7 @@
 {% block body_class %}portal-shell-page ganaderia-app-page no-chat{% endblock %}
 {% block content %}
   <div class="ganaderia-shell">
-    {% set ganaderia_active = "fincas" %}{% include "partials/ganaderia_sidebar.html" %}
+    {% set ganaderia_active = "fincas" %}{% set ganaderia_section = "animales" %}{% include "partials/ganaderia_sidebar.html" %}
     <div class="ganaderia-main">
       <header class="ganaderia-topbar">
         <button class="ganaderia-menu" type="button" aria-label="Abrir menú" onclick="document.body.classList.toggle('ganaderia-menu-open')">☰</button>
@@ -20,7 +20,7 @@
                 <a class="ganaderia-animal-row" href="/ganaderia/fincas/{{ finca.id }}/animales/{{ animal.id }}">
                   <span class="ganaderia-animal-sex {{ animal.sexo }}">{{ "H" if animal.sexo == "hembra" else "M" }}</span>
                   <div><strong>{{ animal.nombre or animal.codigo }}</strong><small>Arete {{ animal.codigo }} · {{ animal.raza or "Raza pendiente" }}</small></div>
-                  <div><strong>{{ animal.peso_actual or "—" }}{% if animal.peso_actual %} kg{% endif %}</strong><small>{{ paddock_names.get(animal.potrero_id, "Sin potrero") }}</small></div>
+                  <div><strong>{{ animal.peso_actual or "—" }}{% if animal.peso_actual %} lb{% endif %}</strong><small>{{ paddock_names.get(animal.potrero_id, "Sin potrero") }}</small></div>
                   <span class="ganaderia-status {{ 'active' if animal.estado == 'activo' else 'inactive' }}">{{ animal.estado|capitalize }}</span><b>→</b>
                 </a>
               {% else %}<div class="ganaderia-empty-state"><strong>No hay animales registrados</strong><p>Registra el primer animal para iniciar su expediente.</p></div>{% endfor %}
@@ -34,14 +34,13 @@
                 <label>Código o arete<input name="codigo" value="{{ form_values.codigo }}" required /></label>
                 <label>Nombre<input name="nombre" value="{{ form_values.nombre }}" /></label>
                 <div class="ganaderia-two-fields"><label>Sexo<select name="sexo"><option value="hembra" {% if form_values.sexo == 'hembra' %}selected{% endif %}>Hembra</option><option value="macho" {% if form_values.sexo == 'macho' %}selected{% endif %}>Macho</option></select></label><label>Raza<input name="raza" value="{{ form_values.raza }}" /></label></div>
-                <div class="ganaderia-two-fields"><label>Nacimiento<input type="date" name="fecha_nacimiento" value="{{ form_values.fecha_nacimiento }}" /></label><label>Peso actual (kg)<input type="number" step="0.01" min="0" name="peso_actual" value="{{ form_values.peso_actual }}" /></label></div>
+                <div class="ganaderia-two-fields"><label>Nacimiento<input type="date" name="fecha_nacimiento" value="{{ form_values.fecha_nacimiento }}" /></label><label>Peso actual (lb)<input type="number" step="0.01" min="0" name="peso_actual" value="{{ form_values.peso_actual }}" /></label></div>
                 <label>Potrero o lote<select name="potrero_id"><option value="">Sin asignar</option>{% for item in paddocks %}<option value="{{ item.id }}">{{ item.nombre }}</option>{% endfor %}</select></label>
                 <label>Procedencia<input name="procedencia" value="{{ form_values.procedencia }}" /></label>
                 <div class="ganaderia-two-fields"><label>Madre (arete)<input name="madre_codigo" value="{{ form_values.madre_codigo }}" /></label><label>Padre (arete)<input name="padre_codigo" value="{{ form_values.padre_codigo }}" /></label></div>
                 <label>Observaciones<textarea name="observaciones" rows="3">{{ form_values.observaciones }}</textarea></label>
                 <button class="ganaderia-primary" type="submit">Registrar animal</button>
               </form>
-              <details class="ganaderia-access-form ganaderia-paddock-form"><summary>Crear lote o potrero</summary><form method="post" action="/ganaderia/fincas/{{ finca.id }}/potreros"><label>Nombre<input name="nombre" required /></label><label>Tipo<select name="tipo"><option value="potrero">Potrero</option><option value="lote">Lote</option><option value="corral">Corral</option></select></label><label>Capacidad<input type="number" name="capacidad" min="0" /></label><button class="ganaderia-primary" type="submit">Crear espacio</button></form></details>
             </aside>
           {% endif %}
         </section>

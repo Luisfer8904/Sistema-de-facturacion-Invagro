@@ -4,6 +4,7 @@
 {% block content %}
   <div class="ganaderia-shell">
     {% set ganaderia_active = "fincas" %}
+    {% set ganaderia_section = "resumen" %}
     {% include "partials/ganaderia_sidebar.html" %}
     <div class="ganaderia-main">
       <header class="ganaderia-topbar">
@@ -19,15 +20,18 @@
           <div><span class="ganaderia-eyebrow">EXPEDIENTE DE FINCA</span><h2>{{ finca.nombre }}</h2><p>{{ finca.direccion or finca.ubicacion or "Dirección pendiente" }}</p></div>
           <span class="ganaderia-status {{ 'active' if finca.activa else 'inactive' }}">{{ "Activa" if finca.activa else "Inactiva" }}</span>
         </section>
-        <section class="ganaderia-detail-grid">
+        <section class="ganaderia-detail-grid ganaderia-farm-kpis">
           <article><span>Animales activos</span><strong>{{ animals_count }}</strong></article>
+          <article><span>Hembras / machos</span><strong>{{ female_count }} / {{ male_count }}</strong></article>
+          <article><span>Peso promedio</span><strong>{{ "%.1f"|format(average_weight|float) if average_weight else "—" }}{% if average_weight %} lb{% endif %}</strong></article>
           <article><span>Lotes y potreros</span><strong>{{ paddocks_count }}</strong></article>
-          <article><span>Próximos 30 días</span><strong>{{ pending_count }}</strong></article>
+          <article><span>Próximos partos</span><strong>{{ upcoming_births|length }}</strong></article>
+          <article><span>Agenda de 30 días</span><strong>{{ pending_count }}</strong></article>
         </section>
-        <nav class="ganaderia-farm-actions" aria-label="Módulos de la finca">
-          <a href="/ganaderia/fincas/{{ finca.id }}/animales"><span>A</span><div><strong>Animales</strong><small>Inventario y expedientes</small></div><b>→</b></a>
-          <a href="/ganaderia/fincas/{{ finca.id }}/actividades"><span>C</span><div><strong>Actividades</strong><small>Sanidad, reproducción y visitas</small></div><b>→</b></a>
-        </nav>
+        <section class="ganaderia-farm-summary-grid">
+          <div class="ganaderia-user-list"><div class="ganaderia-panel-heading"><div><span>REPRODUCCIÓN</span><h2>Próximos partos</h2></div><strong>{{ upcoming_births|length }}</strong></div>{% for item in upcoming_births[:5] %}<a class="ganaderia-summary-line" href="/ganaderia/fincas/{{ finca.id }}/partos"><time>{{ item.proxima_fecha.strftime('%d/%m/%Y') }}</time><div><strong>{{ animal_names.get(item.animal_id, "Animal sin asignar") }}</strong><small>{{ item.titulo }}</small></div><b>→</b></a>{% else %}<div class="ganaderia-empty-inline">No hay partos programados.</div>{% endfor %}</div>
+          <div class="ganaderia-user-list"><div class="ganaderia-panel-heading"><div><span>BITÁCORA</span><h2>Actividad reciente</h2></div><strong>{{ recent_activities|length }}</strong></div>{% for item in recent_activities %}<a class="ganaderia-summary-line" href="/ganaderia/fincas/{{ finca.id }}/actividades"><time>{{ item.fecha.strftime('%d/%m') }}</time><div><strong>{{ item.titulo }}</strong><small>{{ activity_label(item.tipo) }} · {{ animal_names.get(item.animal_id, "Toda la finca") }}</small></div><b>→</b></a>{% else %}<div class="ganaderia-empty-inline">No hay actividades registradas.</div>{% endfor %}</div>
+        </section>
         <section class="ganaderia-detail-grid ganaderia-contact-grid">
           <article><span>Propietario</span><strong>{{ finca.propietario or "Pendiente" }}</strong></article>
           <article><span>Teléfono</span><strong>{{ finca.telefono or "Pendiente" }}</strong></article>

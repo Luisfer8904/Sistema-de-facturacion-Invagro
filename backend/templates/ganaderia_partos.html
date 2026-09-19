@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Próximos partos de {{ finca.nombre }} | Invagro{% endblock %}
+{% block body_class %}portal-shell-page ganaderia-app-page no-chat{% endblock %}
+{% block content %}
+  <div class="ganaderia-shell">
+    {% set ganaderia_active = "fincas" %}{% set ganaderia_section = "partos" %}{% include "partials/ganaderia_sidebar.html" %}
+    <div class="ganaderia-main">
+      <header class="ganaderia-topbar">
+        <button class="ganaderia-menu" type="button" aria-label="Abrir menú" onclick="document.body.classList.toggle('ganaderia-menu-open')">☰</button>
+        <div><small>{{ finca.nombre|upper }}</small><h1>Próximos partos</h1></div>
+        <a class="ganaderia-back" href="/ganaderia/fincas/{{ finca.id }}/actividades">Registrar reproducción</a>
+      </header>
+      <main class="ganaderia-content">
+        <section class="ganaderia-birth-hero">
+          <div><span>AGENDA REPRODUCTIVA</span><h2>{{ upcoming|length }} partos programados</h2><p>Seguimiento de fechas estimadas y nacimientos registrados.</p></div>
+          <strong>{{ upcoming|selectattr('proxima_fecha', 'le', today)|list|length }}</strong>
+          <small>Para hoy</small>
+        </section>
+        <section class="ganaderia-birth-layout">
+          <div class="ganaderia-user-list">
+            <div class="ganaderia-panel-heading"><div><span>PROGRAMACIÓN</span><h2>Fechas estimadas</h2></div><strong>{{ upcoming|length }}</strong></div>
+            <div class="ganaderia-birth-list">
+              {% for item in upcoming %}
+                {% set animal = animals.get(item.animal_id) %}
+                <a href="{% if animal %}/ganaderia/fincas/{{ finca.id }}/animales/{{ animal.id }}{% else %}/ganaderia/fincas/{{ finca.id }}/actividades{% endif %}">
+                  <time><b>{{ item.proxima_fecha.strftime('%d') }}</b><span>{{ item.proxima_fecha.strftime('%b')|upper }}</span></time>
+                  <div><strong>{{ animal.nombre or animal.codigo if animal else "Animal sin asignar" }}</strong><small>{{ animal.codigo if animal and animal.nombre else item.titulo }}</small></div>
+                  <em>{{ (item.proxima_fecha - today).days }} días</em><b>→</b>
+                </a>
+              {% else %}<div class="ganaderia-empty-inline">No hay partos programados.</div>{% endfor %}
+            </div>
+          </div>
+          <div class="ganaderia-user-list">
+            <div class="ganaderia-panel-heading"><div><span>HISTORIAL</span><h2>Partos registrados</h2></div><strong>{{ births|length }}</strong></div>
+            <div class="ganaderia-birth-history">
+              {% for item in births %}
+                {% set animal = animals.get(item.animal_id) %}
+                <article><span class="ganaderia-timeline-dot parto"></span><div><strong>{{ animal.nombre or animal.codigo if animal else item.titulo }}</strong><small>{{ item.fecha.strftime('%d/%m/%Y') }} · {{ item.resultado or "Parto registrado" }}</small></div></article>
+              {% else %}<div class="ganaderia-empty-inline">Todavía no hay partos registrados.</div>{% endfor %}
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+{% endblock %}

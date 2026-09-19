@@ -5,7 +5,17 @@
   </a>
   <nav aria-label="Navegación de ganadería">
     <a class="{% if ganaderia_active == 'dashboard' %}active{% endif %}" href="/ganaderia/dashboard"><span>⌂</span> Dashboard</a>
-    <a class="{% if ganaderia_active == 'fincas' %}active{% endif %}" href="/ganaderia/fincas"><span>▦</span> Fincas</a>
+    <a class="{% if ganaderia_active == 'fincas' and finca is not defined %}active{% endif %}" href="/ganaderia/fincas"><span>▦</span> Fincas</a>
+    {% if finca is defined %}
+      <div class="ganaderia-farm-submenu">
+        <p><small>FINCA ACTUAL</small><strong>{{ finca.nombre }}</strong></p>
+        <a class="{% if ganaderia_section == 'resumen' %}active{% endif %}" href="/ganaderia/fincas/{{ finca.id }}"><span>⌂</span> Resumen</a>
+        <a class="{% if ganaderia_section == 'animales' %}active{% endif %}" href="/ganaderia/fincas/{{ finca.id }}/animales"><span>◉</span> Animales</a>
+        <a class="{% if ganaderia_section == 'potreros' %}active{% endif %}" href="/ganaderia/fincas/{{ finca.id }}/potreros"><span>▦</span> Lotes y potreros</a>
+        <a class="{% if ganaderia_section == 'partos' %}active{% endif %}" href="/ganaderia/fincas/{{ finca.id }}/partos"><span>◇</span> Próximos partos</a>
+        <a class="{% if ganaderia_section == 'actividades' %}active{% endif %}" href="/ganaderia/fincas/{{ finca.id }}/actividades"><span>✓</span> Actividades</a>
+      </div>
+    {% endif %}
     {% if session.get('ganaderia_rol') == 'superadmin' %}
       <a class="{% if ganaderia_active == 'usuarios' %}active{% endif %}" href="/ganaderia/usuarios"><span>♙</span> Usuarios</a>
     {% endif %}

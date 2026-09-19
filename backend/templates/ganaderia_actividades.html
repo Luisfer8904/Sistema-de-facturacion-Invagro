@@ -3,7 +3,7 @@
 {% block body_class %}portal-shell-page ganaderia-app-page no-chat{% endblock %}
 {% block content %}
   <div class="ganaderia-shell">
-    {% set ganaderia_active = "fincas" %}{% include "partials/ganaderia_sidebar.html" %}
+    {% set ganaderia_active = "fincas" %}{% set ganaderia_section = "actividades" %}{% include "partials/ganaderia_sidebar.html" %}
     <div class="ganaderia-main">
       <header class="ganaderia-topbar"><button class="ganaderia-menu" type="button" aria-label="Abrir menú" onclick="document.body.classList.toggle('ganaderia-menu-open')">☰</button><div><small>{{ finca.nombre|upper }}</small><h1>Actividades</h1></div><a class="ganaderia-back" href="/ganaderia/fincas/{{ finca.id }}">Volver a la finca</a></header>
       <main class="ganaderia-content">

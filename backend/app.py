@@ -2792,6 +2792,7 @@ def create_app():
     def ganaderia_finca_detalle(finca_id):
         current = ganaderia_current_user()
         finca = ganaderia_get_accessible_farm_or_404(finca_id)
+        today = datetime.utcnow().date()
         vet_links = GanaderiaVeterinarioFinca.query.filter_by(finca_id=finca.id).all()
         vet_ids = [link.veterinario_id for link in vet_links]
         veterinarians = (
@@ -2818,6 +2819,40 @@ def create_app():
                 .order_by(GanaderiaUser.nombre_completo.asc())
                 .all()
             )
+        animals_query = GanaderiaAnimal.query.filter_by(finca_id=finca.id, estado="activo")
+        animals_count = animals_query.count()
+        female_count = animals_query.filter_by(sexo="hembra").count()
+        male_count = animals_query.filter_by(sexo="macho").count()
+        average_weight = (
+            db.session.query(func.avg(GanaderiaAnimal.peso_actual))
+            .filter(
+                GanaderiaAnimal.finca_id == finca.id,
+                GanaderiaAnimal.estado == "activo",
+                GanaderiaAnimal.peso_actual.isnot(None),
+            )
+            .scalar()
+        )
+        upcoming_births = (
+            GanaderiaActividad.query.filter(
+                GanaderiaActividad.finca_id == finca.id,
+                GanaderiaActividad.tipo == "reproduccion",
+                GanaderiaActividad.proxima_fecha.isnot(None),
+                GanaderiaActividad.proxima_fecha >= today,
+            )
+            .order_by(GanaderiaActividad.proxima_fecha.asc())
+            .all()
+        )
+        recent_activities = (
+            GanaderiaActividad.query.filter_by(finca_id=finca.id)
+            .order_by(GanaderiaActividad.fecha.desc(), GanaderiaActividad.id.desc())
+            .limit(6)
+            .all()
+        )
+        animal_ids = {item.animal_id for item in upcoming_births + recent_activities if item.animal_id}
+        animal_names = {
+            animal.id: animal.nombre or animal.codigo
+            for animal in GanaderiaAnimal.query.filter(GanaderiaAnimal.id.in_(animal_ids)).all()
+        } if animal_ids else {}
         return render_template(
             "ganaderia_finca_detalle.html",
             current=current,
@@ -2829,13 +2864,22 @@ def create_app():
             created=request.args.get("created") == "1",
             user_created=request.args.get("user_created") == "1",
             error=request.args.get("error"),
-            animals_count=GanaderiaAnimal.query.filter_by(finca_id=finca.id, estado="activo").count(),
+            animals_count=animals_count,
+            female_count=female_count,
+            male_count=male_count,
+            average_weight=average_weight,
             paddocks_count=GanaderiaPotrero.query.filter_by(finca_id=finca.id, activo=True).count(),
             pending_count=GanaderiaActividad.query.filter(
                 GanaderiaActividad.finca_id == finca.id,
                 GanaderiaActividad.proxima_fecha.isnot(None),
-                GanaderiaActividad.proxima_fecha <= (datetime.utcnow().date() + timedelta(days=30)),
+                GanaderiaActividad.proxima_fecha >= today,
+                GanaderiaActividad.proxima_fecha <= (today + timedelta(days=30)),
             ).count(),
+            upcoming_births=upcoming_births,
+            recent_activities=recent_activities,
+            animal_names=animal_names,
+            activity_label=ganaderia_activity_label,
+            today=today,
         )
 
     @app.post("/ganaderia/fincas/<int:finca_id>/usuarios")
@@ -3021,7 +3065,72 @@ def create_app():
                 db.session.commit()
             except SQLAlchemyError:
                 db.session.rollback()
-        return redirect(url_for("ganaderia_animales", finca_id=finca.id))
+        return redirect(url_for("ganaderia_potreros", finca_id=finca.id))
+
+    @app.get("/ganaderia/fincas/<int:finca_id>/potreros")
+    @ganaderia_login_required
+    def ganaderia_potreros(finca_id):
+        current = ganaderia_current_user()
+        finca = ganaderia_get_accessible_farm_or_404(finca_id)
+        paddocks = (
+            GanaderiaPotrero.query.filter_by(finca_id=finca.id)
+            .order_by(GanaderiaPotrero.activo.desc(), GanaderiaPotrero.nombre.asc())
+            .all()
+        )
+        animal_counts = dict(
+            db.session.query(GanaderiaAnimal.potrero_id, func.count(GanaderiaAnimal.id))
+            .filter(
+                GanaderiaAnimal.finca_id == finca.id,
+                GanaderiaAnimal.estado == "activo",
+                GanaderiaAnimal.potrero_id.isnot(None),
+            )
+            .group_by(GanaderiaAnimal.potrero_id)
+            .all()
+        )
+        return render_template(
+            "ganaderia_potreros.html",
+            current=current,
+            finca=finca,
+            paddocks=paddocks,
+            animal_counts=animal_counts,
+        )
+
+    @app.get("/ganaderia/fincas/<int:finca_id>/partos")
+    @ganaderia_login_required
+    def ganaderia_partos(finca_id):
+        current = ganaderia_current_user()
+        finca = ganaderia_get_accessible_farm_or_404(finca_id)
+        today = datetime.utcnow().date()
+        upcoming = (
+            GanaderiaActividad.query.filter(
+                GanaderiaActividad.finca_id == finca.id,
+                GanaderiaActividad.tipo == "reproduccion",
+                GanaderiaActividad.proxima_fecha.isnot(None),
+                GanaderiaActividad.proxima_fecha >= today,
+            )
+            .order_by(GanaderiaActividad.proxima_fecha.asc())
+            .all()
+        )
+        births = (
+            GanaderiaActividad.query.filter_by(finca_id=finca.id, tipo="parto")
+            .order_by(GanaderiaActividad.fecha.desc(), GanaderiaActividad.id.desc())
+            .limit(50)
+            .all()
+        )
+        animal_ids = {item.animal_id for item in upcoming + births if item.animal_id}
+        animals = {
+            animal.id: animal
+            for animal in GanaderiaAnimal.query.filter(GanaderiaAnimal.id.in_(animal_ids)).all()
+        } if animal_ids else {}
+        return render_template(
+            "ganaderia_partos.html",
+            current=current,
+            finca=finca,
+            upcoming=upcoming,
+            births=births,
+            animals=animals,
+            today=today,
+        )
 
     @app.get("/ganaderia/fincas/<int:finca_id>/animales/<int:animal_id>")
     @ganaderia_login_required
