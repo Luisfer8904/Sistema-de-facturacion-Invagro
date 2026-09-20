@@ -44,7 +44,7 @@
     </div>
   </div>
   {% if current.rol in ["superadmin", "veterinario"] %}
-    <dialog class="ganaderia-modal" id="newAnimalDialog" {% if error or open_new %}open{% endif %}>
+    <dialog class="ganaderia-modal" id="newAnimalDialog">
       <div class="ganaderia-modal-header"><div><span>NUEVO ANIMAL</span><h2>Registrar animal</h2></div><button type="button" aria-label="Cerrar" onclick="document.getElementById('newAnimalDialog').close()">×</button></div>
       {% if error %}<div class="form-error">{{ error }}</div>{% endif %}
       <form class="ganaderia-animal-modal-form" method="post">
@@ -60,9 +60,11 @@
       </form>
     </dialog>
     <script>
-      document.getElementById("newAnimalDialog").addEventListener("click", function (event) {
+      const newAnimalDialog = document.getElementById("newAnimalDialog");
+      newAnimalDialog.addEventListener("click", function (event) {
         if (event.target === this) this.close();
       });
+      {% if error or open_new %}newAnimalDialog.showModal();{% endif %}
     </script>
     <dialog class="ganaderia-modal ganaderia-move-modal" id="moveAnimalDialog">
       <div class="ganaderia-modal-header"><div><span>CAMBIO DE UBICACIÓN</span><h2 id="moveAnimalTitle">Mover animal</h2></div><button type="button" aria-label="Cerrar" onclick="document.getElementById('moveAnimalDialog').close()">×</button></div>
