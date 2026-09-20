@@ -7841,6 +7841,12 @@ def create_app():
     @admin_required
     def factura_detalle(factura_id):
         factura = FacturaContado.query.get_or_404(factura_id)
+        ultima_factura_id = (
+            db.session.query(FacturaContado.id)
+            .order_by(FacturaContado.id.desc())
+            .limit(1)
+            .scalar()
+        )
         cliente = Cliente.query.get(factura.cliente_id) if factura.cliente_id else None
         vendedor = User.query.get(factura.usuario_id) if factura.usuario_id else None
         detalles = (DetalleFacturaContado.query.filter_by(factura_id=factura.id)
@@ -7898,77 +7904,54 @@ def create_app():
             items_analisis=items_analisis, unidades=unidades, total=total,
             pagado=pagado, saldo=saldo, porcentaje_pagado=porcentaje_pagado,
             estado=estado, abonos=abonos,
+            puede_eliminar=factura.id == ultima_factura_id,
         )
 
-    @app.route("/facturas/<path:factura_ref>/delete", methods=["POST", "GET"])
-    def eliminar_factura(factura_ref):
-        if not session.get("user"):
-            return redirect(url_for("login"))
+    @app.post("/facturas/<int:factura_id>/delete")
+    @admin_required
+    def eliminar_factura(factura_id):
+        factura = FacturaContado.query.get_or_404(factura_id)
+        ultima_factura_id = (
+            db.session.query(FacturaContado.id)
+            .order_by(FacturaContado.id.desc())
+            .limit(1)
+            .scalar()
+        )
+        if factura.id != ultima_factura_id:
+            return redirect(
+                url_for("factura_detalle", factura_id=factura.id, delete_error="ultima")
+            )
 
-        tipo = (request.form.get("tipo", "") or "").strip().lower()
-        ref = factura_ref.strip()
-        factura_id = None
-        numero_ref = None
+        if AbonoFactura.query.filter_by(factura_id=factura.id).first():
+            return redirect(
+                url_for("factura_detalle", factura_id=factura.id, delete_error="abonos")
+            )
 
-        if "/" in ref and not tipo:
-            factura = FacturaContado.query.filter_by(numero_factura=ref).first()
-            if factura:
-                try:
-                    DetalleFacturaContado.query.filter_by(
-                        factura_id=factura.id
-                    ).delete(synchronize_session=False)
-                    db.session.delete(factura)
-                    db.session.commit()
-                except SQLAlchemyError:
-                    db.session.rollback()
-                return redirect(url_for("facturas_historial"))
-
-        parts = [part for part in ref.split("/") if part]
-        if len(parts) == 2 and parts[0] in {"contado", "credito"} and parts[1].isdigit():
-            tipo = parts[0]
-            factura_id = int(parts[1])
-        elif ref.isdigit():
-            factura_id = int(ref)
-        elif parts and parts[-1].isdigit():
-            factura_id = int(parts[-1])
-        else:
-            numero_ref = ref
-
+        numero_factura = factura.numero_factura
+        pdf_filename = os.path.basename(factura.pdf_filename or "")
         try:
-            if tipo in {"contado", "credito"} and factura_id is not None:
-                factura = FacturaContado.query.get_or_404(factura_id)
-                DetalleFacturaContado.query.filter_by(
-                    factura_id=factura_id
-                ).delete(synchronize_session=False)
-                db.session.delete(factura)
-            elif factura_id is not None:
-                factura = FacturaContado.query.get(factura_id)
-                if not factura:
-                    return redirect(url_for("facturas_historial"))
-                DetalleFacturaContado.query.filter_by(
-                    factura_id=factura_id
-                ).delete(synchronize_session=False)
-                db.session.delete(factura)
-            else:
-                factura = None
-                if numero_ref:
-                    factura = FacturaContado.query.filter_by(
-                        numero_factura=numero_ref
-                    ).first()
-                    if factura:
-                        DetalleFacturaContado.query.filter_by(
-                            factura_id=factura.id
-                        ).delete(synchronize_session=False)
-                        db.session.delete(factura)
-                    else:
-                        return redirect(url_for("facturas_historial"))
-                else:
-                    return redirect(url_for("facturas_historial"))
-
+            DetalleFacturaContado.query.filter_by(
+                factura_id=factura.id
+            ).delete(synchronize_session=False)
+            db.session.delete(factura)
             db.session.commit()
         except SQLAlchemyError:
             db.session.rollback()
-        return redirect(url_for("facturas_historial"))
+            return redirect(
+                url_for("factura_detalle", factura_id=factura.id, delete_error="database")
+            )
+
+        if pdf_filename:
+            pdf_path = os.path.join(app.config["INVOICE_PDF_FOLDER"], pdf_filename)
+            try:
+                if os.path.isfile(pdf_path):
+                    os.remove(pdf_path)
+            except OSError:
+                app.logger.warning("No se pudo eliminar el PDF de la factura %s.", numero_factura)
+
+        return redirect(
+            url_for("facturas_historial", deleted=numero_factura)
+        )
 
     @app.route("/clientes/<int:cliente_id>/edit", methods=["GET", "POST"])
     def editar_cliente(cliente_id):

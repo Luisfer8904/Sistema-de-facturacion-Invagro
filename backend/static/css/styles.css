@@ -3859,6 +3859,25 @@ body {
   font-weight: 600;
 }
 
+.pos-invoice-date {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(170px, 220px);
+  align-items: center;
+  gap: 12px;
+  color: #52616b;
+  font-weight: 700;
+}
+
+.pos-invoice-date input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 2px solid #e0e0e0;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #1d2b27;
+  font: inherit;
+}
+
 .pos-client {
   display: grid;
   gap: 10px;
@@ -5952,6 +5971,36 @@ h1 { letter-spacing: -0.025em; }
 .danger-button:focus-visible {
   outline: none;
   box-shadow: var(--r-ring);
+}
+
+.invoice-delete-form {
+  margin: 0;
+}
+
+.invoice-notice {
+  padding: 12px 16px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  font-weight: 700;
+}
+
+.invoice-notice-success {
+  border-color: #b7dfc3;
+  background: #edf8f0;
+  color: #1f6b36;
+}
+
+.invoice-notice-error {
+  border-color: #efb7bd;
+  background: #fff1f2;
+  color: #8f2630;
+}
+
+@media (max-width: 720px) {
+  .pos-invoice-date {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
 }
 
 /* ---------- Inputs: focus ring unificado ---------- */

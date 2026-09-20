@@ -10,6 +10,11 @@
       </div>
 
       <main class="content-area invoice-history-page">
+        {% if request.args.get('deleted') %}
+          <div class="invoice-notice invoice-notice-success">
+            Se eliminó la factura {{ request.args.get('deleted') }}. Ese correlativo queda disponible para la siguiente emisión.
+          </div>
+        {% endif %}
         <section class="invoice-history-filters" aria-label="Filtros del historial">
           <input id="invoice-history-search" type="search" placeholder="Buscar por cliente, factura o vendedor" />
           <label class="invoice-date-field">
