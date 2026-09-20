@@ -148,6 +148,12 @@ def create_app():
     except PermissionError:
         app.logger.warning("No se pudo crear la carpeta de uploads.")
     app.config["PRODUCT_UPLOAD_FOLDER"] = upload_folder
+    animal_upload_folder = os.path.join(app.static_folder, "uploads", "animales")
+    try:
+        os.makedirs(animal_upload_folder, exist_ok=True)
+    except PermissionError:
+        app.logger.warning("No se pudo crear la carpeta de fotos de animales.")
+    app.config["ANIMAL_UPLOAD_FOLDER"] = animal_upload_folder
     invoice_folder = os.path.join(app.static_folder, "invoices")
     try:
         os.makedirs(invoice_folder, exist_ok=True)
@@ -182,6 +188,30 @@ def create_app():
         file_path = os.path.join(app.config["PRODUCT_UPLOAD_FOLDER"], unique_name)
         file_storage.save(file_path)
         return unique_name
+
+    def save_animal_image(file_storage):
+        if not file_storage or not file_storage.filename:
+            return None
+
+        filename = secure_filename(file_storage.filename)
+        ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+        if ext not in allowed_extensions:
+            raise ValueError("La foto debe ser JPG, PNG o WEBP.")
+
+        unique_name = f"{uuid4().hex}.{ext}"
+        file_path = os.path.join(app.config["ANIMAL_UPLOAD_FOLDER"], unique_name)
+        file_storage.save(file_path)
+        return unique_name
+
+    def delete_animal_image(filename):
+        if not filename:
+            return
+        file_path = os.path.join(app.config["ANIMAL_UPLOAD_FOLDER"], filename)
+        try:
+            if os.path.isfile(file_path):
+                os.remove(file_path)
+        except OSError:
+            app.logger.warning("No se pudo eliminar la foto anterior del animal.")
 
     def parse_rango_autorizado_inicio(rango_texto):
         if not rango_texto:
@@ -3002,7 +3032,9 @@ def create_app():
                 error = "Ya existe un animal con ese codigo en la finca."
 
             if not error:
+                photo_filename = None
                 try:
+                    photo_filename = save_animal_image(request.files.get("foto"))
                     animal = GanaderiaAnimal(
                         finca_id=finca.id,
                         potrero_id=paddock.id if paddock else None,
@@ -3015,6 +3047,7 @@ def create_app():
                         procedencia=form_values["procedencia"] or None,
                         madre_codigo=form_values["madre_codigo"] or None,
                         padre_codigo=form_values["padre_codigo"] or None,
+                        foto=photo_filename,
                         estado="activo",
                         observaciones=form_values["observaciones"] or None,
                         fecha_registro=datetime.utcnow(),
@@ -3022,8 +3055,11 @@ def create_app():
                     db.session.add(animal)
                     db.session.commit()
                     return redirect(url_for("ganaderia_animal_detalle", finca_id=finca.id, animal_id=animal.id, created="1"))
+                except ValueError as exc:
+                    error = str(exc)
                 except SQLAlchemyError:
                     db.session.rollback()
+                    delete_animal_image(photo_filename)
                     error = "No se pudo registrar el animal."
 
         search = request.args.get("q", "").strip()
@@ -3273,6 +3309,15 @@ def create_app():
         activities = GanaderiaActividad.query.filter_by(
             finca_id=finca.id, animal_id=animal.id
         ).order_by(GanaderiaActividad.fecha.desc(), GanaderiaActividad.id.desc()).all()
+        latest_insemination = next(
+            (item for item in activities if item.tipo in {"inseminacion", "reproduccion"}),
+            None,
+        )
+        estimated_due_date = (
+            (latest_insemination.fecha + timedelta(days=283)).isoformat()
+            if latest_insemination
+            else ""
+        )
         return render_template(
             "ganaderia_animal_detalle.html",
             current=current,
@@ -3286,6 +3331,8 @@ def create_app():
             activity_created=request.args.get("activity_created") == "1",
             error=request.args.get("error"),
             edit_error=request.args.get("edit_error"),
+            selected_activity_type=request.args.get("activity_type", ""),
+            estimated_due_date=estimated_due_date,
             today=datetime.utcnow().date(),
         )
 
@@ -3337,7 +3384,10 @@ def create_app():
                 edit_error=error,
             ))
 
+        new_photo = None
+        old_photo = animal.foto
         try:
+            new_photo = save_animal_image(request.files.get("foto"))
             animal.codigo = code
             animal.nombre = request.form.get("nombre", "").strip() or None
             animal.sexo = sex
@@ -3347,17 +3397,30 @@ def create_app():
             animal.procedencia = request.form.get("procedencia", "").strip() or None
             animal.madre_codigo = request.form.get("madre_codigo", "").strip() or None
             animal.padre_codigo = request.form.get("padre_codigo", "").strip() or None
+            if new_photo:
+                animal.foto = new_photo
             animal.estado = status
             animal.observaciones = request.form.get("observaciones", "").strip() or None
             db.session.commit()
+            if new_photo and old_photo != new_photo:
+                delete_animal_image(old_photo)
             return redirect(url_for(
                 "ganaderia_animal_detalle",
                 finca_id=finca.id,
                 animal_id=animal.id,
                 edited="1",
             ))
+        except ValueError as exc:
+            delete_animal_image(new_photo)
+            return redirect(url_for(
+                "ganaderia_animal_detalle",
+                finca_id=finca.id,
+                animal_id=animal.id,
+                edit_error=str(exc),
+            ))
         except SQLAlchemyError:
             db.session.rollback()
+            delete_animal_image(new_photo)
             return redirect(url_for(
                 "ganaderia_animal_detalle",
                 finca_id=finca.id,

@@ -189,6 +189,7 @@ class GanaderiaAnimal(db.Model):
     procedencia = db.Column(db.String(160))
     madre_codigo = db.Column(db.String(60))
     padre_codigo = db.Column(db.String(60))
+    foto = db.Column(db.String(255))
     estado = db.Column(db.String(30), nullable=False, default="activo")
     observaciones = db.Column(db.Text)
     fecha_registro = db.Column(db.DateTime)

@@ -2265,6 +2265,7 @@ body {
 .ganaderia-move-button { min-height: 36px; padding: 0 12px; color: #76501a; background: #fff0d2; border: 1px solid #f0d4a2; border-radius: 7px; font: inherit; font-size: .76rem; font-weight: 900; cursor: pointer; }
 .ganaderia-move-button:hover { background: #f8dfaf; }
 .ganaderia-animal-sex { width: 38px; height: 38px; display: grid; place-items: center; border-radius: 50%; font-size: .8rem; font-weight: 900; }
+.ganaderia-animal-list-photo { width: 38px; height: 38px; padding: 2px; object-fit: contain; background: #f3f6f4; border: 1px solid #dfe6e1; border-radius: 50%; }
 .ganaderia-animal-sex.hembra,
 .ganaderia-animal-badge.hembra { color: #954f63; background: #f9e9ee; }
 .ganaderia-animal-sex.macho,
@@ -2297,6 +2298,9 @@ body {
 .ganaderia-animal-modal-form input:focus,
 .ganaderia-animal-modal-form select:focus,
 .ganaderia-animal-modal-form textarea:focus { border-color: #9a661c; outline: 3px solid rgba(241,178,75,.2); }
+.ganaderia-photo-field small { color: #78877f; font-size: .72rem; font-weight: 600; }
+.ganaderia-photo-field input[type="file"] { padding: 8px; }
+.ganaderia-photo-field input[type="file"]::file-selector-button { min-height: 30px; margin-right: 10px; padding: 0 12px; color: #294438; background: #edf2ef; border: 0; border-radius: 6px; font: inherit; font-weight: 800; cursor: pointer; }
 .ganaderia-modal-actions { padding-top: 6px; display: flex; justify-content: flex-end; gap: 10px; }
 .ganaderia-secondary { min-height: 46px; padding: 0 20px; color: #294438; background: #edf2ef; border: 0; border-radius: 7px; font: inherit; font-weight: 800; cursor: pointer; }
 .ganaderia-two-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
@@ -2304,12 +2308,21 @@ body {
 .ganaderia-paddock-form form { grid-template-columns: 1fr; }
 .ganaderia-animal-profile { min-height: 210px; padding: clamp(28px, 4vw, 48px); display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 24px; background: #fff; border: 1px solid #dfe6e1; border-radius: 8px; }
 .ganaderia-animal-badge { min-width: 78px; min-height: 78px; padding: 12px; display: grid; place-items: center; border-radius: 50%; font-weight: 900; }
+.ganaderia-animal-photo { width: 136px; height: 136px; padding: 6px; display: grid; place-items: center; background: #f5f7f5; border: 1px solid #dfe6e1; border-radius: 8px; overflow: hidden; }
+.ganaderia-animal-photo img { width: 100%; height: 100%; object-fit: contain; }
 .ganaderia-animal-profile > div:nth-child(2) > span { color: #89978f; font-size: .7rem; font-weight: 800; letter-spacing: .12em; }
 .ganaderia-animal-profile h2 { margin: 7px 0; font-size: clamp(1.8rem, 3vw, 2.6rem); letter-spacing: 0; }
 .ganaderia-animal-profile p { margin: 0; color: #6f7e76; }
 .ganaderia-animal-profile > strong { font-size: 1.8rem; }
 .ganaderia-animal-profile-actions { display: grid; justify-items: end; gap: 14px; }
 .ganaderia-animal-profile-actions > strong { font-size: 1.8rem; }
+.ganaderia-animal-actions { margin: 18px 0; padding: 22px 24px; display: grid; grid-template-columns: 190px 1fr; align-items: center; gap: 20px; background: #fff; border: 1px solid #dfe6e1; border-radius: 8px; }
+.ganaderia-animal-actions > div:first-child > span { color: #8a9890; font-size: .68rem; font-weight: 800; letter-spacing: .12em; }
+.ganaderia-animal-actions h2 { margin: 5px 0 0; font-size: 1.2rem; }
+.ganaderia-animal-action-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+.ganaderia-animal-action-buttons button { min-height: 40px; padding: 5px 11px 5px 6px; display: inline-flex; align-items: center; gap: 7px; color: #294438; background: #f7f9f7; border: 1px solid #dfe6e1; border-radius: 7px; font: inherit; font-size: .76rem; font-weight: 800; cursor: pointer; }
+.ganaderia-animal-action-buttons button:hover { color: #714a12; background: #fff8eb; border-color: #efb24c; }
+.ganaderia-animal-action-buttons button span { width: 28px; height: 28px; display: grid; place-items: center; color: #855817; background: #fff0d2; border-radius: 5px; font-size: .62rem; font-weight: 900; }
 .ganaderia-record-layout { margin-top: 28px; display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(330px, .8fr); gap: 18px; align-items: start; }
 .ganaderia-timeline { display: grid; }
 .ganaderia-timeline article { min-height: 96px; padding: 18px 0; display: grid; grid-template-columns: 18px 1fr; gap: 12px; border-top: 1px solid #e7ece8; }
@@ -2471,6 +2484,7 @@ body {
   .ganaderia-animal-profile { grid-template-columns: auto 1fr; }
   .ganaderia-animal-profile-actions { grid-column: 2; justify-items: start; }
   .ganaderia-animal-profile-actions > strong { font-size: 1.45rem; }
+  .ganaderia-animal-actions { grid-template-columns: 1fr; }
   .ganaderia-agenda-list { grid-template-columns: 1fr; }
   .ganaderia-farm-kpis,
   .ganaderia-paddock-grid,
@@ -2500,6 +2514,11 @@ body {
   .ganaderia-modal-header { padding: 20px 16px 16px; }
   .ganaderia-modal > .form-error { margin: 14px 16px 0; }
   .ganaderia-modal-actions { flex-direction: column-reverse; }
+  .ganaderia-animal-profile { padding: 22px 18px; }
+  .ganaderia-animal-photo { width: 92px; height: 92px; }
+  .ganaderia-animal-actions { padding: 18px 16px; }
+  .ganaderia-animal-action-buttons { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ganaderia-animal-action-buttons button { width: 100%; }
 }
 
 @media (max-width: 720px) {

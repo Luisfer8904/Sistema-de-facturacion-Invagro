@@ -8,21 +8,52 @@
       <header class="ganaderia-topbar"><button class="ganaderia-menu" type="button" aria-label="Abrir menú" onclick="document.body.classList.toggle('ganaderia-menu-open')">☰</button><div><small>{{ finca.nombre|upper }}</small><h1>Expediente animal</h1></div><a class="ganaderia-back" href="/ganaderia/fincas/{{ finca.id }}/animales">Volver a animales</a></header>
       <main class="ganaderia-content">
         {% if created %}<div class="ganaderia-success">Animal registrado correctamente.</div>{% endif %}{% if edited %}<div class="ganaderia-success">Información del animal actualizada correctamente.</div>{% endif %}{% if activity_created %}<div class="ganaderia-success">Actividad registrada correctamente.</div>{% endif %}{% if error %}<div class="form-error">{{ error }}</div>{% endif %}{% if edit_error %}<div class="form-error">{{ edit_error }}</div>{% endif %}
-        <section class="ganaderia-animal-profile"><div class="ganaderia-animal-badge {{ animal.sexo }}">{{ animal.codigo }}</div><div><span>EXPEDIENTE INDIVIDUAL</span><h2>{{ animal.nombre or "Animal " ~ animal.codigo }}</h2><p>{{ animal.raza or "Raza pendiente" }} · {{ "Hembra" if animal.sexo == "hembra" else "Macho" }} · {{ paddock.nombre if paddock else "Sin potrero asignado" }}</p></div><div class="ganaderia-animal-profile-actions"><strong>{{ animal.peso_actual or "—" }}{% if animal.peso_actual %} lb{% endif %}</strong>{% if current.rol in ["superadmin", "veterinario"] %}<button class="ganaderia-secondary" type="button" onclick="document.getElementById('editAnimalDialog').showModal()">Editar animal</button>{% endif %}</div></section>
+        <section class="ganaderia-animal-profile">
+          {% if animal.foto %}<div class="ganaderia-animal-photo"><img src="{{ url_for('static', filename='uploads/animales/' ~ animal.foto) }}" alt="Foto de {{ animal.nombre or animal.codigo }}" /></div>{% else %}<div class="ganaderia-animal-badge {{ animal.sexo }}">{{ animal.codigo }}</div>{% endif %}
+          <div><span>EXPEDIENTE INDIVIDUAL</span><h2>{{ animal.nombre or "Animal " ~ animal.codigo }}</h2><p>{{ animal.raza or "Raza pendiente" }} · {{ "Hembra" if animal.sexo == "hembra" else "Macho" }} · {{ paddock.nombre if paddock else "Sin potrero asignado" }}</p></div>
+          <div class="ganaderia-animal-profile-actions"><strong>{{ animal.peso_actual or "—" }}{% if animal.peso_actual %} lb{% endif %}</strong>{% if current.rol in ["superadmin", "veterinario"] %}<button class="ganaderia-secondary" type="button" onclick="document.getElementById('editAnimalDialog').showModal()">Editar animal</button>{% endif %}</div>
+        </section>
+        {% if current.rol in ["superadmin", "veterinario"] %}
+          <section class="ganaderia-animal-actions">
+            <div><span>ACCIONES RÁPIDAS</span><h2>Registrar actividad</h2></div>
+            <div class="ganaderia-animal-action-buttons">
+              <button type="button" data-type="pesaje" data-label="Pesaje" onclick="openAnimalActivity(this)"><span>LB</span>Pesaje</button>
+              <button type="button" data-type="vacunacion" data-label="Vacunación" onclick="openAnimalActivity(this)"><span>VA</span>Vacunación</button>
+              <button type="button" data-type="desparasitacion" data-label="Desparasitación" onclick="openAnimalActivity(this)"><span>DP</span>Desparasitación</button>
+              <button type="button" data-type="tratamiento" data-label="Tratamiento" onclick="openAnimalActivity(this)"><span>TR</span>Tratamiento</button>
+              <button type="button" data-type="inseminacion" data-label="Inseminación" onclick="openAnimalActivity(this)"><span>IN</span>Inseminación</button>
+              <button type="button" data-type="palpacion" data-label="Palpación" onclick="openAnimalActivity(this)"><span>PA</span>Palpación</button>
+              <button type="button" data-type="parto" data-label="Parto" onclick="openAnimalActivity(this)"><span>PT</span>Parto</button>
+              <button type="button" data-type="secado" data-label="Secado" onclick="openAnimalActivity(this)"><span>SE</span>Secado</button>
+              <button type="button" data-type="destete" data-label="Destete" onclick="openAnimalActivity(this)"><span>DE</span>Destete</button>
+              <button type="button" data-type="identificacion" data-label="Identificación" onclick="openAnimalActivity(this)"><span>ID</span>Identificación</button>
+              <button type="button" data-type="visita" data-label="Visita veterinaria" onclick="openAnimalActivity(this)"><span>VE</span>Visita</button>
+              <button type="button" data-type="manejo" data-label="Manejo general" onclick="openAnimalActivity(this)"><span>MA</span>Manejo</button>
+            </div>
+          </section>
+        {% endif %}
         <section class="ganaderia-detail-grid"><article><span>Nacimiento</span><strong>{{ animal.fecha_nacimiento.strftime('%d/%m/%Y') if animal.fecha_nacimiento else "Pendiente" }}</strong></article><article><span>Madre</span><strong>{{ animal.madre_codigo or "Pendiente" }}</strong></article><article><span>Padre</span><strong>{{ animal.padre_codigo or "Pendiente" }}</strong></article></section>
-        <section class="ganaderia-record-layout{% if current.rol == 'finca' %} read-only{% endif %}">
+        <section class="ganaderia-record-layout read-only">
           <div class="ganaderia-user-list"><div class="ganaderia-panel-heading"><div><span>HISTORIAL</span><h2>Actividades del animal</h2></div><strong>{{ activities|length }}</strong></div><div class="ganaderia-timeline">{% for item in activities %}<article><span class="ganaderia-timeline-dot {{ item.tipo }}"></span><div><small>{{ item.fecha.strftime('%d/%m/%Y') }} · {{ activity_label(item.tipo) }}</small><strong>{{ item.titulo }}</strong><p>{% if item.peso %}{{ item.peso }} lb{% endif %}{% if item.producto %} · {{ item.producto }}{% endif %}{% if item.dosis %} · {{ item.dosis }}{% endif %}{{ item.observaciones or "" }}</p>{% if item.proxima_fecha %}<em class="{% if item.proxima_fecha < today %}overdue{% endif %}">Próxima: {{ item.proxima_fecha.strftime('%d/%m/%Y') }}</em>{% endif %}</div></article>{% else %}<div class="ganaderia-empty-inline">Este animal todavía no tiene actividades.</div>{% endfor %}</div></div>
-          {% if current.rol in ["superadmin", "veterinario"] %}<aside class="ganaderia-create-user"><span>NUEVO REGISTRO</span><h2>Agregar actividad</h2><form method="post" action="/ganaderia/fincas/{{ finca.id }}/actividades"><input type="hidden" name="animal_id" value="{{ animal.id }}" />{% include "partials/ganaderia_activity_fields.html" %}<button class="ganaderia-primary" type="submit">Guardar actividad</button></form></aside>{% endif %}
         </section>
       </main>
     </div>
   </div>
   {% if current.rol in ["superadmin", "veterinario"] %}
-    <dialog class="ganaderia-modal" id="editAnimalDialog" {% if edit_error %}open{% endif %}>
+    <dialog class="ganaderia-modal" id="animalActivityDialog">
+      <div class="ganaderia-modal-header"><div><span>NUEVA ACTIVIDAD</span><h2 id="animalActivityTitle">Registrar actividad</h2></div><button type="button" aria-label="Cerrar" onclick="document.getElementById('animalActivityDialog').close()">×</button></div>
+      <form class="ganaderia-animal-modal-form ganaderia-activity-modal-form" method="post" action="/ganaderia/fincas/{{ finca.id }}/actividades">
+        <input type="hidden" name="animal_id" value="{{ animal.id }}" />
+        {% set activity_type_locked = true %}{% include "partials/ganaderia_activity_fields.html" %}
+        <div class="ganaderia-modal-actions"><button class="ganaderia-secondary" type="button" onclick="document.getElementById('animalActivityDialog').close()">Cancelar</button><button class="ganaderia-primary" type="submit">Guardar actividad</button></div>
+      </form>
+    </dialog>
+    <dialog class="ganaderia-modal" id="editAnimalDialog">
       <div class="ganaderia-modal-header"><div><span>EXPEDIENTE ANIMAL</span><h2>Editar {{ animal.nombre or animal.codigo }}</h2></div><button type="button" aria-label="Cerrar" onclick="document.getElementById('editAnimalDialog').close()">×</button></div>
-      <form class="ganaderia-animal-modal-form" method="post" action="/ganaderia/fincas/{{ finca.id }}/animales/{{ animal.id }}/editar">
+      <form class="ganaderia-animal-modal-form" method="post" enctype="multipart/form-data" action="/ganaderia/fincas/{{ finca.id }}/animales/{{ animal.id }}/editar">
         <label>Código o arete<input name="codigo" value="{{ animal.codigo }}" required /></label>
         <label>Nombre<input name="nombre" value="{{ animal.nombre or '' }}" /></label>
+        <label class="ganaderia-full-field ganaderia-photo-field">Foto del animal<input type="file" name="foto" accept="image/jpeg,image/png,image/webp" /><small>{% if animal.foto %}Selecciona otra imagen para reemplazar la actual.{% else %}JPG, PNG o WEBP. La imagen se mostrará completa.{% endif %}</small></label>
         <div class="ganaderia-two-fields"><label>Sexo<select name="sexo"><option value="hembra" {% if animal.sexo == 'hembra' %}selected{% endif %}>Hembra</option><option value="macho" {% if animal.sexo == 'macho' %}selected{% endif %}>Macho</option></select></label><label>Raza<input name="raza" value="{{ animal.raza or '' }}" /></label></div>
         <div class="ganaderia-two-fields"><label>Nacimiento<input type="date" name="fecha_nacimiento" value="{{ animal.fecha_nacimiento.isoformat() if animal.fecha_nacimiento else '' }}" /></label><label>Peso actual (lb)<input type="number" step="0.01" min="0" name="peso_actual" value="{{ animal.peso_actual or '' }}" /></label></div>
         <label>Procedencia<input name="procedencia" value="{{ animal.procedencia or '' }}" /></label>
@@ -33,9 +64,42 @@
       </form>
     </dialog>
     <script>
-      document.getElementById("editAnimalDialog").addEventListener("click", function (event) {
-        if (event.target === this) this.close();
+      const animalActivityLabels = {pesaje:"Pesaje", vacunacion:"Vacunación", desparasitacion:"Desparasitación", tratamiento:"Tratamiento", inseminacion:"Inseminación", palpacion:"Palpación", parto:"Parto", secado:"Secado", destete:"Destete", identificacion:"Identificación", visita:"Visita veterinaria", manejo:"Manejo general"};
+      function openAnimalActivity(buttonOrType) {
+        const type = typeof buttonOrType === "string" ? buttonOrType : buttonOrType.dataset.type;
+        const label = typeof buttonOrType === "string" ? animalActivityLabels[type] : buttonOrType.dataset.label;
+        document.getElementById("activityTypeInput").value = type;
+        document.getElementById("animalActivityTitle").textContent = label || "Registrar actividad";
+        configureAnimalActivity(type);
+        document.getElementById("animalActivityDialog").showModal();
+      }
+      function configureAnimalActivity(type) {
+        const isPalpation = type === "palpacion";
+        const genericResult = document.getElementById("activityResultInput");
+        const genericResultField = document.getElementById("activityResultField");
+        const palpationResult = document.getElementById("palpationResultInput");
+        const palpationResultField = document.getElementById("palpationResultField");
+        document.getElementById("activityNextDateLabel").textContent = isPalpation ? "Fecha probable de parto" : "Próxima fecha";
+        document.getElementById("palpationDueHint").hidden = !isPalpation;
+        genericResult.disabled = isPalpation;
+        genericResultField.hidden = isPalpation;
+        palpationResult.disabled = !isPalpation;
+        palpationResultField.hidden = !isPalpation;
+        updateAnimalDueDate();
+      }
+      function updateAnimalDueDate() {
+        const isPalpation = document.getElementById("activityTypeInput").value === "palpacion";
+        const result = document.getElementById("palpationResultInput");
+        const nextDate = document.getElementById("activityNextDateInput");
+        nextDate.required = isPalpation && result.value === "prenada";
+        if (isPalpation && result.value === "prenada" && !nextDate.value) nextDate.value = "{{ estimated_due_date }}";
+      }
+      document.getElementById("palpationResultInput").addEventListener("change", updateAnimalDueDate);
+      ["animalActivityDialog", "editAnimalDialog"].forEach(function (id) {
+        document.getElementById(id).addEventListener("click", function (event) { if (event.target === this) this.close(); });
       });
+      {% if error and selected_activity_type %}openAnimalActivity("{{ selected_activity_type }}");{% endif %}
+      {% if edit_error %}document.getElementById("editAnimalDialog").showModal();{% endif %}
     </script>
   {% endif %}
 {% endblock %}
