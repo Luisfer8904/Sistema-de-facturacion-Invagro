@@ -147,11 +147,8 @@
             <div>
               <label>Cliente</label>
               <div class="cliente-dropdown" id="cliente-dropdown">
-                <button type="button" class="cliente-dropdown-toggle" id="cliente-toggle">
-                  Selecciona un cliente
-                </button>
+                <input type="text" id="cliente-search" class="cliente-combo-input" placeholder="Buscar o escribir cliente..." autocomplete="off" />
                 <div class="cliente-dropdown-panel" id="cliente-panel">
-                  <input type="text" id="cliente-search" placeholder="Buscar cliente..." />
                   <div class="cliente-options" id="cliente-options"></div>
                 </div>
                 <select id="cliente-select" class="cliente-select-hidden">
@@ -163,6 +160,7 @@
                   {% endfor %}
                 </select>
               </div>
+              <input type="hidden" id="cliente-manual" />
             </div>
             <div>
               <label>RTN</label>
@@ -211,8 +209,10 @@
           <div class="pos-actions">
             {% if is_vendedor %}
               <button class="primary-button" type="button" id="save-order">Guardar factura</button>
+              <button class="secondary-button personal-charge-button" type="button" id="save-personal-charge">Cobro personal</button>
             {% else %}
               <button class="secondary-button" type="button" id="save-order">Guardar factura</button>
+              <button class="secondary-button personal-charge-button" type="button" id="save-personal-charge">Cobro personal</button>
               <button class="primary-button" type="button" id="emit-invoice">Emitir factura</button>
             {% endif %}
           </div>
@@ -307,12 +307,14 @@
     const clientPanel = document.getElementById("cliente-panel");
     const clientOptionsContainer = document.getElementById("cliente-options");
     const clientSearch = document.getElementById("cliente-search");
+    const clientManualInput = document.getElementById("cliente-manual");
     const clientRtnInput = document.getElementById("cliente-rtn");
     const savedSalesDropdown = document.getElementById("saved-sales-dropdown");
     const savedSalesToggle = document.getElementById("saved-sales-toggle");
     const savedSalesPanel = document.getElementById("saved-sales-panel");
     const savedSaleOptions = document.querySelectorAll("[data-saved-sale-id]");
     const saveOrderButton = document.getElementById("save-order");
+    const savePersonalChargeButton = document.getElementById("save-personal-charge");
     const emitButton = document.getElementById("emit-invoice");
     const invoiceModal = document.getElementById("invoice-modal");
     const invoiceCloseButtons = invoiceModal
@@ -360,8 +362,11 @@
       }
       const option = clientSelect.options[clientSelect.selectedIndex];
       const label = option && option.value ? option.textContent.trim() : "Selecciona un cliente";
-      if (clientToggle) {
-        clientToggle.textContent = label;
+      if (clientSearch) {
+        clientSearch.value = option && option.value ? label : "";
+      }
+      if (clientManualInput && option && option.value) {
+        clientManualInput.value = "";
       }
       if (clientRtnInput) {
         clientRtnInput.value = option ? option.dataset.rtn || "" : "";
@@ -396,6 +401,7 @@
               clientSelect.value = option.value;
             }
             updateClientSelection();
+            refreshLastPriceNotes();
             if (clientSearch) {
               renderClientOptions(clientSearch.value);
             }
@@ -406,10 +412,38 @@
           clientOptionsContainer.appendChild(item);
         }
       });
-      if (matches === 0) {
+      if (normalized) {
+        const exactMatch = clientOptions.some((option) => {
+          return option.value && (option.textContent || "").toLowerCase().trim() === normalized;
+        });
+        if (!exactMatch) {
+          const manual = document.createElement("button");
+          manual.type = "button";
+          manual.className = "cliente-option cliente-option-manual";
+          manual.textContent = `Usar "${query.trim()}" como cliente nuevo`;
+          manual.addEventListener("click", () => {
+            if (clientSelect) {
+              clientSelect.value = "";
+            }
+            if (clientManualInput) {
+              clientManualInput.value = query.trim();
+            }
+            if (clientSearch) {
+              clientSearch.value = query.trim();
+            }
+            if (clientRtnInput) {
+              clientRtnInput.value = "";
+            }
+            refreshLastPriceNotes();
+            closeClientDropdown();
+          });
+          clientOptionsContainer.appendChild(manual);
+        }
+      }
+      if (matches === 0 && !normalized) {
         const empty = document.createElement("div");
         empty.className = "cliente-option-empty";
-        empty.textContent = "No hay resultados";
+        empty.textContent = "Escribe para buscar o crear cliente";
         clientOptionsContainer.appendChild(empty);
       }
     };
@@ -420,20 +454,28 @@
       }
     };
 
-    if (clientToggle && clientPanel) {
-      clientToggle.addEventListener("click", () => {
-        clientPanel.classList.toggle("open");
-        if (clientPanel.classList.contains("open")) {
-          renderClientOptions(clientSearch ? clientSearch.value : "");
-        }
-        if (clientPanel.classList.contains("open") && clientSearch) {
-          clientSearch.focus();
-        }
-      });
-    }
-
     if (clientSearch) {
+      clientSearch.addEventListener("focus", () => {
+        if (clientPanel) {
+          clientPanel.classList.add("open");
+        }
+        renderClientOptions(clientSearch.value);
+      });
       clientSearch.addEventListener("input", (event) => {
+        const value = event.target.value.trim();
+        if (clientSelect) {
+          clientSelect.value = "";
+        }
+        if (clientManualInput) {
+          clientManualInput.value = value;
+        }
+        if (clientRtnInput) {
+          clientRtnInput.value = "";
+        }
+        refreshLastPriceNotes();
+        if (clientPanel) {
+          clientPanel.classList.add("open");
+        }
         renderClientOptions(event.target.value);
       });
     }
@@ -498,6 +540,69 @@
       }
     };
 
+    const getSelectedClienteId = () => {
+      if (!clientSelect || !clientSelect.value) {
+        return null;
+      }
+      return Number(clientSelect.value);
+    };
+
+    const renderLastPriceNote = (row, result) => {
+      const note = row.querySelector(".last-price-note");
+      if (!note) {
+        return;
+      }
+      if (!result || !result.found) {
+        note.textContent = "Sin factura previa de este producto para el cliente seleccionado.";
+        note.classList.add("muted");
+        return;
+      }
+      note.classList.remove("muted");
+      note.innerHTML = `
+        Ultima factura ${result.numero_factura || ""} (${result.fecha || "-"}):
+        precio ${formatCurrency(Number(result.precio_unitario || 0))},
+        descuento ${formatCurrency(Number(result.descuento || 0))},
+        neto ${formatCurrency(Number(result.precio_neto || 0))}
+      `;
+    };
+
+    const loadLastPriceNote = async (row) => {
+      const note = row.querySelector(".last-price-note");
+      if (!note) {
+        return;
+      }
+      resolveTypedClientSelection();
+      const clienteId = getSelectedClienteId();
+      if (!clienteId) {
+        note.textContent = "Selecciona un cliente registrado para ver el ultimo precio facturado.";
+        note.classList.add("muted");
+        return;
+      }
+      note.textContent = "Consultando ultimo precio facturado...";
+      note.classList.add("muted");
+      try {
+        const response = await fetch(
+          `/facturacion/ultimo-precio?cliente_id=${clienteId}&producto_id=${row.dataset.id}`
+        );
+        const result = await response.json();
+        if (!response.ok) {
+          note.textContent = result.error || "No se pudo consultar el ultimo precio.";
+          note.classList.add("muted");
+          return;
+        }
+        renderLastPriceNote(row, result);
+      } catch (error) {
+        note.textContent = "No se pudo consultar el ultimo precio.";
+        note.classList.add("muted");
+      }
+    };
+
+    const refreshLastPriceNotes = () => {
+      invoiceTable.querySelectorAll(".invoice-row").forEach((row) => {
+        loadLastPriceNote(row);
+      });
+    };
+
     const clearInvoiceRows = () => {
       invoiceTable.querySelectorAll(".invoice-row").forEach((row) => row.remove());
       ensureEmptyState();
@@ -531,6 +636,7 @@
         <input class="discount-input" type="number" min="0" step="0.01" value="${discount}" />
         <span class="line-total">${formatCurrency(Number(card.dataset.price))}</span>
         <button class="remove-button" type="button">×</button>
+        <div class="last-price-note muted">Selecciona un cliente registrado para ver el ultimo precio facturado.</div>
       `;
 
       invoiceTable.appendChild(row);
@@ -553,6 +659,7 @@
         clearPedidoContext();
       }
       ensureEmptyState();
+      loadLastPriceNote(row);
       updateTotals();
     };
 
@@ -591,6 +698,7 @@
     if (clientSelect && clientRtnInput) {
       clientSelect.addEventListener("change", () => {
         updateClientSelection();
+        refreshLastPriceNotes();
         if (clientSearch) {
           renderClientOptions(clientSearch.value);
         }
@@ -681,6 +789,33 @@
       return selected ? selected.value : "contado";
     };
 
+    const resolveTypedClientSelection = () => {
+      const typedName = clientSearch ? clientSearch.value.trim() : "";
+      if (!clientSelect) {
+        if (clientManualInput) {
+          clientManualInput.value = typedName;
+        }
+        return;
+      }
+      if (clientSelect.value) {
+        return;
+      }
+      const exactMatch = clientOptions.find((option) => {
+        return option.value && (option.textContent || "").trim().toLowerCase() === typedName.toLowerCase();
+      });
+      if (exactMatch) {
+        clientSelect.value = exactMatch.value;
+        if (clientManualInput) {
+          clientManualInput.value = "";
+        }
+        updateClientSelection();
+        return;
+      }
+      if (clientManualInput) {
+        clientManualInput.value = typedName;
+      }
+    };
+
     const openInvoiceModal = () => {
       const rows = invoiceTable.querySelectorAll(".invoice-row");
       if (!rows.length) {
@@ -688,8 +823,10 @@
         return;
       }
 
+      resolveTypedClientSelection();
       const selectedOption = clientSelect ? clientSelect.options[clientSelect.selectedIndex] : null;
-      const clientName = selectedOption && selectedOption.value ? selectedOption.textContent.trim() : "-";
+      const manualClientName = clientManualInput ? clientManualInput.value.trim() : "";
+      const clientName = selectedOption && selectedOption.value ? selectedOption.textContent.trim() : manualClientName || "-";
       const rtnValue = clientRtnInput ? clientRtnInput.value.trim() : "";
       if (invoiceClient) {
         invoiceClient.textContent = `Cliente: ${clientName || "-"}`;
@@ -838,8 +975,10 @@
           alert("Agrega productos antes de emitir la factura.");
           return;
         }
+        resolveTypedClientSelection();
         const selectedOption = clientSelect ? clientSelect.options[clientSelect.selectedIndex] : null;
         const clienteId = selectedOption && selectedOption.value ? Number(selectedOption.value) : null;
+        const clienteNombre = clientManualInput ? clientManualInput.value.trim() : "";
         const rtnValue = clientRtnInput ? clientRtnInput.value.trim() : "";
         const paid = Number(invoicePaid ? invoicePaid.value : 0);
         const tipo = modalInvoiceType;
@@ -861,6 +1000,7 @@
             body: JSON.stringify({
               tipo,
               cliente_id: clienteId,
+              cliente_nombre: clienteNombre,
               rtn: rtnValue,
               pago: paid,
               fecha,
@@ -883,7 +1023,7 @@
           }
           if (invoiceWhatsappLink && result.pdf_url) {
             const pdfUrl = new URL(result.pdf_url, window.location.origin).toString();
-            const clientName = clientSelect ? clientSelect.options[clientSelect.selectedIndex]?.textContent.trim() : "";
+            const clientName = clienteId && clientSelect ? clientSelect.options[clientSelect.selectedIndex]?.textContent.trim() : clienteNombre;
             const greeting = clientName ? `Hola ${clientName},` : "Hola,";
             const tipoText = tipo === "credito" ? "credito" : "contado";
             const message = encodeURIComponent(
@@ -906,8 +1046,10 @@
           alert("Agrega productos antes de guardar la factura.");
           return;
         }
+        resolveTypedClientSelection();
         const selectedOption = clientSelect ? clientSelect.options[clientSelect.selectedIndex] : null;
         const clienteId = selectedOption && selectedOption.value ? Number(selectedOption.value) : null;
+        const clienteNombre = clientManualInput ? clientManualInput.value.trim() : "";
         const rtnValue = clientRtnInput ? clientRtnInput.value.trim() : "";
         const items = Array.from(rows).map((row) => ({
           producto_id: Number(row.dataset.id),
@@ -921,6 +1063,7 @@
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               cliente_id: clienteId,
+              cliente_nombre: clienteNombre,
               rtn: rtnValue,
               items,
             }),
@@ -934,6 +1077,10 @@
           clearInvoiceRows();
           if (clientSelect) {
             clientSelect.value = "";
+            updateClientSelection();
+          }
+          if (clientManualInput) {
+            clientManualInput.value = "";
           }
           if (clientRtnInput) {
             clientRtnInput.value = "";
@@ -941,6 +1088,63 @@
           clearPedidoContext();
         } catch (error) {
           alert("No se pudo guardar la factura.");
+        }
+      });
+    }
+
+    if (savePersonalChargeButton) {
+      savePersonalChargeButton.addEventListener("click", async () => {
+        const rows = invoiceTable.querySelectorAll(".invoice-row");
+        if (!rows.length) {
+          alert("Agrega productos antes de guardar el cobro personal.");
+          return;
+        }
+        resolveTypedClientSelection();
+        const selectedOption = clientSelect ? clientSelect.options[clientSelect.selectedIndex] : null;
+        const clienteId = selectedOption && selectedOption.value ? Number(selectedOption.value) : null;
+        const clienteNombre = clientManualInput ? clientManualInput.value.trim() : "";
+        const rtnValue = clientRtnInput ? clientRtnInput.value.trim() : "";
+        if (!clienteId && !clienteNombre) {
+          alert("Selecciona o escribe un cliente para crear el cobro personal.");
+          return;
+        }
+        const items = Array.from(rows).map((row) => ({
+          producto_id: Number(row.dataset.id),
+          cantidad: Number(row.querySelector(".qty-input").value || 0),
+          descuento: Number(row.querySelector(".discount-input").value || 0),
+        }));
+
+        try {
+          const response = await fetch("/cobros-personales/desde-facturacion", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              cliente_id: clienteId,
+              cliente_nombre: clienteNombre,
+              rtn: rtnValue,
+              items,
+            }),
+          });
+          const result = await response.json();
+          if (!response.ok) {
+            alert(result.error || "No se pudo guardar el cobro personal.");
+            return;
+          }
+          alert(`Cobro personal guardado: ${result.numero_cobro}`);
+          clearInvoiceRows();
+          if (clientSelect) {
+            clientSelect.value = "";
+            updateClientSelection();
+          }
+          if (clientManualInput) {
+            clientManualInput.value = "";
+          }
+          if (clientRtnInput) {
+            clientRtnInput.value = "";
+          }
+          clearPedidoContext();
+        } catch (error) {
+          alert("No se pudo guardar el cobro personal.");
         }
       });
     }
