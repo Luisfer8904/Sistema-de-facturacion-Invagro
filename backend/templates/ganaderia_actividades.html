@@ -36,7 +36,7 @@
     <dialog class="ganaderia-modal" id="activityDialog">
       <div class="ganaderia-modal-header"><div><span>NUEVA ACTIVIDAD</span><h2 id="activityDialogTitle">Registrar actividad</h2></div><button type="button" aria-label="Cerrar" onclick="document.getElementById('activityDialog').close()">×</button></div>
       <form class="ganaderia-animal-modal-form ganaderia-activity-modal-form" method="post">
-        <label class="ganaderia-full-field">Animal<select name="animal_id"><option value="">Actividad general de finca</option>{% for animal in animals %}<option value="{{ animal.id }}">{{ animal.codigo }} · {{ animal.nombre or "Sin nombre" }}</option>{% endfor %}</select></label>
+        <label class="ganaderia-full-field">Animal<select id="activityAnimalSelect" name="animal_id"><option value="">Actividad general de finca</option>{% for animal in animals %}<option value="{{ animal.id }}" data-estimated-due="{{ estimated_due_dates.get(animal.id, '') }}">{{ animal.codigo }} · {{ animal.nombre or "Sin nombre" }}</option>{% endfor %}</select></label>
         {% set activity_type_locked = true %}{% include "partials/ganaderia_activity_fields.html" %}
         <div class="ganaderia-modal-actions"><button class="ganaderia-secondary" type="button" onclick="document.getElementById('activityDialog').close()">Cancelar</button><button class="ganaderia-primary" type="submit">Guardar actividad</button></div>
       </form>
@@ -53,8 +53,39 @@
         const label = typeof buttonOrType === "string" ? activityLabels[type] : buttonOrType.dataset.label;
         document.getElementById("activityTypeInput").value = type;
         document.getElementById("activityDialogTitle").textContent = label || "Registrar actividad";
+        configureActivityFields(type);
         document.getElementById("activityDialog").showModal();
       }
+      function configureActivityFields(type) {
+        const isPalpation = type === "palpacion";
+        const animalSelect = document.getElementById("activityAnimalSelect");
+        const genericResult = document.getElementById("activityResultInput");
+        const genericResultField = document.getElementById("activityResultField");
+        const palpationResult = document.getElementById("palpationResultInput");
+        const palpationResultField = document.getElementById("palpationResultField");
+        const nextDateLabel = document.getElementById("activityNextDateLabel");
+        const hint = document.getElementById("palpationDueHint");
+        animalSelect.required = isPalpation;
+        genericResult.disabled = isPalpation;
+        genericResultField.hidden = isPalpation;
+        palpationResult.disabled = !isPalpation;
+        palpationResultField.hidden = !isPalpation;
+        nextDateLabel.textContent = isPalpation ? "Fecha probable de parto" : "Próxima fecha";
+        hint.hidden = !isPalpation;
+        updatePalpationDueDate();
+      }
+      function updatePalpationDueDate() {
+        const isPalpation = document.getElementById("activityTypeInput").value === "palpacion";
+        const animalSelect = document.getElementById("activityAnimalSelect");
+        const result = document.getElementById("palpationResultInput");
+        const nextDate = document.getElementById("activityNextDateInput");
+        nextDate.required = isPalpation && result.value === "prenada";
+        if (isPalpation && result.value === "prenada" && !nextDate.value) {
+          nextDate.value = animalSelect.selectedOptions[0]?.dataset.estimatedDue || "";
+        }
+      }
+      document.getElementById("activityAnimalSelect").addEventListener("change", updatePalpationDueDate);
+      document.getElementById("palpationResultInput").addEventListener("change", updatePalpationDueDate);
       document.getElementById("activityDialog").addEventListener("click", function (event) {
         if (event.target === this) this.close();
       });

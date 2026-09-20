@@ -2286,6 +2286,7 @@ body {
 .ganaderia-modal > .form-error { margin: 18px 28px 0; }
 .ganaderia-animal-modal-form { padding: 24px 28px 28px; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .ganaderia-animal-modal-form > label { display: grid; gap: 7px; color: #46564d; font-size: .82rem; font-weight: 800; }
+.ganaderia-field-hint { color: #7b8981; font-size: .7rem; font-weight: 600; line-height: 1.35; }
 .ganaderia-full-field { grid-column: 1 / -1; }
 .ganaderia-animal-modal-form > label:nth-of-type(n+3),
 .ganaderia-animal-modal-form > .ganaderia-two-fields,

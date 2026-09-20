@@ -14,7 +14,7 @@ import requests
 import urllib.parse
 
 import click
-from sqlalchemy import bindparam, create_engine, func, text, or_
+from sqlalchemy import and_, bindparam, create_engine, func, text, or_
 from flask import (
     Flask,
     abort,
@@ -2841,7 +2841,13 @@ def create_app():
         upcoming_births = (
             GanaderiaActividad.query.filter(
                 GanaderiaActividad.finca_id == finca.id,
-                GanaderiaActividad.tipo.in_(["reproduccion", "inseminacion"]),
+                or_(
+                    GanaderiaActividad.tipo.in_(["reproduccion", "inseminacion"]),
+                    and_(
+                        GanaderiaActividad.tipo == "palpacion",
+                        func.lower(GanaderiaActividad.resultado).in_(["preñada", "prenada", "positivo"]),
+                    ),
+                ),
                 GanaderiaActividad.proxima_fecha.isnot(None),
                 GanaderiaActividad.proxima_fecha >= today,
             )
@@ -3178,7 +3184,13 @@ def create_app():
         upcoming = (
             GanaderiaActividad.query.filter(
                 GanaderiaActividad.finca_id == finca.id,
-                GanaderiaActividad.tipo.in_(["reproduccion", "inseminacion"]),
+                or_(
+                    GanaderiaActividad.tipo.in_(["reproduccion", "inseminacion"]),
+                    and_(
+                        GanaderiaActividad.tipo == "palpacion",
+                        func.lower(GanaderiaActividad.resultado).in_(["preñada", "prenada", "positivo"]),
+                    ),
+                ),
                 GanaderiaActividad.proxima_fecha.isnot(None),
                 GanaderiaActividad.proxima_fecha >= today,
             )
@@ -3249,14 +3261,23 @@ def create_app():
             activity_date = parse_optional_date(request.form.get("fecha"))
             next_date = parse_optional_date(request.form.get("proxima_fecha"))
             title = request.form.get("titulo", "").strip()
+            raw_result = request.form.get("resultado", "").strip()
+            palpation_results = {"prenada": "Preñada", "vacia": "Vacía", "dudosa": "Dudosa"}
             if activity_type not in allowed_types:
                 error = "Selecciona un tipo de actividad valido."
             elif animal_id and not animal:
                 error = "El animal seleccionado no pertenece a esta finca."
+            elif activity_type == "palpacion" and not animal:
+                error = "Selecciona la vaca que fue palpada."
+            elif activity_type == "palpacion" and raw_result not in palpation_results:
+                error = "Selecciona el resultado de la palpacion."
+            elif activity_type == "palpacion" and raw_result == "prenada" and not next_date:
+                error = "Indica la fecha probable de parto."
             elif not activity_date:
                 error = "La fecha de la actividad es obligatoria."
             else:
                 error = None
+            result_value = palpation_results.get(raw_result, raw_result)
             try:
                 weight = Decimal(request.form.get("peso", "")) if request.form.get("peso", "").strip() else None
             except Exception:
@@ -3280,7 +3301,7 @@ def create_app():
                         producto=request.form.get("producto", "").strip() or None,
                         dosis=request.form.get("dosis", "").strip() or None,
                         peso=weight,
-                        resultado=request.form.get("resultado", "").strip() or None,
+                        resultado=result_value or None,
                         observaciones=request.form.get("observaciones", "").strip() or None,
                         realizada_por_user_id=current.id,
                         fecha_registro=datetime.utcnow(),
@@ -3309,6 +3330,27 @@ def create_app():
             GanaderiaActividad.proxima_fecha.isnot(None),
         ).order_by(GanaderiaActividad.proxima_fecha.asc()).limit(20).all()
         animal_names = {animal.id: (animal.nombre or animal.codigo) for animal in animals}
+        animal_ids = [animal.id for animal in animals]
+        estimated_due_dates = {}
+        if animal_ids:
+            inseminations = (
+                GanaderiaActividad.query.filter(
+                    GanaderiaActividad.finca_id == finca.id,
+                    GanaderiaActividad.animal_id.in_(animal_ids),
+                    GanaderiaActividad.tipo.in_(["inseminacion", "reproduccion"]),
+                )
+                .order_by(
+                    GanaderiaActividad.animal_id.asc(),
+                    GanaderiaActividad.fecha.desc(),
+                    GanaderiaActividad.id.desc(),
+                )
+                .all()
+            )
+            for insemination in inseminations:
+                estimated_due_dates.setdefault(
+                    insemination.animal_id,
+                    (insemination.fecha + timedelta(days=283)).isoformat(),
+                )
         return render_template(
             "ganaderia_actividades.html",
             current=current,
@@ -3317,6 +3359,7 @@ def create_app():
             activities=activities,
             upcoming=upcoming,
             animal_names=animal_names,
+            estimated_due_dates=estimated_due_dates,
             activity_label=ganaderia_activity_label,
             created=request.args.get("created") == "1",
             error=request.args.get("error"),
