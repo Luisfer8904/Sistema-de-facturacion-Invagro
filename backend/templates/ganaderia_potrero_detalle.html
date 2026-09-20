@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}{{ paddock.nombre }} | {{ finca.nombre }}{% endblock %}
+{% block body_class %}portal-shell-page ganaderia-app-page no-chat{% endblock %}
+{% block content %}
+  <div class="ganaderia-shell">
+    {% set ganaderia_active = "fincas" %}{% set ganaderia_section = "potreros" %}{% include "partials/ganaderia_sidebar.html" %}
+    <div class="ganaderia-main">
+      <header class="ganaderia-topbar">
+        <button class="ganaderia-menu" type="button" aria-label="Abrir menú" onclick="document.body.classList.toggle('ganaderia-menu-open')">☰</button>
+        <div><small>{{ finca.nombre|upper }}</small><h1>{{ paddock.nombre }}</h1></div>
+        <a class="ganaderia-back" href="/ganaderia/fincas/{{ finca.id }}/potreros">Volver a lotes</a>
+      </header>
+      <main class="ganaderia-content">
+        <section class="ganaderia-paddock-detail-hero">
+          <div class="ganaderia-paddock-icon">{{ paddock.tipo[:1]|upper }}</div>
+          <div><span>{{ paddock.tipo|upper }}</span><h2>{{ paddock.nombre }}</h2><p>{{ paddock.descripcion or "Sin observaciones registradas" }}</p></div>
+          <span class="ganaderia-status {{ 'active' if paddock.activo else 'inactive' }}">{{ "Activo" if paddock.activo else "Inactivo" }}</span>
+        </section>
+
+        <section class="ganaderia-detail-grid ganaderia-paddock-kpis">
+          <article><span>Animales asignados</span><strong>{{ animals|length }}</strong></article>
+          <article><span>Capacidad</span><strong>{{ paddock.capacidad or "Sin límite" }}</strong></article>
+          <article><span>Ocupación</span><strong>{{ occupancy_percent ~ '%' if occupancy_percent is not none else "—" }}</strong></article>
+          <article><span>Peso promedio</span><strong>{{ average_weight ~ ' lb' if average_weight is not none else "—" }}</strong></article>
+        </section>
+
+        <nav class="ganaderia-paddock-quick-actions" aria-label="Acciones rápidas del lote">
+          {% if current.rol in ["superadmin", "veterinario"] %}<a class="ganaderia-primary" href="/ganaderia/fincas/{{ finca.id }}/animales?new=1&amp;potrero_id={{ paddock.id }}">+ Nuevo animal en este lote</a>{% endif %}
+          <a class="ganaderia-secondary" href="/ganaderia/fincas/{{ finca.id }}/animales">Mover animales</a>
+          <a class="ganaderia-secondary" href="/ganaderia/fincas/{{ finca.id }}/actividades">Registrar actividad</a>
+        </nav>
+
+        <section class="ganaderia-user-list">
+          <div class="ganaderia-panel-heading"><div><span>INVENTARIO DEL LOTE</span><h2>Animales</h2></div><strong>{{ animals|length }}</strong></div>
+          <div>
+            {% for animal in animals %}
+              {% set last_activity = latest_activities.get(animal.id) %}
+              <a class="ganaderia-paddock-animal-row" href="/ganaderia/fincas/{{ finca.id }}/animales/{{ animal.id }}">
+                <span class="ganaderia-animal-sex {{ animal.sexo }}">{{ "H" if animal.sexo == "hembra" else "M" }}</span>
+                <div><strong>{{ animal.nombre or animal.codigo }}</strong><small>Arete {{ animal.codigo }} · {{ animal.raza or "Raza pendiente" }}</small></div>
+                <div><small>Nacimiento</small><strong>{{ animal.fecha_nacimiento.strftime('%d/%m/%Y') if animal.fecha_nacimiento else "Pendiente" }}</strong></div>
+                <div><small>Última acción</small><strong>{{ activity_label(last_activity.tipo) if last_activity else "Sin actividad" }}</strong>{% if last_activity %}<small>{{ last_activity.fecha.strftime('%d/%m/%Y') }}</small>{% endif %}</div>
+                <div><small>Peso</small><strong>{{ animal.peso_actual ~ ' lb' if animal.peso_actual is not none else "—" }}</strong></div>
+                <span class="ganaderia-status {{ 'active' if animal.estado == 'activo' else 'inactive' }}">{{ animal.estado|capitalize }}</span>
+                <b>→</b>
+              </a>
+            {% else %}<div class="ganaderia-empty-state"><strong>Este lote está vacío</strong><p>Registra un animal nuevo o mueve uno existente a este lote.</p></div>{% endfor %}
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+{% endblock %}

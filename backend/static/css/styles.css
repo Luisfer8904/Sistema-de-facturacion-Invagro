@@ -2358,8 +2358,10 @@ body {
 .ganaderia-activity-modal-form { max-height: calc(100vh - 136px); overflow-y: auto; }
 .ganaderia-paddock-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
 .ganaderia-paddock-inventory { width: 100%; }
-.ganaderia-paddock-grid article { padding: 20px; display: grid; grid-template-columns: 42px 1fr; gap: 14px; background: #f8faf8; border: 1px solid #e1e8e3; border-radius: 8px; }
-.ganaderia-paddock-grid article.inactive { opacity: .58; }
+.ganaderia-paddock-card { padding: 20px; display: grid; grid-template-columns: 42px 1fr auto; gap: 14px; color: #26372f; background: #f8faf8; border: 1px solid #e1e8e3; border-radius: 8px; text-decoration: none; }
+.ganaderia-paddock-card:hover { background: #fffaf1; border-color: #efb24c; }
+.ganaderia-paddock-card.inactive { opacity: .58; }
+.ganaderia-paddock-arrow { align-self: center; color: #875916; font-size: 1.1rem; font-weight: 900; }
 .ganaderia-paddock-icon { width: 40px; height: 40px; display: grid; place-items: center; color: #865817; background: #ffefd0; border-radius: 7px; font-weight: 900; }
 .ganaderia-paddock-grid h3 { margin: 3px 0 6px; }
 .ganaderia-paddock-grid small { color: #8a9890; font-size: .7rem; font-weight: 800; text-transform: uppercase; }
@@ -2368,6 +2370,19 @@ body {
 .ganaderia-paddock-grid dl div { padding: 10px; display: flex; justify-content: space-between; background: #fff; border-radius: 6px; }
 .ganaderia-paddock-grid dt { color: #7c8b83; font-size: .76rem; }
 .ganaderia-paddock-grid dd { margin: 0; font-weight: 900; }
+.ganaderia-paddock-detail-hero { min-height: 190px; padding: 30px; display: grid; grid-template-columns: 58px 1fr auto; align-items: center; gap: 18px; color: #fff; background: #1d4938; border-radius: 8px; }
+.ganaderia-paddock-detail-hero .ganaderia-paddock-icon { width: 56px; height: 56px; color: #754b10; background: #f6c46d; }
+.ganaderia-paddock-detail-hero span { color: #f3bd61; font-size: .7rem; font-weight: 800; letter-spacing: .12em; }
+.ganaderia-paddock-detail-hero h2 { margin: 7px 0; color: #fff; font-size: 2rem; }
+.ganaderia-paddock-detail-hero p { margin: 0; color: #ccddd4; }
+.ganaderia-paddock-kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.ganaderia-paddock-quick-actions { margin: 18px 0; display: flex; flex-wrap: wrap; gap: 10px; }
+.ganaderia-paddock-quick-actions .ganaderia-secondary { display: inline-flex; align-items: center; text-decoration: none; }
+.ganaderia-paddock-animal-row { min-height: 82px; display: grid; grid-template-columns: 42px minmax(150px, 1.2fr) minmax(110px, .7fr) minmax(130px, .8fr) minmax(90px, .55fr) auto 18px; align-items: center; gap: 14px; color: #26372f; border-top: 1px solid #e7ece8; text-decoration: none; }
+.ganaderia-paddock-animal-row:hover { background: #f7faf8; }
+.ganaderia-paddock-animal-row > div { min-width: 0; display: grid; gap: 4px; }
+.ganaderia-paddock-animal-row small { overflow: hidden; color: #7b8981; text-overflow: ellipsis; white-space: nowrap; }
+.ganaderia-paddock-animal-row > b { color: #294f3e; }
 .ganaderia-birth-hero { min-height: 180px; padding: 30px; display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 4px 28px; color: #fff; background: #1d4938; border-radius: 8px; }
 .ganaderia-birth-hero span { color: #f3bd61; font-size: .7rem; font-weight: 800; letter-spacing: .12em; }
 .ganaderia-birth-hero h2 { margin: 6px 0; color: #fff; }
@@ -2397,6 +2412,7 @@ body {
   .ganaderia-farm-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .ganaderia-farm-management { grid-template-columns: 1fr; }
   .ganaderia-farm-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .ganaderia-paddock-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .ganaderia-farm-summary-grid,
   .ganaderia-birth-layout { grid-template-columns: 1fr; }
   .ganaderia-animal-layout,
@@ -2413,6 +2429,10 @@ body {
   .ganaderia-agenda { grid-template-columns: 1fr; }
   .ganaderia-agenda-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .ganaderia-activity-types { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .ganaderia-paddock-animal-row { grid-template-columns: 40px minmax(0, 1fr) auto; padding: 14px 0; align-items: start; }
+  .ganaderia-paddock-animal-row > div:nth-of-type(n+2) { grid-column: 2; }
+  .ganaderia-paddock-animal-row > .ganaderia-status { grid-column: 3; grid-row: 1; }
+  .ganaderia-paddock-animal-row > b { display: none; }
 }
 
 @media (max-width: 700px) {
@@ -2453,7 +2473,11 @@ body {
   .ganaderia-animal-profile-actions > strong { font-size: 1.45rem; }
   .ganaderia-agenda-list { grid-template-columns: 1fr; }
   .ganaderia-farm-kpis,
-  .ganaderia-paddock-grid { grid-template-columns: 1fr; }
+  .ganaderia-paddock-grid,
+  .ganaderia-paddock-kpis { grid-template-columns: 1fr; }
+  .ganaderia-paddock-detail-hero { grid-template-columns: 52px 1fr; padding: 24px 20px; }
+  .ganaderia-paddock-detail-hero > .ganaderia-status { grid-column: 2; width: fit-content; }
+  .ganaderia-paddock-quick-actions { align-items: stretch; flex-direction: column; }
   .ganaderia-summary-line { grid-template-columns: 72px 1fr auto; }
   .ganaderia-birth-hero { grid-template-columns: 1fr; }
   .ganaderia-birth-hero > strong,

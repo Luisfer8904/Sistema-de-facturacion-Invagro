@@ -2975,7 +2975,7 @@ def create_app():
             "procedencia": "",
             "madre_codigo": "",
             "padre_codigo": "",
-            "potrero_id": "",
+            "potrero_id": request.args.get("potrero_id", "").strip(),
             "observaciones": "",
         }
         if request.method == "POST":
@@ -3068,6 +3068,7 @@ def create_app():
             search=search,
             moved=request.args.get("moved") == "1",
             move_error=request.args.get("move_error"),
+            open_new=request.args.get("new") == "1",
         )
 
     @app.post("/ganaderia/fincas/<int:finca_id>/animales/<int:animal_id>/mover")
@@ -3173,6 +3174,50 @@ def create_app():
             animal_counts=animal_counts,
             created=request.args.get("created") == "1",
             error=request.args.get("error"),
+        )
+
+    @app.get("/ganaderia/fincas/<int:finca_id>/potreros/<int:potrero_id>")
+    @ganaderia_login_required
+    def ganaderia_potrero_detalle(finca_id, potrero_id):
+        current = ganaderia_current_user()
+        finca = ganaderia_get_accessible_farm_or_404(finca_id)
+        paddock = GanaderiaPotrero.query.filter_by(id=potrero_id, finca_id=finca.id).first_or_404()
+        animals = (
+            GanaderiaAnimal.query.filter_by(finca_id=finca.id, potrero_id=paddock.id)
+            .order_by(GanaderiaAnimal.estado.asc(), GanaderiaAnimal.codigo.asc())
+            .all()
+        )
+        animal_ids = [animal.id for animal in animals]
+        latest_activities = {}
+        if animal_ids:
+            activities = (
+                GanaderiaActividad.query.filter(GanaderiaActividad.animal_id.in_(animal_ids))
+                .order_by(
+                    GanaderiaActividad.animal_id.asc(),
+                    GanaderiaActividad.fecha.desc(),
+                    GanaderiaActividad.id.desc(),
+                )
+                .all()
+            )
+            for activity in activities:
+                latest_activities.setdefault(activity.animal_id, activity)
+        weights = [float(animal.peso_actual) for animal in animals if animal.peso_actual is not None]
+        average_weight = round(sum(weights) / len(weights), 1) if weights else None
+        occupancy_percent = (
+            min(100, round((len(animals) / paddock.capacidad) * 100))
+            if paddock.capacidad
+            else None
+        )
+        return render_template(
+            "ganaderia_potrero_detalle.html",
+            current=current,
+            finca=finca,
+            paddock=paddock,
+            animals=animals,
+            latest_activities=latest_activities,
+            activity_label=ganaderia_activity_label,
+            average_weight=average_weight,
+            occupancy_percent=occupancy_percent,
         )
 
     @app.get("/ganaderia/fincas/<int:finca_id>/partos")

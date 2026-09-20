@@ -17,11 +17,12 @@
             <div class="ganaderia-panel-heading ganaderia-animal-heading"><div><span>DISTRIBUCIÓN</span><h2>Espacios de la finca</h2></div><div class="ganaderia-heading-actions"><strong>{{ paddocks|length }}</strong>{% if current.rol in ["superadmin", "veterinario"] %}<button class="ganaderia-primary" type="button" onclick="document.getElementById('newPaddockDialog').showModal()">+ Nuevo lote o potrero</button>{% endif %}</div></div>
             <div class="ganaderia-paddock-grid">
               {% for item in paddocks %}
-                <article class="{% if not item.activo %}inactive{% endif %}">
+                <a class="ganaderia-paddock-card{% if not item.activo %} inactive{% endif %}" href="/ganaderia/fincas/{{ finca.id }}/potreros/{{ item.id }}">
                   <div class="ganaderia-paddock-icon">{{ item.tipo[:1]|upper }}</div>
                   <div><small>{{ item.tipo|capitalize }}</small><h3>{{ item.nombre }}</h3><p>{{ item.descripcion or "Sin observaciones" }}</p></div>
+                  <span class="ganaderia-paddock-arrow">→</span>
                   <dl><div><dt>Animales</dt><dd>{{ animal_counts.get(item.id, 0) }}</dd></div><div><dt>Capacidad</dt><dd>{{ item.capacidad or "—" }}</dd></div></dl>
-                </article>
+                </a>
               {% else %}
                 <div class="ganaderia-empty-state"><strong>No hay espacios registrados</strong><p>Crea el primer lote, potrero o corral de esta finca.</p></div>
               {% endfor %}
