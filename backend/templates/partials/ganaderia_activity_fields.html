@@ -1,6 +1,10 @@
-<label>Tipo<select name="tipo" required><option value="">Selecciona</option><option value="pesaje">Pesaje</option><option value="vacunacion">Vacunación</option><option value="desparasitacion">Desparasitación</option><option value="tratamiento">Tratamiento</option><option value="reproduccion">Reproducción</option><option value="parto">Parto</option><option value="visita">Visita veterinaria</option><option value="manejo">Manejo</option></select></label>
+{% if activity_type_locked %}
+  <input id="activityTypeInput" type="hidden" name="tipo" value="{{ selected_activity_type or '' }}" required />
+{% else %}
+  <label>Tipo<select name="tipo" required><option value="">Selecciona</option><option value="pesaje">Pesaje</option><option value="vacunacion">Vacunación</option><option value="desparasitacion">Desparasitación</option><option value="tratamiento">Tratamiento</option><option value="inseminacion">Inseminación</option><option value="palpacion">Palpación</option><option value="parto">Parto</option><option value="secado">Secado</option><option value="destete">Destete</option><option value="identificacion">Identificación</option><option value="visita">Visita veterinaria</option><option value="manejo">Manejo general</option></select></label>
+{% endif %}
 <label>Título<input name="titulo" placeholder="Descripción corta" /></label>
-<div class="ganaderia-two-fields"><label>Fecha<input type="date" name="fecha" required /></label><label>Próxima fecha<input type="date" name="proxima_fecha" /></label></div>
+<div class="ganaderia-two-fields"><label>Fecha<input type="date" name="fecha" value="{{ today.isoformat() if today else '' }}" required /></label><label>Próxima fecha<input type="date" name="proxima_fecha" /></label></div>
 <div class="ganaderia-two-fields"><label>Producto<input name="producto" /></label><label>Dosis<input name="dosis" /></label></div>
 <div class="ganaderia-two-fields"><label>Peso (lb)<input type="number" step="0.01" min="0" name="peso" /></label><label>Resultado<input name="resultado" /></label></div>
 <label>Observaciones<textarea name="observaciones" rows="3"></textarea></label>

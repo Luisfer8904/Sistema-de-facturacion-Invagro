@@ -2289,7 +2289,13 @@ def create_app():
             "desparasitacion": "Desparasitación",
             "tratamiento": "Tratamiento",
             "reproduccion": "Reproducción",
+            "inseminacion": "Inseminación",
+            "palpacion": "Palpación",
             "parto": "Parto",
+            "secado": "Secado",
+            "destete": "Destete",
+            "identificacion": "Identificación",
+            "movimiento": "Movimiento de lote",
             "visita": "Visita veterinaria",
             "manejo": "Manejo",
         }
@@ -2835,7 +2841,7 @@ def create_app():
         upcoming_births = (
             GanaderiaActividad.query.filter(
                 GanaderiaActividad.finca_id == finca.id,
-                GanaderiaActividad.tipo == "reproduccion",
+                GanaderiaActividad.tipo.in_(["reproduccion", "inseminacion"]),
                 GanaderiaActividad.proxima_fecha.isnot(None),
                 GanaderiaActividad.proxima_fecha >= today,
             )
@@ -3054,7 +3060,53 @@ def create_app():
             error=error,
             form_values=form_values,
             search=search,
+            moved=request.args.get("moved") == "1",
+            move_error=request.args.get("move_error"),
         )
+
+    @app.post("/ganaderia/fincas/<int:finca_id>/animales/<int:animal_id>/mover")
+    @ganaderia_operador_required
+    def ganaderia_mover_animal(finca_id, animal_id):
+        current = ganaderia_current_user()
+        finca = ganaderia_get_accessible_farm_or_404(finca_id)
+        animal = GanaderiaAnimal.query.filter_by(id=animal_id, finca_id=finca.id).first_or_404()
+        paddock_id = request.form.get("potrero_id", type=int)
+        new_paddock = (
+            GanaderiaPotrero.query.filter_by(id=paddock_id, finca_id=finca.id, activo=True).first()
+            if paddock_id
+            else None
+        )
+        if paddock_id and not new_paddock:
+            return redirect(url_for("ganaderia_animales", finca_id=finca.id, move_error="El lote seleccionado no pertenece a esta finca."))
+        previous_paddock = (
+            GanaderiaPotrero.query.filter_by(id=animal.potrero_id, finca_id=finca.id).first()
+            if animal.potrero_id
+            else None
+        )
+        if animal.potrero_id == (new_paddock.id if new_paddock else None):
+            return redirect(url_for("ganaderia_animales", finca_id=finca.id))
+        previous_name = previous_paddock.nombre if previous_paddock else "Sin lote"
+        new_name = new_paddock.nombre if new_paddock else "Sin lote"
+        try:
+            animal.potrero_id = new_paddock.id if new_paddock else None
+            db.session.add(
+                GanaderiaActividad(
+                    finca_id=finca.id,
+                    animal_id=animal.id,
+                    tipo="movimiento",
+                    titulo="Cambio de lote o potrero",
+                    fecha=datetime.utcnow().date(),
+                    resultado=f"{previous_name} → {new_name}",
+                    observaciones=request.form.get("observaciones", "").strip() or None,
+                    realizada_por_user_id=current.id,
+                    fecha_registro=datetime.utcnow(),
+                )
+            )
+            db.session.commit()
+            return redirect(url_for("ganaderia_animales", finca_id=finca.id, moved="1"))
+        except SQLAlchemyError:
+            db.session.rollback()
+            return redirect(url_for("ganaderia_animales", finca_id=finca.id, move_error="No se pudo mover el animal."))
 
     @app.post("/ganaderia/fincas/<int:finca_id>/potreros")
     @ganaderia_operador_required
@@ -3126,7 +3178,7 @@ def create_app():
         upcoming = (
             GanaderiaActividad.query.filter(
                 GanaderiaActividad.finca_id == finca.id,
-                GanaderiaActividad.tipo == "reproduccion",
+                GanaderiaActividad.tipo.in_(["reproduccion", "inseminacion"]),
                 GanaderiaActividad.proxima_fecha.isnot(None),
                 GanaderiaActividad.proxima_fecha >= today,
             )
@@ -3185,7 +3237,8 @@ def create_app():
         finca = ganaderia_get_accessible_farm_or_404(finca_id)
         allowed_types = {
             "pesaje", "vacunacion", "desparasitacion", "tratamiento",
-            "reproduccion", "parto", "visita", "manejo",
+            "reproduccion", "inseminacion", "palpacion", "parto", "secado",
+            "destete", "identificacion", "movimiento", "visita", "manejo",
         }
         if request.method == "POST":
             if current.rol not in {"superadmin", "veterinario"}:
@@ -3211,7 +3264,7 @@ def create_app():
                 error = "El peso debe ser un numero valido."
             if error:
                 target = "ganaderia_animal_detalle" if animal else "ganaderia_actividades"
-                values = {"finca_id": finca.id, "error": error}
+                values = {"finca_id": finca.id, "error": error, "activity_type": activity_type}
                 if animal:
                     values["animal_id"] = animal.id
                 return redirect(url_for(target, **values))
@@ -3239,7 +3292,7 @@ def create_app():
             except SQLAlchemyError:
                 db.session.rollback()
                 target = "ganaderia_animal_detalle" if animal else "ganaderia_actividades"
-                values = {"finca_id": finca.id, "error": "No se pudo registrar la actividad."}
+                values = {"finca_id": finca.id, "error": "No se pudo registrar la actividad.", "activity_type": activity_type}
                 if animal:
                     values["animal_id"] = animal.id
                 return redirect(url_for(target, **values))
@@ -3267,6 +3320,7 @@ def create_app():
             activity_label=ganaderia_activity_label,
             created=request.args.get("created") == "1",
             error=request.args.get("error"),
+            selected_activity_type=request.args.get("activity_type", ""),
             today=datetime.utcnow().date(),
         )
 

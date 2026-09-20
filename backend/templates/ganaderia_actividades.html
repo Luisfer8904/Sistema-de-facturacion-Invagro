@@ -9,11 +9,56 @@
       <main class="ganaderia-content">
         {% if created %}<div class="ganaderia-success">Actividad registrada correctamente.</div>{% endif %}{% if error %}<div class="form-error">{{ error }}</div>{% endif %}
         <section class="ganaderia-agenda"><div><span>AGENDA</span><h2>Próximas actividades</h2></div><div class="ganaderia-agenda-list">{% for item in upcoming %}<article class="{% if item.proxima_fecha < today %}overdue{% endif %}"><time>{{ item.proxima_fecha.strftime('%d %b') }}</time><div><strong>{{ item.titulo }}</strong><small>{{ activity_label(item.tipo) }} · {{ animal_names.get(item.animal_id, "Actividad de finca") }}</small></div></article>{% else %}<div class="ganaderia-empty-inline">No hay próximas actividades programadas.</div>{% endfor %}</div></section>
-        <section class="ganaderia-record-layout{% if current.rol == 'finca' %} read-only{% endif %}">
-          <div class="ganaderia-user-list"><div class="ganaderia-panel-heading"><div><span>BITÁCORA</span><h2>Actividad reciente</h2></div><strong>{{ activities|length }}</strong></div><div class="ganaderia-activity-table">{% for item in activities %}<article><span class="ganaderia-timeline-dot {{ item.tipo }}"></span><div><strong>{{ item.titulo }}</strong><small>{{ activity_label(item.tipo) }} · {{ animal_names.get(item.animal_id, "Toda la finca") }}</small></div><time>{{ item.fecha.strftime('%d/%m/%Y') }}</time>{% if item.proxima_fecha %}<em class="{% if item.proxima_fecha < today %}overdue{% endif %}">Próxima {{ item.proxima_fecha.strftime('%d/%m/%Y') }}</em>{% else %}<span></span>{% endif %}</article>{% else %}<div class="ganaderia-empty-inline">No hay actividades registradas.</div>{% endfor %}</div></div>
-          {% if current.rol in ["superadmin", "veterinario"] %}<aside class="ganaderia-create-user"><span>NUEVA ACTIVIDAD</span><h2>Registrar actividad</h2><form method="post"><label>Animal<select name="animal_id"><option value="">Actividad general de finca</option>{% for animal in animals %}<option value="{{ animal.id }}">{{ animal.codigo }} · {{ animal.nombre or "Sin nombre" }}</option>{% endfor %}</select></label>{% include "partials/ganaderia_activity_fields.html" %}<button class="ganaderia-primary" type="submit">Guardar actividad</button></form></aside>{% endif %}
-        </section>
+        {% if current.rol in ["superadmin", "veterinario"] %}
+          <section class="ganaderia-activity-picker">
+            <div class="ganaderia-panel-heading"><div><span>NUEVO REGISTRO</span><h2>Selecciona una actividad</h2></div></div>
+            <div class="ganaderia-activity-types">
+              <button type="button" data-type="pesaje" data-label="Pesaje" onclick="openActivityDialog(this)"><span>LB</span><strong>Pesaje</strong><small>Control de peso</small></button>
+              <button type="button" data-type="vacunacion" data-label="Vacunación" onclick="openActivityDialog(this)"><span>VA</span><strong>Vacunación</strong><small>Plan sanitario</small></button>
+              <button type="button" data-type="desparasitacion" data-label="Desparasitación" onclick="openActivityDialog(this)"><span>DP</span><strong>Desparasitación</strong><small>Control parasitario</small></button>
+              <button type="button" data-type="tratamiento" data-label="Tratamiento" onclick="openActivityDialog(this)"><span>TR</span><strong>Tratamiento</strong><small>Atención clínica</small></button>
+              <button type="button" data-type="inseminacion" data-label="Inseminación" onclick="openActivityDialog(this)"><span>IN</span><strong>Inseminación</strong><small>Registro reproductivo</small></button>
+              <button type="button" data-type="palpacion" data-label="Palpación" onclick="openActivityDialog(this)"><span>PA</span><strong>Palpación</strong><small>Diagnóstico reproductivo</small></button>
+              <button type="button" data-type="parto" data-label="Parto" onclick="openActivityDialog(this)"><span>PT</span><strong>Parto</strong><small>Nacimiento y resultado</small></button>
+              <button type="button" data-type="secado" data-label="Secado" onclick="openActivityDialog(this)"><span>SE</span><strong>Secado</strong><small>Cierre de lactancia</small></button>
+              <button type="button" data-type="destete" data-label="Destete" onclick="openActivityDialog(this)"><span>DE</span><strong>Destete</strong><small>Separación de la cría</small></button>
+              <button type="button" data-type="identificacion" data-label="Identificación" onclick="openActivityDialog(this)"><span>ID</span><strong>Identificación</strong><small>Arete o marcación</small></button>
+              <button type="button" data-type="visita" data-label="Visita veterinaria" onclick="openActivityDialog(this)"><span>VE</span><strong>Visita veterinaria</strong><small>Evaluación profesional</small></button>
+              <button type="button" data-type="manejo" data-label="Manejo general" onclick="openActivityDialog(this)"><span>MA</span><strong>Manejo general</strong><small>Otro procedimiento</small></button>
+            </div>
+          </section>
+        {% endif %}
+        <section class="ganaderia-user-list ganaderia-activity-log"><div class="ganaderia-panel-heading"><div><span>BITÁCORA</span><h2>Actividad reciente</h2></div><strong>{{ activities|length }}</strong></div><div class="ganaderia-activity-table">{% for item in activities %}<article><span class="ganaderia-timeline-dot {{ item.tipo }}"></span><div><strong>{{ item.titulo }}</strong><small>{{ activity_label(item.tipo) }} · {{ animal_names.get(item.animal_id, "Toda la finca") }}</small></div><time>{{ item.fecha.strftime('%d/%m/%Y') }}</time>{% if item.proxima_fecha %}<em class="{% if item.proxima_fecha < today %}overdue{% endif %}">Próxima {{ item.proxima_fecha.strftime('%d/%m/%Y') }}</em>{% else %}<span></span>{% endif %}</article>{% else %}<div class="ganaderia-empty-inline">No hay actividades registradas.</div>{% endfor %}</div></section>
       </main>
     </div>
   </div>
+  {% if current.rol in ["superadmin", "veterinario"] %}
+    <dialog class="ganaderia-modal" id="activityDialog">
+      <div class="ganaderia-modal-header"><div><span>NUEVA ACTIVIDAD</span><h2 id="activityDialogTitle">Registrar actividad</h2></div><button type="button" aria-label="Cerrar" onclick="document.getElementById('activityDialog').close()">×</button></div>
+      <form class="ganaderia-animal-modal-form ganaderia-activity-modal-form" method="post">
+        <label class="ganaderia-full-field">Animal<select name="animal_id"><option value="">Actividad general de finca</option>{% for animal in animals %}<option value="{{ animal.id }}">{{ animal.codigo }} · {{ animal.nombre or "Sin nombre" }}</option>{% endfor %}</select></label>
+        {% set activity_type_locked = true %}{% include "partials/ganaderia_activity_fields.html" %}
+        <div class="ganaderia-modal-actions"><button class="ganaderia-secondary" type="button" onclick="document.getElementById('activityDialog').close()">Cancelar</button><button class="ganaderia-primary" type="submit">Guardar actividad</button></div>
+      </form>
+    </dialog>
+    <script>
+      const activityLabels = {
+        pesaje: "Pesaje", vacunacion: "Vacunación", desparasitacion: "Desparasitación",
+        tratamiento: "Tratamiento", inseminacion: "Inseminación", palpacion: "Palpación",
+        parto: "Parto", secado: "Secado", destete: "Destete", identificacion: "Identificación",
+        visita: "Visita veterinaria", manejo: "Manejo general"
+      };
+      function openActivityDialog(buttonOrType) {
+        const type = typeof buttonOrType === "string" ? buttonOrType : buttonOrType.dataset.type;
+        const label = typeof buttonOrType === "string" ? activityLabels[type] : buttonOrType.dataset.label;
+        document.getElementById("activityTypeInput").value = type;
+        document.getElementById("activityDialogTitle").textContent = label || "Registrar actividad";
+        document.getElementById("activityDialog").showModal();
+      }
+      document.getElementById("activityDialog").addEventListener("click", function (event) {
+        if (event.target === this) this.close();
+      });
+      {% if error and selected_activity_type %}openActivityDialog("{{ selected_activity_type }}");{% endif %}
+    </script>
+  {% endif %}
 {% endblock %}

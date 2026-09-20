@@ -11,6 +11,8 @@
         <a class="ganaderia-back" href="/ganaderia/fincas/{{ finca.id }}">Volver a la finca</a>
       </header>
       <main class="ganaderia-content">
+        {% if moved %}<div class="ganaderia-success">Animal movido correctamente. El cambio quedó registrado en su historial.</div>{% endif %}
+        {% if move_error %}<div class="form-error">{{ move_error }}</div>{% endif %}
         <section class="ganaderia-animal-inventory">
           <div class="ganaderia-user-list">
             <div class="ganaderia-panel-heading ganaderia-animal-heading">
@@ -24,14 +26,16 @@
             <div class="ganaderia-animal-table">
               {% for animal in animals %}
                 {% set last_activity = latest_activities.get(animal.id) %}
-                <a class="ganaderia-animal-row" href="/ganaderia/fincas/{{ finca.id }}/animales/{{ animal.id }}">
+                <div class="ganaderia-animal-row">
                   <span class="ganaderia-animal-sex {{ animal.sexo }}">{{ "H" if animal.sexo == "hembra" else "M" }}</span>
-                  <div><strong>{{ animal.nombre or animal.codigo }}</strong><small>Arete {{ animal.codigo }} · {{ animal.raza or "Raza pendiente" }}</small></div>
+                  <a class="ganaderia-animal-main-link" href="/ganaderia/fincas/{{ finca.id }}/animales/{{ animal.id }}"><strong>{{ animal.nombre or animal.codigo }}</strong><small>Arete {{ animal.codigo }} · {{ animal.raza or "Raza pendiente" }}</small></a>
                   <div class="ganaderia-animal-birth"><small>Nacimiento</small><strong>{{ animal.fecha_nacimiento.strftime('%d/%m/%Y') if animal.fecha_nacimiento else "Pendiente" }}</strong></div>
                   <div class="ganaderia-animal-last"><small>Última acción</small><strong>{{ activity_label(last_activity.tipo) if last_activity else "Sin actividad" }}</strong>{% if last_activity %}<em>{{ last_activity.fecha.strftime('%d/%m/%Y') }}</em>{% endif %}</div>
                   <div class="ganaderia-animal-location"><strong>{{ animal.peso_actual or "—" }}{% if animal.peso_actual %} lb{% endif %}</strong><small>{{ paddock_names.get(animal.potrero_id, "Sin potrero") }}</small></div>
-                  <span class="ganaderia-status {{ 'active' if animal.estado == 'activo' else 'inactive' }}">{{ animal.estado|capitalize }}</span><b>→</b>
-                </a>
+                  <span class="ganaderia-status {{ 'active' if animal.estado == 'activo' else 'inactive' }}">{{ animal.estado|capitalize }}</span>
+                  {% if current.rol in ["superadmin", "veterinario"] %}<button class="ganaderia-move-button" type="button" data-animal-id="{{ animal.id }}" data-animal-name="{{ animal.nombre or animal.codigo }}" data-paddock-id="{{ animal.potrero_id or '' }}" onclick="openMoveAnimal(this)">Mover</button>{% endif %}
+                  <a class="ganaderia-animal-detail-link" href="/ganaderia/fincas/{{ finca.id }}/animales/{{ animal.id }}" aria-label="Ver expediente">→</a>
+                </div>
               {% else %}<div class="ganaderia-empty-state"><strong>No hay animales registrados</strong><p>Registra el primer animal para iniciar su expediente.</p></div>{% endfor %}
             </div>
           </div>
@@ -57,6 +61,26 @@
     </dialog>
     <script>
       document.getElementById("newAnimalDialog").addEventListener("click", function (event) {
+        if (event.target === this) this.close();
+      });
+    </script>
+    <dialog class="ganaderia-modal ganaderia-move-modal" id="moveAnimalDialog">
+      <div class="ganaderia-modal-header"><div><span>CAMBIO DE UBICACIÓN</span><h2 id="moveAnimalTitle">Mover animal</h2></div><button type="button" aria-label="Cerrar" onclick="document.getElementById('moveAnimalDialog').close()">×</button></div>
+      <form class="ganaderia-animal-modal-form" id="moveAnimalForm" method="post">
+        <label class="ganaderia-full-field">Nuevo lote o potrero<select id="movePaddockSelect" name="potrero_id"><option value="">Sin lote asignado</option>{% for item in paddocks %}<option value="{{ item.id }}">{{ item.nombre }} · {{ item.tipo|capitalize }}</option>{% endfor %}</select></label>
+        <label class="ganaderia-full-field">Observaciones<textarea name="observaciones" rows="3" placeholder="Motivo del movimiento"></textarea></label>
+        <div class="ganaderia-modal-actions"><button class="ganaderia-secondary" type="button" onclick="document.getElementById('moveAnimalDialog').close()">Cancelar</button><button class="ganaderia-primary" type="submit">Confirmar movimiento</button></div>
+      </form>
+    </dialog>
+    <script>
+      function openMoveAnimal(button) {
+        const dialog = document.getElementById("moveAnimalDialog");
+        document.getElementById("moveAnimalTitle").textContent = "Mover " + button.dataset.animalName;
+        document.getElementById("moveAnimalForm").action = "/ganaderia/fincas/{{ finca.id }}/animales/" + button.dataset.animalId + "/mover";
+        document.getElementById("movePaddockSelect").value = button.dataset.paddockId;
+        dialog.showModal();
+      }
+      document.getElementById("moveAnimalDialog").addEventListener("click", function (event) {
         if (event.target === this) this.close();
       });
     </script>
