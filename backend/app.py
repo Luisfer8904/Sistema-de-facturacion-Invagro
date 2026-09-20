@@ -3442,6 +3442,7 @@ def create_app():
             if current.rol not in {"superadmin", "veterinario"}:
                 abort(403)
             activity_type = request.form.get("tipo", "").strip().lower()
+            activity_mode = request.form.get("modo", "individual").strip().lower()
             animal_id = request.form.get("animal_id", type=int)
             animal = GanaderiaAnimal.query.filter_by(id=animal_id, finca_id=finca.id).first() if animal_id else None
             activity_date = parse_optional_date(request.form.get("fecha"))
@@ -3449,8 +3450,66 @@ def create_app():
             title = request.form.get("titulo", "").strip()
             raw_result = request.form.get("resultado", "").strip()
             palpation_results = {"prenada": "Preñada", "vacia": "Vacía", "dudosa": "Dudosa"}
+            group_entries = []
             if activity_type not in allowed_types:
                 error = "Selecciona un tipo de actividad valido."
+            elif not activity_date:
+                error = "La fecha de la actividad es obligatoria."
+            elif activity_type == "palpacion" and activity_mode == "grupal":
+                selected_ids = []
+                for raw_id in request.form.getlist("animal_ids"):
+                    try:
+                        parsed_id = int(raw_id)
+                    except (TypeError, ValueError):
+                        continue
+                    if parsed_id not in selected_ids:
+                        selected_ids.append(parsed_id)
+                group_animals = (
+                    GanaderiaAnimal.query.filter(
+                        GanaderiaAnimal.finca_id == finca.id,
+                        GanaderiaAnimal.id.in_(selected_ids),
+                        GanaderiaAnimal.estado == "activo",
+                        func.lower(GanaderiaAnimal.sexo) == "hembra",
+                    ).all()
+                    if selected_ids
+                    else []
+                )
+                animals_by_id = {item.id: item for item in group_animals}
+                if not selected_ids:
+                    error = "Selecciona al menos una vaca para la palpacion grupal."
+                elif len(animals_by_id) != len(selected_ids):
+                    error = "Uno de los animales seleccionados no esta disponible."
+                else:
+                    error = None
+                    for selected_id in selected_ids:
+                        group_animal = animals_by_id[selected_id]
+                        group_result = request.form.get(
+                            f"resultado_{selected_id}", ""
+                        ).strip()
+                        group_next_date = parse_optional_date(
+                            request.form.get(f"proxima_fecha_{selected_id}")
+                        )
+                        if group_result not in palpation_results:
+                            error = (
+                                "Selecciona el resultado de la palpacion para "
+                                f"{group_animal.nombre or group_animal.codigo}."
+                            )
+                            break
+                        if group_result == "prenada" and not group_next_date:
+                            error = (
+                                "Indica la fecha probable de parto para "
+                                f"{group_animal.nombre or group_animal.codigo}."
+                            )
+                            break
+                        if group_result != "prenada":
+                            group_next_date = None
+                        group_entries.append(
+                            (
+                                group_animal,
+                                palpation_results[group_result],
+                                group_next_date,
+                            )
+                        )
             elif animal_id and not animal:
                 error = "El animal seleccionado no pertenece a esta finca."
             elif activity_type == "palpacion" and not animal:
@@ -3459,8 +3518,6 @@ def create_app():
                 error = "Selecciona el resultado de la palpacion."
             elif activity_type == "palpacion" and raw_result == "prenada" and not next_date:
                 error = "Indica la fecha probable de parto."
-            elif not activity_date:
-                error = "La fecha de la actividad es obligatoria."
             else:
                 error = None
             result_value = palpation_results.get(raw_result, raw_result)
@@ -3471,35 +3528,65 @@ def create_app():
                 error = "El peso debe ser un numero valido."
             if error:
                 target = "ganaderia_animal_detalle" if animal else "ganaderia_actividades"
-                values = {"finca_id": finca.id, "error": error, "activity_type": activity_type}
+                values = {
+                    "finca_id": finca.id,
+                    "error": error,
+                    "activity_type": activity_type,
+                    "activity_mode": activity_mode,
+                }
                 if animal:
                     values["animal_id"] = animal.id
                 return redirect(url_for(target, **values))
             try:
-                db.session.add(
-                    GanaderiaActividad(
-                        finca_id=finca.id,
-                        animal_id=animal.id if animal else None,
-                        tipo=activity_type,
-                        titulo=title or ganaderia_activity_label(activity_type),
-                        fecha=activity_date,
-                        proxima_fecha=next_date,
-                        producto=request.form.get("producto", "").strip() or None,
-                        dosis=request.form.get("dosis", "").strip() or None,
-                        peso=weight,
-                        resultado=result_value or None,
-                        observaciones=request.form.get("observaciones", "").strip() or None,
-                        realizada_por_user_id=current.id,
-                        fecha_registro=datetime.utcnow(),
+                if activity_type == "palpacion" and activity_mode == "grupal":
+                    for group_animal, group_result, group_next_date in group_entries:
+                        db.session.add(
+                            GanaderiaActividad(
+                                finca_id=finca.id,
+                                animal_id=group_animal.id,
+                                tipo="palpacion",
+                                titulo=title or "Palpación grupal",
+                                fecha=activity_date,
+                                proxima_fecha=group_next_date,
+                                resultado=group_result,
+                                observaciones=request.form.get(
+                                    "observaciones", ""
+                                ).strip()
+                                or None,
+                                realizada_por_user_id=current.id,
+                                fecha_registro=datetime.utcnow(),
+                            )
+                        )
+                else:
+                    db.session.add(
+                        GanaderiaActividad(
+                            finca_id=finca.id,
+                            animal_id=animal.id if animal else None,
+                            tipo=activity_type,
+                            titulo=title or ganaderia_activity_label(activity_type),
+                            fecha=activity_date,
+                            proxima_fecha=next_date,
+                            producto=request.form.get("producto", "").strip() or None,
+                            dosis=request.form.get("dosis", "").strip() or None,
+                            peso=weight,
+                            resultado=result_value or None,
+                            observaciones=request.form.get("observaciones", "").strip() or None,
+                            realizada_por_user_id=current.id,
+                            fecha_registro=datetime.utcnow(),
+                        )
                     )
-                )
                 if animal and activity_type == "pesaje" and weight is not None:
                     animal.peso_actual = weight
                 db.session.commit()
             except SQLAlchemyError:
                 db.session.rollback()
                 target = "ganaderia_animal_detalle" if animal else "ganaderia_actividades"
-                values = {"finca_id": finca.id, "error": "No se pudo registrar la actividad.", "activity_type": activity_type}
+                values = {
+                    "finca_id": finca.id,
+                    "error": "No se pudo registrar la actividad.",
+                    "activity_type": activity_type,
+                    "activity_mode": activity_mode,
+                }
                 if animal:
                     values["animal_id"] = animal.id
                 return redirect(url_for(target, **values))
@@ -3542,6 +3629,9 @@ def create_app():
             current=current,
             finca=finca,
             animals=animals,
+            female_animals=[
+                animal for animal in animals if (animal.sexo or "").lower() == "hembra"
+            ],
             activities=activities,
             upcoming=upcoming,
             animal_names=animal_names,
@@ -3550,6 +3640,7 @@ def create_app():
             created=request.args.get("created") == "1",
             error=request.args.get("error"),
             selected_activity_type=request.args.get("activity_type", ""),
+            selected_activity_mode=request.args.get("activity_mode", "individual"),
             today=datetime.utcnow().date(),
         )
 

@@ -2364,11 +2364,39 @@ body {
 .ganaderia-activity-types { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
 .ganaderia-activity-types button { min-height: 96px; padding: 15px; display: grid; grid-template-columns: 38px 1fr; grid-template-rows: auto auto; align-items: center; gap: 3px 11px; color: #26372f; background: #f8faf8; border: 1px solid #dfe6e1; border-radius: 8px; text-align: left; cursor: pointer; }
 .ganaderia-activity-types button:hover { background: #fff8eb; border-color: #efb24c; }
+.ganaderia-activity-types button:disabled { opacity: .5; cursor: not-allowed; }
+.ganaderia-activity-types button:disabled:hover { background: #f8faf8; border-color: #dfe6e1; }
 .ganaderia-activity-types button > span { width: 38px; height: 38px; grid-row: 1 / 3; display: grid; place-items: center; color: #835718; background: #fff0d2; border-radius: 7px; font-size: .72rem; font-weight: 900; }
 .ganaderia-activity-types button > strong { align-self: end; font-size: .88rem; }
 .ganaderia-activity-types button > small { align-self: start; color: #7b8981; font-size: .72rem; }
 .ganaderia-activity-log { margin-top: 18px; }
 .ganaderia-activity-modal-form { max-height: calc(100vh - 136px); overflow-y: auto; }
+.ganaderia-group-palpation-modal { width: min(940px, calc(100vw - 32px)); }
+.ganaderia-group-palpation-form { max-height: calc(100vh - 136px); padding: 24px 28px 28px; display: grid; gap: 18px; overflow-y: auto; }
+.ganaderia-group-palpation-summary { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.ganaderia-group-palpation-form label { display: grid; gap: 7px; color: #46564d; font-size: .8rem; font-weight: 800; }
+.ganaderia-group-palpation-form input,
+.ganaderia-group-palpation-form select,
+.ganaderia-group-palpation-form textarea { width: 100%; min-height: 44px; padding: 9px 11px; border: 1px solid #cfd9d2; border-radius: 7px; background: #fff; font: inherit; }
+.ganaderia-group-palpation-form input:focus,
+.ganaderia-group-palpation-form select:focus,
+.ganaderia-group-palpation-form textarea:focus { border-color: #9a661c; outline: 3px solid rgba(241,178,75,.2); }
+.ganaderia-group-palpation-heading { display: flex; align-items: end; justify-content: space-between; gap: 16px; }
+.ganaderia-group-palpation-heading > div { display: grid; gap: 4px; }
+.ganaderia-group-palpation-heading small { color: #78877f; }
+.ganaderia-group-palpation-heading > span { padding: 6px 9px; color: #1d6242; background: #e8f5ed; border-radius: 999px; font-size: .72rem; font-weight: 800; }
+.ganaderia-group-palpation-list { display: grid; gap: 9px; }
+.ganaderia-group-palpation-list article { padding: 12px; display: grid; grid-template-columns: minmax(220px, 1.2fr) minmax(150px, .7fr) minmax(180px, .8fr); align-items: end; gap: 12px; background: #f8faf8; border: 1px solid #dfe6e1; border-radius: 8px; }
+.ganaderia-group-palpation-list article.selected { background: #fffaf0; border-color: #efb24c; }
+.ganaderia-group-animal-choice { min-height: 44px; display: grid !important; grid-template-columns: auto 38px 1fr; align-items: center; gap: 10px !important; cursor: pointer; }
+.ganaderia-group-animal-choice input { width: 18px; min-height: 18px; accent-color: #1d6242; }
+.ganaderia-group-animal-choice > span { width: 38px; height: 38px; display: grid; place-items: center; color: #954f63; background: #f9e9ee; border-radius: 50%; font-weight: 900; }
+.ganaderia-group-animal-choice > div { min-width: 0; display: grid; gap: 3px; }
+.ganaderia-group-animal-choice strong,
+.ganaderia-group-animal-choice small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ganaderia-group-animal-choice small { color: #7b8981; font-weight: 600; }
+.ganaderia-group-observations { display: grid; }
+.ganaderia-group-palpation-form .ganaderia-primary:disabled { opacity: .5; cursor: not-allowed; }
 .ganaderia-paddock-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
 .ganaderia-paddock-inventory { width: 100%; }
 .ganaderia-paddock-card { padding: 20px; display: grid; grid-template-columns: 42px 1fr auto; gap: 14px; color: #26372f; background: #f8faf8; border: 1px solid #e1e8e3; border-radius: 8px; text-decoration: none; }
@@ -2503,6 +2531,10 @@ body {
   .ganaderia-activity-table em { grid-column: 2; }
   .ganaderia-activity-picker { padding: 20px 16px; }
   .ganaderia-activity-types { grid-template-columns: 1fr; }
+  .ganaderia-group-palpation-form { padding: 20px 16px 24px; }
+  .ganaderia-group-palpation-summary,
+  .ganaderia-group-palpation-list article { grid-template-columns: 1fr; }
+  .ganaderia-group-palpation-heading { align-items: flex-start; flex-direction: column; }
   .ganaderia-two-fields { grid-template-columns: 1fr; }
   .ganaderia-animal-heading { align-items: flex-start; gap: 14px; }
   .ganaderia-heading-actions { align-items: flex-end; flex-direction: column-reverse; }
