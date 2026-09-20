@@ -3237,10 +3237,88 @@ def create_app():
             activities=activities,
             activity_label=ganaderia_activity_label,
             created=request.args.get("created") == "1",
+            edited=request.args.get("edited") == "1",
             activity_created=request.args.get("activity_created") == "1",
             error=request.args.get("error"),
+            edit_error=request.args.get("edit_error"),
             today=datetime.utcnow().date(),
         )
+
+    @app.post("/ganaderia/fincas/<int:finca_id>/animales/<int:animal_id>/editar")
+    @ganaderia_operador_required
+    def ganaderia_editar_animal(finca_id, animal_id):
+        finca = ganaderia_get_accessible_farm_or_404(finca_id)
+        animal = GanaderiaAnimal.query.filter_by(id=animal_id, finca_id=finca.id).first_or_404()
+        code = request.form.get("codigo", "").strip()
+        sex = request.form.get("sexo", "").strip().lower()
+        status = request.form.get("estado", "").strip().lower()
+        birth_date_raw = request.form.get("fecha_nacimiento", "").strip()
+        birth_date = parse_optional_date(birth_date_raw)
+        weight_raw = request.form.get("peso_actual", "").strip()
+        try:
+            weight = Decimal(weight_raw) if weight_raw else None
+        except Exception:
+            weight = None
+            error = "El peso debe ser un numero valido."
+        else:
+            error = None
+            if weight is not None and weight < 0:
+                error = "El peso no puede ser negativo."
+
+        duplicate = (
+            GanaderiaAnimal.query.filter(
+                GanaderiaAnimal.finca_id == finca.id,
+                GanaderiaAnimal.codigo == code,
+                GanaderiaAnimal.id != animal.id,
+            ).first()
+            if code
+            else None
+        )
+        if not code:
+            error = "El codigo o arete es obligatorio."
+        elif duplicate:
+            error = "Ya existe otro animal con ese codigo en la finca."
+        elif sex not in {"hembra", "macho"}:
+            error = "Selecciona un sexo valido."
+        elif status not in {"activo", "inactivo", "vendido", "fallecido"}:
+            error = "Selecciona un estado valido."
+        elif birth_date_raw and not birth_date:
+            error = "La fecha de nacimiento no es valida."
+        if error:
+            return redirect(url_for(
+                "ganaderia_animal_detalle",
+                finca_id=finca.id,
+                animal_id=animal.id,
+                edit_error=error,
+            ))
+
+        try:
+            animal.codigo = code
+            animal.nombre = request.form.get("nombre", "").strip() or None
+            animal.sexo = sex
+            animal.raza = request.form.get("raza", "").strip() or None
+            animal.fecha_nacimiento = birth_date
+            animal.peso_actual = weight
+            animal.procedencia = request.form.get("procedencia", "").strip() or None
+            animal.madre_codigo = request.form.get("madre_codigo", "").strip() or None
+            animal.padre_codigo = request.form.get("padre_codigo", "").strip() or None
+            animal.estado = status
+            animal.observaciones = request.form.get("observaciones", "").strip() or None
+            db.session.commit()
+            return redirect(url_for(
+                "ganaderia_animal_detalle",
+                finca_id=finca.id,
+                animal_id=animal.id,
+                edited="1",
+            ))
+        except SQLAlchemyError:
+            db.session.rollback()
+            return redirect(url_for(
+                "ganaderia_animal_detalle",
+                finca_id=finca.id,
+                animal_id=animal.id,
+                edit_error="No se pudo actualizar el animal.",
+            ))
 
     @app.route("/ganaderia/fincas/<int:finca_id>/actividades", methods=["GET", "POST"])
     @ganaderia_login_required

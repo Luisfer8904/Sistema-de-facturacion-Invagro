@@ -7,8 +7,8 @@
     <div class="ganaderia-main">
       <header class="ganaderia-topbar"><button class="ganaderia-menu" type="button" aria-label="Abrir menú" onclick="document.body.classList.toggle('ganaderia-menu-open')">☰</button><div><small>{{ finca.nombre|upper }}</small><h1>Expediente animal</h1></div><a class="ganaderia-back" href="/ganaderia/fincas/{{ finca.id }}/animales">Volver a animales</a></header>
       <main class="ganaderia-content">
-        {% if created %}<div class="ganaderia-success">Animal registrado correctamente.</div>{% endif %}{% if activity_created %}<div class="ganaderia-success">Actividad registrada correctamente.</div>{% endif %}{% if error %}<div class="form-error">{{ error }}</div>{% endif %}
-        <section class="ganaderia-animal-profile"><div class="ganaderia-animal-badge {{ animal.sexo }}">{{ animal.codigo }}</div><div><span>EXPEDIENTE INDIVIDUAL</span><h2>{{ animal.nombre or "Animal " ~ animal.codigo }}</h2><p>{{ animal.raza or "Raza pendiente" }} · {{ "Hembra" if animal.sexo == "hembra" else "Macho" }} · {{ paddock.nombre if paddock else "Sin potrero asignado" }}</p></div><strong>{{ animal.peso_actual or "—" }}{% if animal.peso_actual %} lb{% endif %}</strong></section>
+        {% if created %}<div class="ganaderia-success">Animal registrado correctamente.</div>{% endif %}{% if edited %}<div class="ganaderia-success">Información del animal actualizada correctamente.</div>{% endif %}{% if activity_created %}<div class="ganaderia-success">Actividad registrada correctamente.</div>{% endif %}{% if error %}<div class="form-error">{{ error }}</div>{% endif %}{% if edit_error %}<div class="form-error">{{ edit_error }}</div>{% endif %}
+        <section class="ganaderia-animal-profile"><div class="ganaderia-animal-badge {{ animal.sexo }}">{{ animal.codigo }}</div><div><span>EXPEDIENTE INDIVIDUAL</span><h2>{{ animal.nombre or "Animal " ~ animal.codigo }}</h2><p>{{ animal.raza or "Raza pendiente" }} · {{ "Hembra" if animal.sexo == "hembra" else "Macho" }} · {{ paddock.nombre if paddock else "Sin potrero asignado" }}</p></div><div class="ganaderia-animal-profile-actions"><strong>{{ animal.peso_actual or "—" }}{% if animal.peso_actual %} lb{% endif %}</strong>{% if current.rol in ["superadmin", "veterinario"] %}<button class="ganaderia-secondary" type="button" onclick="document.getElementById('editAnimalDialog').showModal()">Editar animal</button>{% endif %}</div></section>
         <section class="ganaderia-detail-grid"><article><span>Nacimiento</span><strong>{{ animal.fecha_nacimiento.strftime('%d/%m/%Y') if animal.fecha_nacimiento else "Pendiente" }}</strong></article><article><span>Madre</span><strong>{{ animal.madre_codigo or "Pendiente" }}</strong></article><article><span>Padre</span><strong>{{ animal.padre_codigo or "Pendiente" }}</strong></article></section>
         <section class="ganaderia-record-layout{% if current.rol == 'finca' %} read-only{% endif %}">
           <div class="ganaderia-user-list"><div class="ganaderia-panel-heading"><div><span>HISTORIAL</span><h2>Actividades del animal</h2></div><strong>{{ activities|length }}</strong></div><div class="ganaderia-timeline">{% for item in activities %}<article><span class="ganaderia-timeline-dot {{ item.tipo }}"></span><div><small>{{ item.fecha.strftime('%d/%m/%Y') }} · {{ activity_label(item.tipo) }}</small><strong>{{ item.titulo }}</strong><p>{% if item.peso %}{{ item.peso }} lb{% endif %}{% if item.producto %} · {{ item.producto }}{% endif %}{% if item.dosis %} · {{ item.dosis }}{% endif %}{{ item.observaciones or "" }}</p>{% if item.proxima_fecha %}<em class="{% if item.proxima_fecha < today %}overdue{% endif %}">Próxima: {{ item.proxima_fecha.strftime('%d/%m/%Y') }}</em>{% endif %}</div></article>{% else %}<div class="ganaderia-empty-inline">Este animal todavía no tiene actividades.</div>{% endfor %}</div></div>
@@ -17,4 +17,25 @@
       </main>
     </div>
   </div>
+  {% if current.rol in ["superadmin", "veterinario"] %}
+    <dialog class="ganaderia-modal" id="editAnimalDialog" {% if edit_error %}open{% endif %}>
+      <div class="ganaderia-modal-header"><div><span>EXPEDIENTE ANIMAL</span><h2>Editar {{ animal.nombre or animal.codigo }}</h2></div><button type="button" aria-label="Cerrar" onclick="document.getElementById('editAnimalDialog').close()">×</button></div>
+      <form class="ganaderia-animal-modal-form" method="post" action="/ganaderia/fincas/{{ finca.id }}/animales/{{ animal.id }}/editar">
+        <label>Código o arete<input name="codigo" value="{{ animal.codigo }}" required /></label>
+        <label>Nombre<input name="nombre" value="{{ animal.nombre or '' }}" /></label>
+        <div class="ganaderia-two-fields"><label>Sexo<select name="sexo"><option value="hembra" {% if animal.sexo == 'hembra' %}selected{% endif %}>Hembra</option><option value="macho" {% if animal.sexo == 'macho' %}selected{% endif %}>Macho</option></select></label><label>Raza<input name="raza" value="{{ animal.raza or '' }}" /></label></div>
+        <div class="ganaderia-two-fields"><label>Nacimiento<input type="date" name="fecha_nacimiento" value="{{ animal.fecha_nacimiento.isoformat() if animal.fecha_nacimiento else '' }}" /></label><label>Peso actual (lb)<input type="number" step="0.01" min="0" name="peso_actual" value="{{ animal.peso_actual or '' }}" /></label></div>
+        <label>Procedencia<input name="procedencia" value="{{ animal.procedencia or '' }}" /></label>
+        <div class="ganaderia-two-fields"><label>Madre (arete)<input name="madre_codigo" value="{{ animal.madre_codigo or '' }}" /></label><label>Padre (arete)<input name="padre_codigo" value="{{ animal.padre_codigo or '' }}" /></label></div>
+        <label>Estado<select name="estado"><option value="activo" {% if animal.estado == 'activo' %}selected{% endif %}>Activo</option><option value="inactivo" {% if animal.estado == 'inactivo' %}selected{% endif %}>Inactivo</option><option value="vendido" {% if animal.estado == 'vendido' %}selected{% endif %}>Vendido</option><option value="fallecido" {% if animal.estado == 'fallecido' %}selected{% endif %}>Fallecido</option></select></label>
+        <label>Observaciones<textarea name="observaciones" rows="3">{{ animal.observaciones or '' }}</textarea></label>
+        <div class="ganaderia-modal-actions"><button class="ganaderia-secondary" type="button" onclick="document.getElementById('editAnimalDialog').close()">Cancelar</button><button class="ganaderia-primary" type="submit">Guardar cambios</button></div>
+      </form>
+    </dialog>
+    <script>
+      document.getElementById("editAnimalDialog").addEventListener("click", function (event) {
+        if (event.target === this) this.close();
+      });
+    </script>
+  {% endif %}
 {% endblock %}

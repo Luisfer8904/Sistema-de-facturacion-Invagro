@@ -2308,6 +2308,8 @@ body {
 .ganaderia-animal-profile h2 { margin: 7px 0; font-size: clamp(1.8rem, 3vw, 2.6rem); letter-spacing: 0; }
 .ganaderia-animal-profile p { margin: 0; color: #6f7e76; }
 .ganaderia-animal-profile > strong { font-size: 1.8rem; }
+.ganaderia-animal-profile-actions { display: grid; justify-items: end; gap: 14px; }
+.ganaderia-animal-profile-actions > strong { font-size: 1.8rem; }
 .ganaderia-record-layout { margin-top: 28px; display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(330px, .8fr); gap: 18px; align-items: start; }
 .ganaderia-timeline { display: grid; }
 .ganaderia-timeline article { min-height: 96px; padding: 18px 0; display: grid; grid-template-columns: 18px 1fr; gap: 12px; border-top: 1px solid #e7ece8; }
@@ -2447,7 +2449,8 @@ body {
   .ganaderia-animal-row > .ganaderia-move-button { grid-column: 2; grid-row: auto; width: fit-content; }
   .ganaderia-animal-detail-link { display: none; }
   .ganaderia-animal-profile { grid-template-columns: auto 1fr; }
-  .ganaderia-animal-profile > strong { grid-column: 2; font-size: 1.45rem; }
+  .ganaderia-animal-profile-actions { grid-column: 2; justify-items: start; }
+  .ganaderia-animal-profile-actions > strong { font-size: 1.45rem; }
   .ganaderia-agenda-list { grid-template-columns: 1fr; }
   .ganaderia-farm-kpis,
   .ganaderia-paddock-grid { grid-template-columns: 1fr; }
