@@ -4,10 +4,12 @@ import os
 import re
 import time
 import unicodedata
+from io import BytesIO
 from datetime import datetime, timedelta
 from decimal import Decimal
 from functools import wraps
 from uuid import uuid4
+from xml.sax.saxutils import escape
 
 import pymysql
 import requests
@@ -22,6 +24,7 @@ from flask import (
     redirect,
     render_template,
     request,
+    send_file,
     send_from_directory,
     session,
     url_for,
@@ -70,6 +73,8 @@ from models import (
     GanaderiaFincaUsuario,
     GanaderiaActividad,
     GanaderiaAnimal,
+    GanaderiaPalpacionDetalle,
+    GanaderiaPalpacionLote,
     GanaderiaPotrero,
     GanaderiaUser,
     GanaderiaVeterinario,
@@ -3428,6 +3433,314 @@ def create_app():
                 edit_error="No se pudo actualizar el animal.",
             ))
 
+    @app.post("/ganaderia/fincas/<int:finca_id>/palpaciones")
+    @ganaderia_login_required
+    def ganaderia_crear_palpacion_lote(finca_id):
+        current = ganaderia_current_user()
+        finca = ganaderia_get_accessible_farm_or_404(finca_id)
+        if current.rol not in {"superadmin", "veterinario"}:
+            abort(403)
+
+        potrero_id = request.form.get("potrero_id", type=int)
+        potrero = GanaderiaPotrero.query.filter_by(
+            id=potrero_id, finca_id=finca.id, activo=True
+        ).first()
+        activity_date = parse_optional_date(request.form.get("fecha"))
+        if not potrero:
+            return redirect(url_for(
+                "ganaderia_actividades", finca_id=finca.id,
+                error="Selecciona un lote o potrero valido.", new_palpation="1",
+            ))
+        if not activity_date:
+            return redirect(url_for(
+                "ganaderia_actividades", finca_id=finca.id,
+                error="La fecha de palpacion es obligatoria.", new_palpation="1",
+                potrero_id=potrero.id,
+            ))
+
+        females = GanaderiaAnimal.query.filter(
+            GanaderiaAnimal.finca_id == finca.id,
+            GanaderiaAnimal.potrero_id == potrero.id,
+            GanaderiaAnimal.estado == "activo",
+            func.lower(GanaderiaAnimal.sexo) == "hembra",
+        ).order_by(GanaderiaAnimal.codigo.asc()).all()
+        if not females:
+            return redirect(url_for(
+                "ganaderia_actividades", finca_id=finca.id,
+                error=f"{potrero.nombre} no tiene hembras activas para palpar.",
+                new_palpation="1", potrero_id=potrero.id,
+            ))
+
+        now = datetime.utcnow()
+        try:
+            batch = GanaderiaPalpacionLote(
+                finca_id=finca.id,
+                potrero_id=potrero.id,
+                fecha=activity_date,
+                titulo=request.form.get("titulo", "").strip() or f"Palpacion - {potrero.nombre}",
+                observaciones=request.form.get("observaciones", "").strip() or None,
+                estado="abierta",
+                creada_por_user_id=current.id,
+                fecha_registro=now,
+            )
+            db.session.add(batch)
+            db.session.flush()
+            for animal in females:
+                db.session.add(GanaderiaPalpacionDetalle(
+                    palpacion_lote_id=batch.id,
+                    animal_id=animal.id,
+                    fecha_registro=now,
+                    fecha_actualizacion=now,
+                ))
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            return redirect(url_for(
+                "ganaderia_actividades", finca_id=finca.id,
+                error="No se pudo abrir la jornada de palpacion.", new_palpation="1",
+            ))
+        return redirect(url_for(
+            "ganaderia_palpacion_lote", finca_id=finca.id, palpacion_id=batch.id,
+        ))
+
+    def ganaderia_get_palpacion_or_404(finca_id, palpacion_id):
+        return GanaderiaPalpacionLote.query.filter_by(
+            id=palpacion_id, finca_id=finca_id
+        ).first_or_404()
+
+    @app.get("/ganaderia/fincas/<int:finca_id>/palpaciones/<int:palpacion_id>")
+    @ganaderia_login_required
+    def ganaderia_palpacion_lote(finca_id, palpacion_id):
+        current = ganaderia_current_user()
+        finca = ganaderia_get_accessible_farm_or_404(finca_id)
+        batch = ganaderia_get_palpacion_or_404(finca.id, palpacion_id)
+        potrero = GanaderiaPotrero.query.filter_by(
+            id=batch.potrero_id, finca_id=finca.id
+        ).first_or_404()
+        details = GanaderiaPalpacionDetalle.query.filter_by(
+            palpacion_lote_id=batch.id
+        ).order_by(GanaderiaPalpacionDetalle.id.asc()).all()
+        animals = GanaderiaAnimal.query.filter(
+            GanaderiaAnimal.id.in_([item.animal_id for item in details])
+        ).all() if details else []
+        animals_by_id = {animal.id: animal for animal in animals}
+        completed = sum(1 for item in details if item.resultado)
+        return render_template(
+            "ganaderia_palpacion_lote.html",
+            current=current,
+            finca=finca,
+            batch=batch,
+            potrero=potrero,
+            details=details,
+            animals_by_id=animals_by_id,
+            completed=completed,
+            total=len(details),
+            result_labels={
+                "prenada": "Prenada", "vacia": "Vacia",
+                "dudosa": "Dudosa", "no_evaluada": "No evaluada",
+            },
+            finalized=request.args.get("finalized") == "1",
+            error=request.args.get("error"),
+        )
+
+    @app.post("/ganaderia/fincas/<int:finca_id>/palpaciones/<int:palpacion_id>/animales/<int:animal_id>")
+    @ganaderia_login_required
+    def ganaderia_guardar_palpacion_animal(finca_id, palpacion_id, animal_id):
+        current = ganaderia_current_user()
+        finca = ganaderia_get_accessible_farm_or_404(finca_id)
+        if current.rol not in {"superadmin", "veterinario"}:
+            abort(403)
+        batch = ganaderia_get_palpacion_or_404(finca.id, palpacion_id)
+        if batch.estado != "abierta":
+            return jsonify(error="La jornada ya fue finalizada."), 409
+        detail = GanaderiaPalpacionDetalle.query.filter_by(
+            palpacion_lote_id=batch.id, animal_id=animal_id
+        ).first_or_404()
+        payload = request.get_json(silent=True) or {}
+        result = str(payload.get("resultado") or "").strip().lower()
+        allowed_results = {"", "prenada", "vacia", "dudosa", "no_evaluada"}
+        if result not in allowed_results:
+            return jsonify(error="El resultado no es valido."), 400
+        raw_days = payload.get("dias_gestacion")
+        days = None
+        if raw_days not in (None, ""):
+            try:
+                days = int(raw_days)
+            except (TypeError, ValueError):
+                return jsonify(error="Los dias de gestacion deben ser un numero."), 400
+            if days < 0 or days > 283:
+                return jsonify(error="Los dias de gestacion deben estar entre 0 y 283."), 400
+        if result != "prenada":
+            days = None
+        detail.resultado = result or None
+        detail.dias_gestacion = days
+        detail.fecha_probable_parto = (
+            batch.fecha + timedelta(days=283 - days)
+            if result == "prenada" and days is not None else None
+        )
+        detail.observaciones = str(payload.get("observaciones") or "").strip() or None
+        detail.fecha_actualizacion = datetime.utcnow()
+        try:
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            return jsonify(error="No se pudo guardar el resultado."), 500
+        details = GanaderiaPalpacionDetalle.query.filter_by(
+            palpacion_lote_id=batch.id
+        ).all()
+        return jsonify(
+            saved=True,
+            fecha_probable_parto=(
+                detail.fecha_probable_parto.strftime("%d/%m/%Y")
+                if detail.fecha_probable_parto else None
+            ),
+            completed=sum(1 for item in details if item.resultado),
+            total=len(details),
+        )
+
+    @app.post("/ganaderia/fincas/<int:finca_id>/palpaciones/<int:palpacion_id>/finalizar")
+    @ganaderia_login_required
+    def ganaderia_finalizar_palpacion_lote(finca_id, palpacion_id):
+        current = ganaderia_current_user()
+        finca = ganaderia_get_accessible_farm_or_404(finca_id)
+        if current.rol not in {"superadmin", "veterinario"}:
+            abort(403)
+        batch = ganaderia_get_palpacion_or_404(finca.id, palpacion_id)
+        if batch.estado != "abierta":
+            return redirect(url_for(
+                "ganaderia_palpacion_lote", finca_id=finca.id,
+                palpacion_id=batch.id,
+            ))
+        details = GanaderiaPalpacionDetalle.query.filter_by(
+            palpacion_lote_id=batch.id
+        ).all()
+        missing = [item for item in details if not item.resultado]
+        missing_days = [
+            item for item in details
+            if item.resultado == "prenada" and item.dias_gestacion is None
+        ]
+        if missing:
+            error = "Registra el resultado de todos los animales antes de finalizar."
+        elif missing_days:
+            error = "Indica los dias de gestacion de todas las vacas prenadas."
+        else:
+            error = None
+        if error:
+            return redirect(url_for(
+                "ganaderia_palpacion_lote", finca_id=finca.id,
+                palpacion_id=batch.id, error=error,
+            ))
+
+        result_labels = {
+            "prenada": "Prenada", "vacia": "Vacia",
+            "dudosa": "Dudosa", "no_evaluada": "No evaluada",
+        }
+        now = datetime.utcnow()
+        try:
+            for detail in details:
+                observation_parts = []
+                if detail.dias_gestacion is not None:
+                    observation_parts.append(f"Gestacion estimada: {detail.dias_gestacion} dias")
+                if detail.observaciones:
+                    observation_parts.append(detail.observaciones)
+                db.session.add(GanaderiaActividad(
+                    finca_id=finca.id,
+                    animal_id=detail.animal_id,
+                    tipo="palpacion",
+                    titulo=batch.titulo,
+                    fecha=batch.fecha,
+                    proxima_fecha=detail.fecha_probable_parto,
+                    resultado=result_labels.get(detail.resultado, detail.resultado),
+                    observaciones=". ".join(observation_parts) or batch.observaciones,
+                    realizada_por_user_id=current.id,
+                    fecha_registro=now,
+                ))
+            batch.estado = "finalizada"
+            batch.fecha_finalizacion = now
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            return redirect(url_for(
+                "ganaderia_palpacion_lote", finca_id=finca.id,
+                palpacion_id=batch.id,
+                error="No se pudo finalizar la jornada de palpacion.",
+            ))
+        return redirect(url_for(
+            "ganaderia_palpacion_lote", finca_id=finca.id,
+            palpacion_id=batch.id, finalized="1",
+        ))
+
+    @app.get("/ganaderia/fincas/<int:finca_id>/palpaciones/<int:palpacion_id>/reporte")
+    @ganaderia_login_required
+    def ganaderia_reporte_palpacion_lote(finca_id, palpacion_id):
+        finca = ganaderia_get_accessible_farm_or_404(finca_id)
+        batch = ganaderia_get_palpacion_or_404(finca.id, palpacion_id)
+        if batch.estado != "finalizada":
+            abort(409)
+        potrero = GanaderiaPotrero.query.filter_by(id=batch.potrero_id).first_or_404()
+        details = GanaderiaPalpacionDetalle.query.filter_by(
+            palpacion_lote_id=batch.id
+        ).order_by(GanaderiaPalpacionDetalle.id.asc()).all()
+        animals = GanaderiaAnimal.query.filter(
+            GanaderiaAnimal.id.in_([item.animal_id for item in details])
+        ).all() if details else []
+        animals_by_id = {animal.id: animal for animal in animals}
+        labels = {
+            "prenada": "Prenada", "vacia": "Vacia",
+            "dudosa": "Dudosa", "no_evaluada": "No evaluada",
+        }
+        counts = {key: sum(item.resultado == key for item in details) for key in labels}
+        buffer = BytesIO()
+        styles = getSampleStyleSheet()
+        document = SimpleDocTemplate(
+            buffer, pagesize=letter, rightMargin=34, leftMargin=34,
+            topMargin=34, bottomMargin=34,
+        )
+        story = [
+            Paragraph("Reporte de palpacion por lote", styles["Title"]),
+            Spacer(1, 8),
+            Paragraph(f"<b>Finca:</b> {escape(finca.nombre)}", styles["BodyText"]),
+            Paragraph(f"<b>Lote o potrero:</b> {escape(potrero.nombre)}", styles["BodyText"]),
+            Paragraph(f"<b>Fecha:</b> {batch.fecha.strftime('%d/%m/%Y')}", styles["BodyText"]),
+            Spacer(1, 12),
+            Paragraph(
+                " | ".join(f"{label}: {counts[key]}" for key, label in labels.items()),
+                styles["BodyText"],
+            ),
+            Spacer(1, 12),
+        ]
+        rows = [["Animal", "Resultado", "Dias", "Parto probable", "Observaciones"]]
+        for detail in details:
+            animal = animals_by_id.get(detail.animal_id)
+            animal_name = f"{animal.codigo} - {animal.nombre or 'Sin nombre'}" if animal else str(detail.animal_id)
+            rows.append([
+                animal_name,
+                labels.get(detail.resultado, detail.resultado or "Pendiente"),
+                str(detail.dias_gestacion) if detail.dias_gestacion is not None else "-",
+                detail.fecha_probable_parto.strftime("%d/%m/%Y") if detail.fecha_probable_parto else "-",
+                detail.observaciones or "-",
+            ])
+        table = Table(rows, colWidths=[126, 74, 38, 82, 158], repeatRows=1)
+        table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1c4636")),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTSIZE", (0, 0), (-1, -1), 8),
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("GRID", (0, 0), (-1, -1), .4, colors.HexColor("#cfd9d2")),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f4f7f5")]),
+            ("LEFTPADDING", (0, 0), (-1, -1), 5),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+        ]))
+        story.append(table)
+        document.build(story)
+        buffer.seek(0)
+        safe_name = secure_filename(f"palpacion-{finca.nombre}-{potrero.nombre}-{batch.fecha.isoformat()}")
+        return send_file(
+            buffer, mimetype="application/pdf", as_attachment=True,
+            download_name=f"{safe_name or 'reporte-palpacion'}.pdf",
+        )
+
     @app.route("/ganaderia/fincas/<int:finca_id>/actividades", methods=["GET", "POST"])
     @ganaderia_login_required
     def ganaderia_actividades(finca_id):
@@ -3602,6 +3915,24 @@ def create_app():
             GanaderiaActividad.finca_id == finca.id,
             GanaderiaActividad.proxima_fecha.isnot(None),
         ).order_by(GanaderiaActividad.proxima_fecha.asc()).limit(20).all()
+        paddocks = GanaderiaPotrero.query.filter_by(
+            finca_id=finca.id, activo=True
+        ).order_by(GanaderiaPotrero.nombre.asc()).all()
+        palpation_batches = GanaderiaPalpacionLote.query.filter_by(
+            finca_id=finca.id
+        ).order_by(
+            GanaderiaPalpacionLote.fecha_registro.desc()
+        ).limit(20).all()
+        palpation_progress = {}
+        for batch in palpation_batches:
+            batch_details = GanaderiaPalpacionDetalle.query.filter_by(
+                palpacion_lote_id=batch.id
+            ).all()
+            palpation_progress[batch.id] = (
+                sum(1 for detail in batch_details if detail.resultado),
+                len(batch_details),
+            )
+        paddock_names = {paddock.id: paddock.nombre for paddock in paddocks}
         animal_names = {animal.id: (animal.nombre or animal.codigo) for animal in animals}
         animal_ids = [animal.id for animal in animals]
         estimated_due_dates = {}
@@ -3634,6 +3965,10 @@ def create_app():
             ],
             activities=activities,
             upcoming=upcoming,
+            paddocks=paddocks,
+            paddock_names=paddock_names,
+            palpation_batches=palpation_batches,
+            palpation_progress=palpation_progress,
             animal_names=animal_names,
             estimated_due_dates=estimated_due_dates,
             activity_label=ganaderia_activity_label,
@@ -3641,6 +3976,8 @@ def create_app():
             error=request.args.get("error"),
             selected_activity_type=request.args.get("activity_type", ""),
             selected_activity_mode=request.args.get("activity_mode", "individual"),
+            open_palpation_dialog=request.args.get("new_palpation") == "1",
+            selected_paddock_id=request.args.get("potrero_id", type=int),
             today=datetime.utcnow().date(),
         )
 

@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+{% block title %}{{ batch.titulo }} | Invagro{% endblock %}
+{% block body_class %}portal-shell-page ganaderia-app-page no-chat{% endblock %}
+{% block content %}
+  <div class="ganaderia-shell">
+    {% set ganaderia_active = "fincas" %}{% set ganaderia_section = "actividades" %}{% include "partials/ganaderia_sidebar.html" %}
+    <div class="ganaderia-main">
+      <header class="ganaderia-topbar">
+        <button class="ganaderia-menu" type="button" aria-label="Abrir menú" onclick="document.body.classList.toggle('ganaderia-menu-open')">☰</button>
+        <div><small>{{ finca.nombre|upper }}</small><h1>Palpación · {{ potrero.nombre }}</h1></div>
+        <a class="ganaderia-back" href="{{ url_for('ganaderia_actividades', finca_id=finca.id) }}">Volver a actividades</a>
+      </header>
+      <main class="ganaderia-content ganaderia-palpation-workspace">
+        {% if finalized %}<div class="ganaderia-success">Jornada finalizada. El reporte ya está disponible.</div>{% endif %}
+        {% if error %}<div class="form-error">{{ error }}</div>{% endif %}
+        <section class="ganaderia-palpation-hero">
+          <div><span>PALPACIÓN POR LOTE</span><h2>{{ batch.titulo }}</h2><p>{{ potrero.nombre }} · {{ batch.fecha.strftime('%d/%m/%Y') }}</p></div>
+          <div class="ganaderia-palpation-summary">
+            <strong id="palpationProgress">{{ completed }}/{{ total }}</strong>
+            <small>animales registrados</small>
+            <em class="{{ batch.estado }}">{{ "En curso" if batch.estado == "abierta" else "Finalizada" }}</em>
+          </div>
+          {% if batch.estado == "finalizada" %}
+            <a class="ganaderia-primary ganaderia-report-button" href="{{ url_for('ganaderia_reporte_palpacion_lote', finca_id=finca.id, palpacion_id=batch.id) }}">Descargar reporte PDF</a>
+          {% endif %}
+        </section>
+
+        <section class="ganaderia-palpation-list-panel">
+          <div class="ganaderia-panel-heading"><div><span>ANIMALES DEL LOTE</span><h2>Resultados de palpación</h2></div><strong>{{ total }}</strong></div>
+          <div class="ganaderia-palpation-records">
+            {% for detail in details %}{% set animal = animals_by_id.get(detail.animal_id) %}
+              <article class="ganaderia-palpation-record" data-record data-animal-id="{{ detail.animal_id }}" data-save-url="{{ url_for('ganaderia_guardar_palpacion_animal', finca_id=finca.id, palpacion_id=batch.id, animal_id=detail.animal_id) }}">
+                <div class="ganaderia-palpation-animal">
+                  <span>{{ (animal.nombre or animal.codigo)[:1]|upper if animal else '?' }}</span>
+                  <div><strong>{{ animal.codigo if animal else detail.animal_id }} · {{ animal.nombre or "Sin nombre" if animal else "Animal" }}</strong><small>{{ animal.raza or "Raza no registrada" if animal else "" }}</small></div>
+                </div>
+                <label>Resultado
+                  <select data-field="resultado" {% if batch.estado != "abierta" %}disabled{% endif %}>
+                    <option value="">Pendiente</option>
+                    {% for value, label in result_labels.items() %}<option value="{{ value }}" {% if detail.resultado == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+                  </select>
+                </label>
+                <label data-days-field style="{% if detail.resultado != 'prenada' %}display:none{% endif %}">Días de gestación
+                  <input data-field="dias_gestacion" type="number" min="0" max="283" inputmode="numeric" value="{{ detail.dias_gestacion if detail.dias_gestacion is not none else '' }}" {% if batch.estado != "abierta" %}disabled{% endif %} />
+                </label>
+                <div class="ganaderia-palpation-due"><span>Parto probable</span><strong data-due>{{ detail.fecha_probable_parto.strftime('%d/%m/%Y') if detail.fecha_probable_parto else "—" }}</strong></div>
+                <label class="ganaderia-palpation-notes">Observaciones
+                  <input data-field="observaciones" value="{{ detail.observaciones or '' }}" {% if batch.estado != "abierta" %}disabled{% endif %} />
+                </label>
+                <span class="ganaderia-save-state" data-save-state>{{ "Registrado" if detail.resultado else "Pendiente" }}</span>
+              </article>
+            {% endfor %}
+          </div>
+        </section>
+
+        {% if batch.estado == "abierta" and current.rol in ["superadmin", "veterinario"] %}
+          <section class="ganaderia-palpation-finish">
+            <div><strong>Finalizar jornada</strong><small>Todos los animales deben tener resultado y las preñadas deben incluir días de gestación.</small></div>
+            <form method="post" action="{{ url_for('ganaderia_finalizar_palpacion_lote', finca_id=finca.id, palpacion_id=batch.id) }}" id="finishPalpationForm"><button class="ganaderia-primary" type="submit">Finalizar y generar reporte</button></form>
+          </section>
+        {% endif %}
+      </main>
+    </div>
+  </div>
+  {% if batch.estado == "abierta" and current.rol in ["superadmin", "veterinario"] %}
+    <script>
+      const batchId = {{ batch.id }};
+      const records = Array.from(document.querySelectorAll("[data-record]"));
+      const pendingSaves = new Map();
+      function storageKey(record) { return `invagro-palpacion-${batchId}-${record.dataset.animalId}`; }
+      function valuesFor(record) {
+        return {
+          resultado: record.querySelector('[data-field="resultado"]').value,
+          dias_gestacion: record.querySelector('[data-field="dias_gestacion"]').value,
+          observaciones: record.querySelector('[data-field="observaciones"]').value
+        };
+      }
+      function applyValues(record, values) {
+        Object.entries(values).forEach(([name, value]) => {
+          const field = record.querySelector(`[data-field="${name}"]`);
+          if (field) field.value = value ?? "";
+        });
+        configureRecord(record);
+      }
+      function configureRecord(record) {
+        const pregnant = record.querySelector('[data-field="resultado"]').value === "prenada";
+        const daysField = record.querySelector("[data-days-field]");
+        daysField.style.display = pregnant ? "" : "none";
+        if (!pregnant) record.querySelector('[data-field="dias_gestacion"]').value = "";
+      }
+      async function saveRecord(record) {
+        if (record.activeSave) await record.activeSave.catch(() => null);
+        const state = record.querySelector("[data-save-state]");
+        const values = valuesFor(record);
+        const serializedValues = JSON.stringify(values);
+        localStorage.setItem(storageKey(record), serializedValues);
+        const operation = (async () => {
+          state.textContent = navigator.onLine ? "Guardando…" : "Sin conexión · pendiente";
+          state.className = "ganaderia-save-state saving";
+          const response = await fetch(record.dataset.saveUrl, {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: serializedValues
+          });
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.error || "No se pudo guardar");
+          if (localStorage.getItem(storageKey(record)) === serializedValues) {
+            localStorage.removeItem(storageKey(record));
+          }
+          state.textContent = "Guardado";
+          state.className = "ganaderia-save-state saved";
+          record.querySelector("[data-due]").textContent = data.fecha_probable_parto || "—";
+          document.getElementById("palpationProgress").textContent = `${data.completed}/${data.total}`;
+          return data;
+        })();
+        record.activeSave = operation;
+        try {
+          return await operation;
+        } catch (error) {
+          state.textContent = navigator.onLine ? "Pendiente de reintento" : "Sin conexión · pendiente";
+          state.className = "ganaderia-save-state error";
+          throw error;
+        } finally {
+          if (record.activeSave === operation) record.activeSave = null;
+        }
+      }
+      function queueSave(record) {
+        configureRecord(record);
+        localStorage.setItem(storageKey(record), JSON.stringify(valuesFor(record)));
+        clearTimeout(record.saveTimer);
+        record.saveTimer = setTimeout(() => {
+          const promise = saveRecord(record).catch(() => null).finally(() => pendingSaves.delete(record));
+          pendingSaves.set(record, promise);
+        }, 450);
+      }
+      records.forEach((record) => {
+        const saved = localStorage.getItem(storageKey(record));
+        if (saved) {
+          try { applyValues(record, JSON.parse(saved)); } catch (error) { localStorage.removeItem(storageKey(record)); }
+        }
+        record.querySelectorAll("[data-field]").forEach((field) => {
+          field.addEventListener(field.tagName === "SELECT" ? "change" : "input", () => queueSave(record));
+        });
+        if (saved) queueSave(record);
+      });
+      window.addEventListener("online", () => records.forEach((record) => {
+        if (localStorage.getItem(storageKey(record))) queueSave(record);
+      }));
+      document.getElementById("finishPalpationForm")?.addEventListener("submit", async function (event) {
+        event.preventDefault();
+        records.forEach((record) => clearTimeout(record.saveTimer));
+        const saves = records.filter((record) => localStorage.getItem(storageKey(record))).map((record) => saveRecord(record));
+        try { await Promise.all(saves); this.submit(); } catch (error) { alert("Hay resultados pendientes de guardar. Revisa la conexión antes de finalizar."); }
+      });
+    </script>
+  {% endif %}
+{% endblock %}

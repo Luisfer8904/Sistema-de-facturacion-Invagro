@@ -19,13 +19,28 @@
               <button type="button" data-type="tratamiento" data-label="Tratamiento" onclick="openActivityDialog(this)"><span>TR</span><strong>Tratamiento</strong><small>Atención clínica</small></button>
               <button type="button" data-type="inseminacion" data-label="Inseminación" onclick="openActivityDialog(this)"><span>IN</span><strong>Inseminación</strong><small>Registro reproductivo</small></button>
               <button type="button" data-type="palpacion" data-label="Palpación individual" onclick="openActivityDialog(this)"><span>PI</span><strong>Palpación individual</strong><small>Diagnóstico de una vaca</small></button>
-              <button type="button" onclick="openGroupPalpationDialog()" {% if not female_animals %}disabled title="No hay hembras activas"{% endif %}><span>PG</span><strong>Palpación grupal</strong><small>Evaluar varias vacas</small></button>
+              <button type="button" onclick="openPalpationBatchDialog()" {% if not paddocks %}disabled title="Primero crea un lote o potrero"{% endif %}><span>PL</span><strong>Palpación por lote</strong><small>Abrir jornada persistente</small></button>
               <button type="button" data-type="parto" data-label="Parto" onclick="openActivityDialog(this)"><span>PT</span><strong>Parto</strong><small>Nacimiento y resultado</small></button>
               <button type="button" data-type="secado" data-label="Secado" onclick="openActivityDialog(this)"><span>SE</span><strong>Secado</strong><small>Cierre de lactancia</small></button>
               <button type="button" data-type="destete" data-label="Destete" onclick="openActivityDialog(this)"><span>DE</span><strong>Destete</strong><small>Separación de la cría</small></button>
               <button type="button" data-type="identificacion" data-label="Identificación" onclick="openActivityDialog(this)"><span>ID</span><strong>Identificación</strong><small>Arete o marcación</small></button>
               <button type="button" data-type="visita" data-label="Visita veterinaria" onclick="openActivityDialog(this)"><span>VE</span><strong>Visita veterinaria</strong><small>Evaluación profesional</small></button>
               <button type="button" data-type="manejo" data-label="Manejo general" onclick="openActivityDialog(this)"><span>MA</span><strong>Manejo general</strong><small>Otro procedimiento</small></button>
+            </div>
+          </section>
+        {% endif %}
+        {% if palpation_batches %}
+          <section class="ganaderia-user-list ganaderia-palpation-sessions">
+            <div class="ganaderia-panel-heading"><div><span>PALPACIONES POR LOTE</span><h2>Jornadas guardadas</h2></div><strong>{{ palpation_batches|length }}</strong></div>
+            <div class="ganaderia-palpation-session-list">
+              {% for batch in palpation_batches %}{% set progress = palpation_progress.get(batch.id, (0, 0)) %}
+                <a href="{{ url_for('ganaderia_palpacion_lote', finca_id=finca.id, palpacion_id=batch.id) }}">
+                  <div><strong>{{ batch.titulo }}</strong><small>{{ paddock_names.get(batch.potrero_id, "Lote") }} · {{ batch.fecha.strftime('%d/%m/%Y') }}</small></div>
+                  <span>{{ progress[0] }}/{{ progress[1] }}</span>
+                  <em class="{{ batch.estado }}">{{ "En curso" if batch.estado == "abierta" else "Finalizada" }}</em>
+                  <b aria-hidden="true">→</b>
+                </a>
+              {% endfor %}
             </div>
           </section>
         {% endif %}
@@ -42,42 +57,16 @@
         <div class="ganaderia-modal-actions"><button class="ganaderia-secondary" type="button" onclick="document.getElementById('activityDialog').close()">Cancelar</button><button class="ganaderia-primary" type="submit">Guardar actividad</button></div>
       </form>
     </dialog>
-    <dialog class="ganaderia-modal ganaderia-group-palpation-modal" id="groupPalpationDialog">
-      <div class="ganaderia-modal-header"><div><span>NUEVA ACTIVIDAD</span><h2>Palpación grupal</h2></div><button type="button" aria-label="Cerrar" onclick="document.getElementById('groupPalpationDialog').close()">×</button></div>
-      <form class="ganaderia-group-palpation-form" method="post">
-        <input type="hidden" name="tipo" value="palpacion" />
-        <input type="hidden" name="modo" value="grupal" />
+    <dialog class="ganaderia-modal ganaderia-palpation-start-modal" id="palpationBatchDialog">
+      <div class="ganaderia-modal-header"><div><span>NUEVA JORNADA</span><h2>Palpación por lote</h2></div><button type="button" aria-label="Cerrar" onclick="document.getElementById('palpationBatchDialog').close()">×</button></div>
+      <form class="ganaderia-group-palpation-form" method="post" action="{{ url_for('ganaderia_crear_palpacion_lote', finca_id=finca.id) }}">
         <div class="ganaderia-group-palpation-summary">
+          <label>Lote o potrero<select name="potrero_id" required><option value="">Selecciona</option>{% for paddock in paddocks %}<option value="{{ paddock.id }}" {% if selected_paddock_id == paddock.id %}selected{% endif %}>{{ paddock.nombre }} · {{ paddock.tipo|title }}</option>{% endfor %}</select></label>
           <label>Fecha de palpación<input type="date" name="fecha" value="{{ today.isoformat() if today else '' }}" required /></label>
-          <label>Título<input name="titulo" value="Palpación grupal" /></label>
         </div>
-        <div class="ganaderia-group-palpation-heading">
-          <div><strong>Selecciona las vacas</strong><small>Cada resultado se guardará en el expediente del animal.</small></div>
-          <span id="groupPalpationCount">0 seleccionadas</span>
-        </div>
-        <div class="ganaderia-group-palpation-list">
-          {% for animal in female_animals %}
-            <article data-group-palpation-row>
-              <label class="ganaderia-group-animal-choice">
-                <input type="checkbox" name="animal_ids" value="{{ animal.id }}" />
-                <span>{{ (animal.nombre or animal.codigo)[:1]|upper }}</span>
-                <div><strong>{{ animal.codigo }} · {{ animal.nombre or "Sin nombre" }}</strong><small>{{ animal.raza or "Raza no registrada" }}</small></div>
-              </label>
-              <label>Resultado
-                <select name="resultado_{{ animal.id }}" disabled>
-                  <option value="">Selecciona</option><option value="prenada">Preñada</option><option value="vacia">Vacía</option><option value="dudosa">Dudosa</option>
-                </select>
-              </label>
-              <label>Fecha probable de parto
-                <input type="date" name="proxima_fecha_{{ animal.id }}" data-estimated-due="{{ estimated_due_dates.get(animal.id, '') }}" disabled />
-              </label>
-            </article>
-          {% else %}
-            <div class="ganaderia-empty-inline">No hay hembras activas disponibles para registrar una palpación.</div>
-          {% endfor %}
-        </div>
+        <label>Título<input name="titulo" value="Palpación por lote" /></label>
         <label class="ganaderia-group-observations">Observaciones generales<textarea name="observaciones" rows="3"></textarea></label>
-        <div class="ganaderia-modal-actions"><button class="ganaderia-secondary" type="button" onclick="document.getElementById('groupPalpationDialog').close()">Cancelar</button><button class="ganaderia-primary" id="saveGroupPalpation" type="submit" disabled>Guardar palpaciones</button></div>
+        <div class="ganaderia-modal-actions"><button class="ganaderia-secondary" type="button" onclick="document.getElementById('palpationBatchDialog').close()">Cancelar</button><button class="ganaderia-primary" type="submit">Abrir jornada</button></div>
       </form>
     </dialog>
     <script>
@@ -95,8 +84,8 @@
         configureActivityFields(type);
         document.getElementById("activityDialog").showModal();
       }
-      function openGroupPalpationDialog() {
-        document.getElementById("groupPalpationDialog").showModal();
+      function openPalpationBatchDialog() {
+        document.getElementById("palpationBatchDialog").showModal();
       }
       function configureActivityFields(type) {
         const isPalpation = type === "palpacion";
@@ -131,43 +120,13 @@
       document.getElementById("activityDialog").addEventListener("click", function (event) {
         if (event.target === this) this.close();
       });
-      const groupRows = Array.from(document.querySelectorAll("[data-group-palpation-row]"));
-      const groupCount = document.getElementById("groupPalpationCount");
-      const saveGroupPalpation = document.getElementById("saveGroupPalpation");
-      function updateGroupPalpationCount() {
-        const selected = groupRows.filter((row) => row.querySelector('input[type="checkbox"]').checked).length;
-        groupCount.textContent = `${selected} ${selected === 1 ? "seleccionada" : "seleccionadas"}`;
-        saveGroupPalpation.disabled = selected === 0;
-      }
-      function configureGroupPalpationRow(row) {
-        const checkbox = row.querySelector('input[type="checkbox"]');
-        const result = row.querySelector("select");
-        const dueDate = row.querySelector('input[type="date"]');
-        const selected = checkbox.checked;
-        result.disabled = !selected;
-        dueDate.disabled = !selected;
-        result.required = selected;
-        dueDate.required = selected && result.value === "prenada";
-        row.classList.toggle("selected", selected);
-        if (selected && result.value === "prenada" && !dueDate.value) {
-          dueDate.value = dueDate.dataset.estimatedDue || "";
-        } else if (selected && result.value && result.value !== "prenada") {
-          dueDate.value = "";
-        }
-        updateGroupPalpationCount();
-      }
-      groupRows.forEach((row) => {
-        const checkbox = row.querySelector('input[type="checkbox"]');
-        const result = row.querySelector("select");
-        checkbox.addEventListener("change", () => configureGroupPalpationRow(row));
-        result.addEventListener("change", () => configureGroupPalpationRow(row));
-      });
-      document.getElementById("groupPalpationDialog").addEventListener("click", function (event) {
+      document.getElementById("palpationBatchDialog").addEventListener("click", function (event) {
         if (event.target === this) this.close();
       });
       {% if error and selected_activity_type %}
-        {% if selected_activity_type == "palpacion" and selected_activity_mode == "grupal" %}openGroupPalpationDialog();{% else %}openActivityDialog("{{ selected_activity_type }}");{% endif %}
+        openActivityDialog("{{ selected_activity_type }}");
       {% endif %}
+      {% if open_palpation_dialog %}openPalpationBatchDialog();{% endif %}
     </script>
   {% endif %}
 {% endblock %}

@@ -225,6 +225,69 @@ class GanaderiaActividad(db.Model):
     fecha_registro = db.Column(db.DateTime)
 
 
+class GanaderiaPalpacionLote(db.Model):
+    __tablename__ = "inva_ganaderia_palpaciones_lote"
+    __table_args__ = {"extend_existing": True}
+
+    id = db.Column(db.Integer, primary_key=True)
+    finca_id = db.Column(
+        db.Integer,
+        db.ForeignKey("inva_ganaderia_fincas.id"),
+        nullable=False,
+        index=True,
+    )
+    potrero_id = db.Column(
+        db.Integer,
+        db.ForeignKey("inva_ganaderia_potreros.id"),
+        nullable=False,
+        index=True,
+    )
+    fecha = db.Column(db.Date, nullable=False, index=True)
+    titulo = db.Column(db.String(160), nullable=False)
+    observaciones = db.Column(db.Text)
+    estado = db.Column(db.String(20), nullable=False, default="abierta", index=True)
+    creada_por_user_id = db.Column(
+        db.Integer,
+        db.ForeignKey("inva_ganaderia_usuarios.id"),
+        nullable=False,
+        index=True,
+    )
+    fecha_registro = db.Column(db.DateTime, nullable=False)
+    fecha_finalizacion = db.Column(db.DateTime)
+
+
+class GanaderiaPalpacionDetalle(db.Model):
+    __tablename__ = "inva_ganaderia_palpacion_detalles"
+    __table_args__ = (
+        db.UniqueConstraint(
+            "palpacion_lote_id",
+            "animal_id",
+            name="uq_gan_palpacion_lote_animal",
+        ),
+        {"extend_existing": True},
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    palpacion_lote_id = db.Column(
+        db.Integer,
+        db.ForeignKey("inva_ganaderia_palpaciones_lote.id"),
+        nullable=False,
+        index=True,
+    )
+    animal_id = db.Column(
+        db.Integer,
+        db.ForeignKey("inva_ganaderia_animales.id"),
+        nullable=False,
+        index=True,
+    )
+    resultado = db.Column(db.String(20))
+    dias_gestacion = db.Column(db.Integer)
+    fecha_probable_parto = db.Column(db.Date)
+    observaciones = db.Column(db.Text)
+    fecha_registro = db.Column(db.DateTime, nullable=False)
+    fecha_actualizacion = db.Column(db.DateTime, nullable=False)
+
+
 class AvesGranjaCliente(db.Model):
     __tablename__ = "inva_aves_granja_clientes"
     __table_args__ = {"extend_existing": True}
