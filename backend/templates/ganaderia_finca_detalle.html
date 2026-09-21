@@ -24,7 +24,7 @@
           <article><span>Animales activos</span><strong>{{ animals_count }}</strong></article>
           <article><span>Hembras / machos</span><strong>{{ female_count }} / {{ male_count }}</strong></article>
           <article><span>Peso promedio</span><strong>{{ "%.1f"|format(average_weight|float) if average_weight else "—" }}{% if average_weight %} lb{% endif %}</strong></article>
-          <article><span>Lotes y potreros</span><strong>{{ paddocks_count }}</strong></article>
+          <article><span>Espacios productivos</span><strong>{{ paddocks_count }}</strong></article>
           <article><span>Próximos partos</span><strong>{{ upcoming_births|length }}</strong></article>
           <article><span>Agenda de 30 días</span><strong>{{ pending_count }}</strong></article>
         </section>

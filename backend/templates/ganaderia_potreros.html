@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Lotes y potreros de {{ finca.nombre }} | Invagro{% endblock %}
+{% block title %}Espacios productivos de {{ finca.nombre }} | Invagro{% endblock %}
 {% block body_class %}portal-shell-page ganaderia-app-page no-chat{% endblock %}
 {% block content %}
   <div class="ganaderia-shell">
@@ -7,24 +7,24 @@
     <div class="ganaderia-main">
       <header class="ganaderia-topbar">
         <button class="ganaderia-menu" type="button" aria-label="Abrir menú" onclick="document.body.classList.toggle('ganaderia-menu-open')">☰</button>
-        <div><small>{{ finca.nombre|upper }}</small><h1>Lotes y potreros</h1></div>
+        <div><small>{{ finca.nombre|upper }}</small><h1>Lotes, potreros y repastos</h1></div>
         <a class="ganaderia-back" href="/ganaderia/fincas/{{ finca.id }}">Volver al resumen</a>
       </header>
       <main class="ganaderia-content">
         {% if created %}<div class="ganaderia-success">Espacio creado correctamente.</div>{% endif %}
         <section class="ganaderia-paddock-inventory">
           <div class="ganaderia-user-list">
-            <div class="ganaderia-panel-heading ganaderia-animal-heading"><div><span>DISTRIBUCIÓN</span><h2>Espacios de la finca</h2></div><div class="ganaderia-heading-actions"><strong>{{ paddocks|length }}</strong>{% if current.rol in ["superadmin", "veterinario"] %}<button class="ganaderia-primary" type="button" onclick="document.getElementById('newPaddockDialog').showModal()">+ Nuevo lote o potrero</button>{% endif %}</div></div>
+            <div class="ganaderia-panel-heading ganaderia-animal-heading"><div><span>DISTRIBUCIÓN</span><h2>Espacios de la finca</h2></div><div class="ganaderia-heading-actions"><strong>{{ paddocks|length }}</strong>{% if current.rol in ["superadmin", "veterinario"] %}<button class="ganaderia-primary" type="button" onclick="document.getElementById('newPaddockDialog').showModal()">+ Nuevo espacio</button>{% endif %}</div></div>
             <div class="ganaderia-paddock-grid">
               {% for item in paddocks %}
                 <a class="ganaderia-paddock-card{% if not item.activo %} inactive{% endif %}" href="/ganaderia/fincas/{{ finca.id }}/potreros/{{ item.id }}">
                   <div class="ganaderia-paddock-icon">{{ item.tipo[:1]|upper }}</div>
-                  <div><small>{{ item.tipo|capitalize }}</small><h3>{{ item.nombre }}</h3><p>{{ item.descripcion or "Sin observaciones" }}</p></div>
+                  <div><small>{{ item.tipo|capitalize }}{% if item.tipo == "repasto" %} · Engorde{% endif %}</small><h3>{{ item.nombre }}</h3><p>{{ item.descripcion or ("Grupo productivo destinado a engorde" if item.tipo == "repasto" else "Sin observaciones") }}</p></div>
                   <span class="ganaderia-paddock-arrow">→</span>
                   <dl><div><dt>Animales</dt><dd>{{ animal_counts.get(item.id, 0) }}</dd></div><div><dt>Capacidad</dt><dd>{{ item.capacidad or "—" }}</dd></div></dl>
                 </a>
               {% else %}
-                <div class="ganaderia-empty-state"><strong>No hay espacios registrados</strong><p>Crea el primer lote, potrero o corral de esta finca.</p></div>
+                <div class="ganaderia-empty-state"><strong>No hay espacios registrados</strong><p>Crea el primer lote, potrero, repasto o corral de esta finca.</p></div>
               {% endfor %}
             </div>
           </div>
@@ -34,11 +34,11 @@
   </div>
   {% if current.rol in ["superadmin", "veterinario"] %}
     <dialog class="ganaderia-modal" id="newPaddockDialog" {% if error %}open{% endif %}>
-      <div class="ganaderia-modal-header"><div><span>NUEVO ESPACIO</span><h2>Crear lote o potrero</h2></div><button type="button" aria-label="Cerrar" onclick="document.getElementById('newPaddockDialog').close()">×</button></div>
+      <div class="ganaderia-modal-header"><div><span>NUEVO ESPACIO</span><h2>Crear espacio productivo</h2></div><button type="button" aria-label="Cerrar" onclick="document.getElementById('newPaddockDialog').close()">×</button></div>
       {% if error %}<div class="form-error">{{ error }}</div>{% endif %}
       <form class="ganaderia-animal-modal-form" method="post" action="/ganaderia/fincas/{{ finca.id }}/potreros">
         <label>Nombre<input name="nombre" required /></label>
-        <label>Tipo<select name="tipo"><option value="potrero">Potrero</option><option value="lote">Lote</option><option value="corral">Corral</option></select></label>
+        <label>Tipo<select id="paddockType" name="tipo"><option value="potrero">Potrero</option><option value="lote">Lote</option><option value="repasto">Repasto (engorde)</option><option value="corral">Corral</option></select><small class="ganaderia-field-hint" id="paddockTypeHint">Área física de pastoreo.</small></label>
         <label>Capacidad de animales<input type="number" name="capacidad" min="0" /></label>
         <label>Descripción<textarea name="descripcion" rows="4"></textarea></label>
         <div class="ganaderia-modal-actions"><button class="ganaderia-secondary" type="button" onclick="document.getElementById('newPaddockDialog').close()">Cancelar</button><button class="ganaderia-primary" type="submit">Crear espacio</button></div>
@@ -47,6 +47,17 @@
     <script>
       document.getElementById("newPaddockDialog").addEventListener("click", function (event) {
         if (event.target === this) this.close();
+      });
+      const paddockType = document.getElementById("paddockType");
+      const paddockTypeHint = document.getElementById("paddockTypeHint");
+      const paddockTypeHints = {
+        potrero: "Área física de pastoreo.",
+        lote: "Grupo general para organizar animales.",
+        repasto: "Grupo de animales destinados a crecimiento y engorde.",
+        corral: "Área de manejo, espera o confinamiento."
+      };
+      paddockType.addEventListener("change", () => {
+        paddockTypeHint.textContent = paddockTypeHints[paddockType.value] || "";
       });
     </script>
   {% endif %}

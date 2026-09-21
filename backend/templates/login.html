@@ -7,7 +7,7 @@
       <div class="login-header">
         <img class="login-mascot" src="/static/assets/logo.jpg" alt="Invagro" />
         {% if portal in ["aves", "ganaderia"] %}
-          <span class="login-portal-badge">Acceso de personal</span>
+          <span class="login-portal-badge">Portal de productores</span>
         {% endif %}
         <h1>INVAGRO</h1>
         <p class="subtitle">
@@ -77,7 +77,7 @@
           {% if portal == "aves" %}
             Manejo sanitario, lotes y clientes de granja
           {% elif portal == "ganaderia" %}
-            Gestión comercial y seguimiento de operaciones ganaderas
+            Animales, reproducción, sanidad y control productivo
           {% else %}
             Productos Veterinarios y Shampoo para Perros
           {% endif %}

@@ -3163,7 +3163,7 @@ def create_app():
         name = request.form.get("nombre", "").strip()
         paddock_type = request.form.get("tipo", "potrero").strip().lower()
         capacity_raw = request.form.get("capacidad", "").strip()
-        if paddock_type not in {"potrero", "lote", "corral"}:
+        if paddock_type not in {"potrero", "lote", "corral", "repasto"}:
             paddock_type = "potrero"
         if not name:
             return redirect(url_for("ganaderia_potreros", finca_id=finca.id, error="El nombre es obligatorio."))
@@ -3450,6 +3450,11 @@ def create_app():
             return redirect(url_for(
                 "ganaderia_actividades", finca_id=finca.id,
                 error="Selecciona un lote o potrero valido.", new_palpation="1",
+            ))
+        if potrero.tipo == "repasto":
+            return redirect(url_for(
+                "ganaderia_actividades", finca_id=finca.id,
+                error="Los repastos son grupos de engorde y no admiten jornadas de palpacion.",
             ))
         if not activity_date:
             return redirect(url_for(
@@ -3915,8 +3920,10 @@ def create_app():
             GanaderiaActividad.finca_id == finca.id,
             GanaderiaActividad.proxima_fecha.isnot(None),
         ).order_by(GanaderiaActividad.proxima_fecha.asc()).limit(20).all()
-        paddocks = GanaderiaPotrero.query.filter_by(
-            finca_id=finca.id, activo=True
+        paddocks = GanaderiaPotrero.query.filter(
+            GanaderiaPotrero.finca_id == finca.id,
+            GanaderiaPotrero.activo.is_(True),
+            GanaderiaPotrero.tipo != "repasto",
         ).order_by(GanaderiaPotrero.nombre.asc()).all()
         palpation_batches = GanaderiaPalpacionLote.query.filter_by(
             finca_id=finca.id

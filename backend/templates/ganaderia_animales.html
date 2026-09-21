@@ -53,7 +53,7 @@
         <label class="ganaderia-full-field ganaderia-photo-field">Foto del animal<input type="file" name="foto" accept="image/jpeg,image/png,image/webp" /><small>JPG, PNG o WEBP. La imagen se mostrará completa.</small></label>
         <div class="ganaderia-two-fields"><label>Sexo<select name="sexo"><option value="hembra" {% if form_values.sexo == 'hembra' %}selected{% endif %}>Hembra</option><option value="macho" {% if form_values.sexo == 'macho' %}selected{% endif %}>Macho</option></select></label><label>Raza<input name="raza" value="{{ form_values.raza }}" /></label></div>
         <div class="ganaderia-two-fields"><label>Nacimiento<input type="date" name="fecha_nacimiento" value="{{ form_values.fecha_nacimiento }}" /></label><label>Peso actual (lb)<input type="number" step="0.01" min="0" name="peso_actual" value="{{ form_values.peso_actual }}" /></label></div>
-        <label>Potrero o lote<select name="potrero_id"><option value="">Sin asignar</option>{% for item in paddocks %}<option value="{{ item.id }}" {% if form_values.potrero_id == item.id|string %}selected{% endif %}>{{ item.nombre }}</option>{% endfor %}</select></label>
+        <label>Espacio productivo<select name="potrero_id"><option value="">Sin asignar</option>{% for item in paddocks %}<option value="{{ item.id }}" {% if form_values.potrero_id == item.id|string %}selected{% endif %}>{{ item.nombre }}{% if item.tipo == "repasto" %} · Repasto (engorde){% endif %}</option>{% endfor %}</select></label>
         <label>Procedencia<input name="procedencia" value="{{ form_values.procedencia }}" /></label>
         <div class="ganaderia-two-fields"><label>Madre (arete)<input name="madre_codigo" value="{{ form_values.madre_codigo }}" /></label><label>Padre (arete)<input name="padre_codigo" value="{{ form_values.padre_codigo }}" /></label></div>
         <label>Observaciones<textarea name="observaciones" rows="3">{{ form_values.observaciones }}</textarea></label>
@@ -70,7 +70,7 @@
     <dialog class="ganaderia-modal ganaderia-move-modal" id="moveAnimalDialog">
       <div class="ganaderia-modal-header"><div><span>CAMBIO DE UBICACIÓN</span><h2 id="moveAnimalTitle">Mover animal</h2></div><button type="button" aria-label="Cerrar" onclick="document.getElementById('moveAnimalDialog').close()">×</button></div>
       <form class="ganaderia-animal-modal-form" id="moveAnimalForm" method="post">
-        <label class="ganaderia-full-field">Nuevo lote o potrero<select id="movePaddockSelect" name="potrero_id"><option value="">Sin lote asignado</option>{% for item in paddocks %}<option value="{{ item.id }}">{{ item.nombre }} · {{ item.tipo|capitalize }}</option>{% endfor %}</select></label>
+        <label class="ganaderia-full-field">Nuevo espacio productivo<select id="movePaddockSelect" name="potrero_id"><option value="">Sin espacio asignado</option>{% for item in paddocks %}<option value="{{ item.id }}">{{ item.nombre }} · {{ item.tipo|capitalize }}{% if item.tipo == "repasto" %} (engorde){% endif %}</option>{% endfor %}</select></label>
         <label class="ganaderia-full-field">Observaciones<textarea name="observaciones" rows="3" placeholder="Motivo del movimiento"></textarea></label>
         <div class="ganaderia-modal-actions"><button class="ganaderia-secondary" type="button" onclick="document.getElementById('moveAnimalDialog').close()">Cancelar</button><button class="ganaderia-primary" type="submit">Confirmar movimiento</button></div>
       </form>

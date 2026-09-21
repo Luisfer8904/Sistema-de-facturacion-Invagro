@@ -13,12 +13,12 @@
       <main class="ganaderia-content">
         <section class="ganaderia-paddock-detail-hero">
           <div class="ganaderia-paddock-icon">{{ paddock.tipo[:1]|upper }}</div>
-          <div><span>{{ paddock.tipo|upper }}</span><h2>{{ paddock.nombre }}</h2><p>{{ paddock.descripcion or "Sin observaciones registradas" }}</p></div>
+          <div><span>{{ paddock.tipo|upper }}{% if paddock.tipo == "repasto" %} · ENGORDE{% endif %}</span><h2>{{ paddock.nombre }}</h2><p>{{ paddock.descripcion or ("Grupo productivo destinado a crecimiento y engorde" if paddock.tipo == "repasto" else "Sin observaciones registradas") }}</p></div>
           <span class="ganaderia-status {{ 'active' if paddock.activo else 'inactive' }}">{{ "Activo" if paddock.activo else "Inactivo" }}</span>
         </section>
 
         <section class="ganaderia-detail-grid ganaderia-paddock-kpis">
-          <article><span>Animales asignados</span><strong>{{ animals|length }}</strong></article>
+          <article><span>{{ "Animales de engorde" if paddock.tipo == "repasto" else "Animales asignados" }}</span><strong>{{ animals|length }}</strong></article>
           <article><span>Capacidad</span><strong>{{ paddock.capacidad or "Sin límite" }}</strong></article>
           <article><span>Ocupación</span><strong>{{ occupancy_percent ~ '%' if occupancy_percent is not none else "—" }}</strong></article>
           <article><span>Peso promedio</span><strong>{{ average_weight ~ ' lb' if average_weight is not none else "—" }}</strong></article>
@@ -31,7 +31,7 @@
         </nav>
 
         <section class="ganaderia-user-list">
-          <div class="ganaderia-panel-heading"><div><span>INVENTARIO DEL LOTE</span><h2>Animales</h2></div><strong>{{ animals|length }}</strong></div>
+          <div class="ganaderia-panel-heading"><div><span>{{ "INVENTARIO DE ENGORDE" if paddock.tipo == "repasto" else "INVENTARIO DEL LOTE" }}</span><h2>{{ "Animales en repasto" if paddock.tipo == "repasto" else "Animales" }}</h2></div><strong>{{ animals|length }}</strong></div>
           <div>
             {% for animal in animals %}
               {% set last_activity = latest_activities.get(animal.id) %}

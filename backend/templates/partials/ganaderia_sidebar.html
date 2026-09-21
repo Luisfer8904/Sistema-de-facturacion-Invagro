@@ -11,7 +11,7 @@
         <p><small>FINCA ACTUAL</small><strong>{{ finca.nombre }}</strong></p>
         <a class="{% if ganaderia_section == 'resumen' %}active{% endif %}" href="/ganaderia/fincas/{{ finca.id }}"><span>⌂</span> Resumen</a>
         <a class="{% if ganaderia_section == 'animales' %}active{% endif %}" href="/ganaderia/fincas/{{ finca.id }}/animales"><span>◉</span> Animales</a>
-        <a class="{% if ganaderia_section == 'potreros' %}active{% endif %}" href="/ganaderia/fincas/{{ finca.id }}/potreros"><span>▦</span> Lotes y potreros</a>
+        <a class="{% if ganaderia_section == 'potreros' %}active{% endif %}" href="/ganaderia/fincas/{{ finca.id }}/potreros"><span>▦</span> Espacios productivos</a>
         <a class="{% if ganaderia_section == 'partos' %}active{% endif %}" href="/ganaderia/fincas/{{ finca.id }}/partos"><span>◇</span> Próximos partos</a>
         <a class="{% if ganaderia_section == 'actividades' %}active{% endif %}" href="/ganaderia/fincas/{{ finca.id }}/actividades"><span>✓</span> Actividades</a>
       </div>
