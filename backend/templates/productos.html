@@ -61,7 +61,7 @@
           <div class="form-error">{{ error }}</div>
         {% endif %}
 
-        <section class="pos-search">
+        <section class="pos-search product-catalog-search">
           <input
             type="text"
             placeholder="Buscar producto por codigo o nombre"
@@ -72,7 +72,7 @@
           </button>
         </section>
 
-        <section class="pos-tabs">
+        <section class="pos-tabs product-catalog-tabs" aria-label="Filtrar productos por categoria">
           <button class="tab active" data-filter="todos">Todos</button>
           {% for categoria in categorias %}
             <button class="tab" data-filter="{{ categoria.nombre|lower|replace(' ', '-') }}">
@@ -81,23 +81,31 @@
           {% endfor %}
         </section>
 
-        <section class="pos-grid" id="productos-grid">
+        <section class="pos-grid product-catalog-grid" id="productos-grid">
           {% if productos %}
             {% for producto in productos %}
+              {% set product_stock = producto.stock or 0 %}
               <article
-                class="pos-product product-card"
+                class="pos-product product-card product-catalog-card"
                 data-name="{{ producto.nombre }}"
                 data-code="{{ producto.codigo }}"
                 data-category="{{ producto.categoria|lower|replace(' ', '-') }}"
               >
-                {% set product_image = url_for('static', filename='uploads/productos/' ~ producto.foto) if producto.foto else url_for('static', filename='assets/shampoo.jpeg') %}
-                <img src="{{ product_image }}" alt="{{ producto.nombre }}" />
+                <div class="product-catalog-image">
+                  {% if producto.foto %}
+                    <img src="{{ url_for('static', filename='uploads/productos/' ~ producto.foto) }}" alt="{{ producto.nombre }}" />
+                  {% else %}
+                    <span class="product-placeholder" aria-hidden="true">{{ producto.nombre[:2]|upper }}</span>
+                  {% endif %}
+                </div>
                 <div class="product-meta">
                   <h4>{{ producto.nombre }}</h4>
                   <span class="product-price">L {{ "%.2f"|format(producto.precio) }}</span>
-                  <small>Codigo: {{ producto.codigo }}</small>
-                  <small>Categoria: {{ producto.categoria }}</small>
-                  <small>Stock: {{ producto.stock }}</small>
+                  <div class="product-details">
+                    <small>Codigo: {{ producto.codigo }}</small>
+                    <small>{{ producto.categoria }}</small>
+                    <small class="stock-pill{% if product_stock <= 0 %} stock-empty{% elif product_stock <= 10 %} stock-low{% endif %}">Stock: {{ product_stock }}</small>
+                  </div>
                 </div>
                 <div class="product-actions">
                   <a class="secondary-button" href="/productos/{{ producto.id }}/edit">Editar</a>
