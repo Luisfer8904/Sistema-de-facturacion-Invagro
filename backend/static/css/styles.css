@@ -7885,3 +7885,16 @@ body.role-admin .user-pill::before {
     margin-left: 0 !important;
   }
 }
+
+/* El drawer debe quedar por encima del fondo desenfocado en móvil y tablet. */
+@media (max-width: 1180px) {
+  body.sidebar-open {
+    overflow: hidden;
+  }
+
+  body.sidebar-open .app-sidebar,
+  body.sidebar-open .app-sidebar:hover,
+  body.sidebar-open .app-sidebar:focus-within {
+    z-index: 1000 !important;
+  }
+}

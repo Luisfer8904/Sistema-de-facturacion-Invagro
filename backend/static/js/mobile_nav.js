@@ -10,6 +10,8 @@
   if (window.__invagroMobileNavInit) return;
   window.__invagroMobileNavInit = true;
 
+  var drawerMedia = window.matchMedia("(max-width: 1180px)");
+
   function init() {
     var sidebar = document.querySelector(".sidebar");
     var topbar = document.querySelector(".topbar");
@@ -90,7 +92,7 @@
     for (var i = 0; i < navLinks.length; i++) {
       navLinks[i].addEventListener("click", function () {
         // Solo cierra si estamos en modo móvil (drawer activo)
-        if (window.matchMedia("(max-width: 900px)").matches) close();
+        if (drawerMedia.matches) close();
       });
     }
 
@@ -103,7 +105,7 @@
 
     // Si la ventana se agranda y entramos en desktop, cerrar el drawer
     window.addEventListener("resize", function () {
-      if (window.innerWidth > 900 && document.body.classList.contains("sidebar-open")) {
+      if (!drawerMedia.matches && document.body.classList.contains("sidebar-open")) {
         close();
       }
     });
