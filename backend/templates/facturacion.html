@@ -72,11 +72,11 @@
       </div>
 
       <main class="content-area pos-layout">
-        <section class="pos-left">
+        <section class="pos-left" id="product-catalog">
           <div class="pos-search">
             <input
               type="text"
-              placeholder="Buscar producto por codigo o nombre"
+              placeholder="Buscar producto..."
               id="product-search"
             />
             <button class="primary-button" type="button" id="clear-search">
@@ -95,6 +95,11 @@
               </button>
             {% endfor %}
           </div>
+
+          <button class="mobile-sale-jump" id="mobile-sale-jump" type="button" hidden>
+            <span><strong id="mobile-sale-count">0 productos</strong><small>Ver venta</small></span>
+            <strong id="mobile-sale-total">L 0.00</strong>
+          </button>
 
           <div class="pos-products-scroll">
             <div class="pos-grid">
@@ -120,7 +125,8 @@
           </div>
         </section>
 
-        <section class="pos-right">
+        <section class="pos-right" id="sale-document">
+          <button class="mobile-product-jump" id="mobile-product-jump" type="button">← Seguir agregando productos</button>
           <div class="pos-header">
             <div>
               <h3>Documento</h3>
@@ -298,6 +304,12 @@
     const discountTotalEl = document.getElementById("discount-total");
     const isvEl = document.getElementById("isv");
     const totalEl = document.getElementById("total");
+    const mobileSaleJump = document.getElementById("mobile-sale-jump");
+    const mobileSaleCount = document.getElementById("mobile-sale-count");
+    const mobileSaleTotal = document.getElementById("mobile-sale-total");
+    const mobileProductJump = document.getElementById("mobile-product-jump");
+    const productCatalog = document.getElementById("product-catalog");
+    const saleDocument = document.getElementById("sale-document");
     const searchInput = document.getElementById("product-search");
     const clearSearch = document.getElementById("clear-search");
     const tabs = document.querySelectorAll(".pos-tabs .tab");
@@ -510,7 +522,7 @@
         if (applyTax) {
           isv += lineNet * taxRate;
         }
-        row.querySelector(".line-total").textContent = formatCurrency(lineNet);
+        row.querySelector(".line-total-amount").textContent = formatCurrency(lineNet);
       });
 
       const netSubtotal = Math.max(0, grossSubtotal - discountTotal);
@@ -519,7 +531,13 @@
         discountTotalEl.textContent = formatCurrency(discountTotal);
       }
       isvEl.textContent = formatCurrency(isv);
-      totalEl.textContent = formatCurrency(Math.max(0, netSubtotal + isv));
+      const finalTotal = Math.max(0, netSubtotal + isv);
+      totalEl.textContent = formatCurrency(finalTotal);
+      if (mobileSaleJump && mobileSaleCount && mobileSaleTotal) {
+        mobileSaleJump.hidden = rows.length === 0;
+        mobileSaleCount.textContent = `${rows.length} ${rows.length === 1 ? "producto" : "productos"}`;
+        mobileSaleTotal.textContent = formatCurrency(finalTotal);
+      }
       if (invoiceModal && invoiceModal.classList.contains("open")) {
         openInvoiceModal();
       }
@@ -630,12 +648,12 @@
       row.dataset.price = card.dataset.price;
       row.dataset.isv = card.dataset.isv;
       row.innerHTML = `
-        <span>${card.dataset.name}</span>
-        <input class="qty-input" type="number" min="1" value="${quantity}" />
-        <span>${formatCurrency(Number(card.dataset.price))}</span>
-        <input class="discount-input" type="number" min="0" step="0.01" value="${discount}" />
-        <span class="line-total">${formatCurrency(Number(card.dataset.price))}</span>
-        <button class="remove-button" type="button">×</button>
+        <span class="invoice-product-name">${card.dataset.name}</span>
+        <label class="invoice-line-field"><small>Cantidad</small><input class="qty-input" type="number" min="1" value="${quantity}" /></label>
+        <span class="invoice-line-value"><small>Precio</small>${formatCurrency(Number(card.dataset.price))}</span>
+        <label class="invoice-line-field"><small>Descuento</small><input class="discount-input" type="number" min="0" step="0.01" value="${discount}" /></label>
+        <span class="invoice-line-value line-total"><small>Total</small><strong class="line-total-amount">${formatCurrency(Number(card.dataset.price))}</strong></span>
+        <button class="remove-button" type="button" aria-label="Quitar ${card.dataset.name}">×</button>
         <div class="last-price-note muted">Selecciona un cliente registrado para ver el ultimo precio facturado.</div>
       `;
 
@@ -666,6 +684,18 @@
     productCards.forEach((card) => {
       card.querySelector(".add-product").addEventListener("click", () => addRow(card));
     });
+
+    if (mobileSaleJump && saleDocument) {
+      mobileSaleJump.addEventListener("click", () => {
+        saleDocument.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    }
+    if (mobileProductJump && productCatalog) {
+      mobileProductJump.addEventListener("click", () => {
+        productCatalog.scrollIntoView({ behavior: "smooth", block: "start" });
+        if (searchInput) searchInput.focus({ preventScroll: true });
+      });
+    }
 
     const applyFilters = () => {
       const query = searchInput.value.trim().toLowerCase();
