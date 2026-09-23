@@ -2634,6 +2634,87 @@ def create_app():
         )
         veterinarians_total = GanaderiaVeterinario.query.count()
         users_active = GanaderiaUser.query.filter_by(activo=True).count()
+        today = datetime.utcnow().date()
+        next_30_days = today + timedelta(days=30)
+
+        animals_by_farm = {}
+        paddocks_by_farm = {}
+        upcoming_by_farm = {}
+        upcoming_activities = []
+        recent_activities = []
+        overdue_total = 0
+        open_palpations_total = 0
+
+        if farm_ids:
+            animals_by_farm = dict(
+                db.session.query(GanaderiaAnimal.finca_id, func.count(GanaderiaAnimal.id))
+                .filter(
+                    GanaderiaAnimal.finca_id.in_(farm_ids),
+                    GanaderiaAnimal.estado == "activo",
+                )
+                .group_by(GanaderiaAnimal.finca_id)
+                .all()
+            )
+            paddocks_by_farm = dict(
+                db.session.query(GanaderiaPotrero.finca_id, func.count(GanaderiaPotrero.id))
+                .filter(
+                    GanaderiaPotrero.finca_id.in_(farm_ids),
+                    GanaderiaPotrero.activo.is_(True),
+                )
+                .group_by(GanaderiaPotrero.finca_id)
+                .all()
+            )
+            upcoming_by_farm = dict(
+                db.session.query(GanaderiaActividad.finca_id, func.count(GanaderiaActividad.id))
+                .filter(
+                    GanaderiaActividad.finca_id.in_(farm_ids),
+                    GanaderiaActividad.proxima_fecha.isnot(None),
+                    GanaderiaActividad.proxima_fecha >= today,
+                    GanaderiaActividad.proxima_fecha <= next_30_days,
+                )
+                .group_by(GanaderiaActividad.finca_id)
+                .all()
+            )
+            overdue_total = GanaderiaActividad.query.filter(
+                GanaderiaActividad.finca_id.in_(farm_ids),
+                GanaderiaActividad.proxima_fecha.isnot(None),
+                GanaderiaActividad.proxima_fecha < today,
+            ).count()
+            open_palpations_total = GanaderiaPalpacionLote.query.filter(
+                GanaderiaPalpacionLote.finca_id.in_(farm_ids),
+                GanaderiaPalpacionLote.estado == "abierta",
+            ).count()
+            upcoming_activities = (
+                GanaderiaActividad.query.filter(
+                    GanaderiaActividad.finca_id.in_(farm_ids),
+                    GanaderiaActividad.proxima_fecha.isnot(None),
+                    GanaderiaActividad.proxima_fecha >= today,
+                )
+                .order_by(GanaderiaActividad.proxima_fecha.asc(), GanaderiaActividad.id.asc())
+                .limit(6)
+                .all()
+            )
+            recent_activities = (
+                GanaderiaActividad.query.filter(GanaderiaActividad.finca_id.in_(farm_ids))
+                .order_by(GanaderiaActividad.fecha.desc(), GanaderiaActividad.id.desc())
+                .limit(6)
+                .all()
+            )
+
+        farms_by_id = {farm.id: farm for farm in farms}
+        activity_animal_ids = {
+            activity.animal_id
+            for activity in [*upcoming_activities, *recent_activities]
+            if activity.animal_id
+        }
+        animals_by_id = {
+            animal.id: animal
+            for animal in (
+                GanaderiaAnimal.query.filter(GanaderiaAnimal.id.in_(activity_animal_ids)).all()
+                if activity_animal_ids
+                else []
+            )
+        }
         return render_template(
             "ganaderia_dashboard.html",
             current=current,
@@ -2641,6 +2722,18 @@ def create_app():
             farms_total=len(farms),
             veterinarians_total=veterinarians_total,
             users_active=users_active,
+            today=today,
+            animals_total=sum(animals_by_farm.values()),
+            upcoming_total=sum(upcoming_by_farm.values()),
+            overdue_total=overdue_total,
+            open_palpations_total=open_palpations_total,
+            animals_by_farm=animals_by_farm,
+            paddocks_by_farm=paddocks_by_farm,
+            upcoming_by_farm=upcoming_by_farm,
+            upcoming_activities=upcoming_activities,
+            recent_activities=recent_activities,
+            farms_by_id=farms_by_id,
+            animals_by_id=animals_by_id,
         )
 
     @app.route("/ganaderia/usuarios", methods=["GET", "POST"])

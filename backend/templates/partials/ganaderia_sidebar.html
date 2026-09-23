@@ -3,7 +3,7 @@
     <img src="/static/assets/logo.jpg" alt="Invagro" />
     <span><strong>Invagro</strong><small>Portal de ganadería</small></span>
   </a>
-  <nav aria-label="Navegación de ganadería">
+  <nav id="ganaderia-navigation" aria-label="Navegación de ganadería">
     <a class="{% if ganaderia_active == 'dashboard' %}active{% endif %}" href="/ganaderia/dashboard"><span>⌂</span> Dashboard</a>
     <a class="{% if ganaderia_active == 'fincas' and finca is not defined %}active{% endif %}" href="/ganaderia/fincas"><span>▦</span> Fincas</a>
     {% if finca is defined %}

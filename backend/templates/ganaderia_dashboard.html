@@ -1,46 +1,92 @@
 {% extends "base.html" %}
 {% block title %}Dashboard Ganadería | Invagro{% endblock %}
-{% block body_class %}portal-shell-page ganaderia-app-page no-chat{% endblock %}
+{% block body_class %}portal-shell-page ganaderia-app-page ganaderia-dashboard-page no-chat{% endblock %}
 {% block content %}
   <div class="ganaderia-shell">
     {% set ganaderia_active = "dashboard" %}
     {% include "partials/ganaderia_sidebar.html" %}
+    <button class="ganaderia-sidebar-backdrop" type="button" aria-label="Cerrar menú" onclick="document.body.classList.remove('ganaderia-menu-open')"></button>
 
     <div class="ganaderia-main">
       <header class="ganaderia-topbar">
-        <button class="ganaderia-menu" type="button" aria-label="Abrir menú" onclick="document.body.classList.toggle('ganaderia-menu-open')">☰</button>
-        <div><small>PORTAL DE GANADERÍA</small><h1>Dashboard</h1></div>
-        <div class="ganaderia-user"><span>{{ current.nombre_completo }}</span><small>{{ "Superadministrador" if current.rol == "superadmin" else ("Veterinario" if current.rol == "veterinario" else "Finca") }}</small></div>
+        <button class="ganaderia-menu" type="button" aria-label="Abrir menú" aria-controls="ganaderia-navigation" onclick="document.body.classList.toggle('ganaderia-menu-open')">
+          <span></span><span></span><span></span>
+        </button>
+        <div><small>PORTAL DE GANADERÍA</small><h1>Centro de control</h1></div>
+        <div class="ganaderia-user">
+          <span class="ganaderia-user-avatar" aria-hidden="true">{{ current.nombre_completo[:1]|upper }}</span>
+          <span>{{ current.nombre_completo }}</span>
+          <small>{{ "Superadministrador" if current.rol == "superadmin" else ("Veterinario" if current.rol == "veterinario" else "Productor") }}</small>
+        </div>
       </header>
 
-      <main class="ganaderia-content">
-        <section class="ganaderia-hero">
-          <div>
-            <span class="ganaderia-eyebrow">CONTROL GANADERO</span>
+      <main class="ganaderia-content ganaderia-dashboard-content">
+        <section class="ganaderia-dashboard-hero">
+          <div class="ganaderia-dashboard-welcome">
+            <span class="ganaderia-eyebrow">RESUMEN GENERAL</span>
             <h2>Bienvenido, {{ current.nombre_completo.split(' ')[0] }}</h2>
-            <p>Organiza las fincas, sus responsables y los accesos a la información ganadera.</p>
+            <p>Consulta el estado de tus fincas, atiende pendientes y entra rápidamente a las tareas de campo.</p>
+            <div class="ganaderia-dashboard-actions">
+              <a class="ganaderia-primary" href="/ganaderia/fincas">Ver fincas</a>
+              {% if current.rol in ["superadmin", "veterinario"] %}
+                <a class="ganaderia-hero-secondary" href="/ganaderia/fincas">+ Registrar finca</a>
+              {% endif %}
+            </div>
           </div>
-          {% if current.rol in ["superadmin", "veterinario"] %}
-            <a class="ganaderia-primary" href="/ganaderia/fincas">{{ "Administrar fincas" if farms_total else "Crear primera finca" }}</a>
-          {% endif %}
+          <div class="ganaderia-today-summary">
+            <span>ESTADO DE HOY</span>
+            <time datetime="{{ today.isoformat() }}">{{ today.strftime('%d/%m/%Y') }}</time>
+            <div><strong>{{ upcoming_total }}</strong><small>tareas en próximos 30 días</small></div>
+            <div class="{% if overdue_total %}needs-attention{% endif %}"><strong>{{ overdue_total }}</strong><small>tareas vencidas</small></div>
+            {% if open_palpations_total %}
+              <p>{{ open_palpations_total }} jornada{{ "s" if open_palpations_total != 1 else "" }} de palpación abierta{{ "s" if open_palpations_total != 1 else "" }}</p>
+            {% else %}
+              <p>Sin jornadas de palpación abiertas</p>
+            {% endif %}
+          </div>
         </section>
 
-        <section class="ganaderia-stats" aria-label="Resumen del portal">
-          <article><span>Fincas disponibles</span><strong>{{ farms_total }}</strong><small>{{ "Todas las fincas" if current.rol == "superadmin" else "Asignadas a tu cuenta" }}</small></article>
-          <article><span>Veterinarios</span><strong>{{ veterinarians_total if current.rol == "superadmin" else (1 if current.rol == "veterinario" else "—") }}</strong><small>{{ "Registrados en el portal" if current.rol == "superadmin" else "Perfil profesional" }}</small></article>
-          <article><span>Tu perfil</span><strong class="ganaderia-role-value">{{ "Superadmin" if current.rol == "superadmin" else ("Veterinario" if current.rol == "veterinario" else "Finca") }}</strong><small>Permisos actuales</small></article>
+        <section class="ganaderia-dashboard-kpis" aria-label="Resumen del portal">
+          <article>
+            <span class="ganaderia-kpi-icon">FI</span>
+            <div><small>FINCAS</small><strong>{{ farms_total }}</strong><p>{{ "Registradas" if current.rol == "superadmin" else "Asignadas a tu cuenta" }}</p></div>
+          </article>
+          <article>
+            <span class="ganaderia-kpi-icon blue">AN</span>
+            <div><small>ANIMALES ACTIVOS</small><strong>{{ animals_total }}</strong><p>En todas tus fincas</p></div>
+          </article>
+          <article>
+            <span class="ganaderia-kpi-icon amber">AG</span>
+            <div><small>PRÓXIMOS 30 DÍAS</small><strong>{{ upcoming_total }}</strong><p>Actividades programadas</p></div>
+          </article>
+          <article class="{% if overdue_total %}alert{% endif %}">
+            <span class="ganaderia-kpi-icon red">AL</span>
+            <div><small>REQUIEREN ATENCIÓN</small><strong>{{ overdue_total }}</strong><p>{{ "Actividades vencidas" if overdue_total else "Todo está al día" }}</p></div>
+          </article>
         </section>
 
-        <section class="ganaderia-section-heading">
-          <div><span>FINCAS</span><h2>{{ "Tus fincas" if current.rol != "superadmin" else "Fincas registradas" }}</h2></div>
-          <p>Cada usuario consulta únicamente las fincas que tiene asignadas.</p>
+        <section class="ganaderia-dashboard-section-head">
+          <div><span>OPERACIÓN</span><h2>{{ "Tus fincas" if current.rol != "superadmin" else "Fincas registradas" }}</h2></div>
+          <a href="/ganaderia/fincas">Ver todas <span aria-hidden="true">→</span></a>
         </section>
-        <section class="ganaderia-farm-grid">
+
+        <section class="ganaderia-dashboard-farms">
           {% for finca in farms[:6] %}
-            <a class="ganaderia-farm-card" href="/ganaderia/fincas/{{ finca.id }}">
-              <span class="ganaderia-module-icon">F</span>
-              <div><h3>{{ finca.nombre }}</h3><p>{{ finca.ubicacion or "Ubicación pendiente" }}</p></div>
-              <strong>Ver finca →</strong>
+            <a class="ganaderia-dashboard-farm" href="/ganaderia/fincas/{{ finca.id }}">
+              <header>
+                <span class="ganaderia-farm-initial">{{ finca.nombre[:1]|upper }}</span>
+                <span class="ganaderia-farm-state">Activa</span>
+              </header>
+              <div class="ganaderia-farm-copy">
+                <h3>{{ finca.nombre }}</h3>
+                <p>{{ finca.ubicacion or "Ubicación pendiente" }}</p>
+              </div>
+              <dl>
+                <div><dt>Animales</dt><dd>{{ animals_by_farm.get(finca.id, 0) }}</dd></div>
+                <div><dt>Espacios</dt><dd>{{ paddocks_by_farm.get(finca.id, 0) }}</dd></div>
+                <div><dt>Próximas</dt><dd>{{ upcoming_by_farm.get(finca.id, 0) }}</dd></div>
+              </dl>
+              <span class="ganaderia-farm-open">Abrir finca <b aria-hidden="true">→</b></span>
             </a>
           {% else %}
             <div class="ganaderia-empty-state">
@@ -48,6 +94,50 @@
               <p>{% if current.rol in ["superadmin", "veterinario"] %}Registra una finca para comenzar.{% else %}Solicita a tu veterinario que asigne tu acceso a una finca.{% endif %}</p>
             </div>
           {% endfor %}
+        </section>
+
+        <section class="ganaderia-dashboard-feed">
+          <article class="ganaderia-dashboard-panel">
+            <header>
+              <div><span>AGENDA</span><h2>Próximas actividades</h2></div>
+              <strong>{{ upcoming_activities|length }}</strong>
+            </header>
+            <div class="ganaderia-dashboard-list">
+              {% for activity in upcoming_activities %}
+                {% set activity_farm = farms_by_id.get(activity.finca_id) %}
+                {% set activity_animal = animals_by_id.get(activity.animal_id) %}
+                <a href="/ganaderia/fincas/{{ activity.finca_id }}{% if activity_animal %}/animales/{{ activity_animal.id }}{% else %}/actividades{% endif %}">
+                  <time datetime="{{ activity.proxima_fecha.isoformat() }}"><b>{{ activity.proxima_fecha.strftime('%d') }}</b><span>{{ activity.proxima_fecha.strftime('%m/%Y') }}</span></time>
+                  <div><strong>{{ activity.titulo }}</strong><small>{{ activity_farm.nombre if activity_farm else "Finca" }}{% if activity_animal %} · {{ activity_animal.nombre or activity_animal.codigo }}{% endif %}</small></div>
+                  <span class="ganaderia-list-type">{{ activity.tipo|replace('_', ' ')|title }}</span>
+                  <b aria-hidden="true">→</b>
+                </a>
+              {% else %}
+                <div class="ganaderia-dashboard-empty"><strong>Agenda despejada</strong><span>No hay actividades futuras registradas.</span></div>
+              {% endfor %}
+            </div>
+          </article>
+
+          <article class="ganaderia-dashboard-panel">
+            <header>
+              <div><span>BITÁCORA</span><h2>Actividad reciente</h2></div>
+              <strong>{{ recent_activities|length }}</strong>
+            </header>
+            <div class="ganaderia-dashboard-list recent">
+              {% for activity in recent_activities %}
+                {% set activity_farm = farms_by_id.get(activity.finca_id) %}
+                {% set activity_animal = animals_by_id.get(activity.animal_id) %}
+                <a href="/ganaderia/fincas/{{ activity.finca_id }}{% if activity_animal %}/animales/{{ activity_animal.id }}{% else %}/actividades{% endif %}">
+                  <span class="ganaderia-activity-mark">{{ activity.tipo[:2]|upper }}</span>
+                  <div><strong>{{ activity.titulo }}</strong><small>{{ activity_farm.nombre if activity_farm else "Finca" }}{% if activity_animal %} · {{ activity_animal.nombre or activity_animal.codigo }}{% endif %}</small></div>
+                  <time datetime="{{ activity.fecha.isoformat() }}">{{ activity.fecha.strftime('%d/%m/%Y') }}</time>
+                  <b aria-hidden="true">→</b>
+                </a>
+              {% else %}
+                <div class="ganaderia-dashboard-empty"><strong>Sin actividad todavía</strong><span>Los registros de campo aparecerán aquí.</span></div>
+              {% endfor %}
+            </div>
+          </article>
         </section>
       </main>
     </div>
