@@ -7898,3 +7898,66 @@ body.role-admin .user-pill::before {
     z-index: 1000 !important;
   }
 }
+
+/* Facturas a crédito: cada registro se convierte en tarjeta legible en celular. */
+@media (max-width: 600px) {
+  .credit-invoice-table {
+    overflow: visible;
+    background: transparent;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .credit-invoice-table .table-header {
+    display: none;
+  }
+
+  .credit-invoice-table .table-row.table-credit {
+    display: grid;
+    grid-template-columns: 1fr;
+    min-width: 0;
+    margin-bottom: 12px;
+    padding: 0 !important;
+    gap: 0;
+    overflow: hidden;
+    border: 1px solid #e3e9e6;
+    border-radius: 12px;
+    background: #ffffff;
+    box-shadow: 0 5px 14px rgba(15, 76, 58, 0.07);
+  }
+
+  .credit-invoice-table .table-row.table-credit > span {
+    display: grid;
+    grid-template-columns: 84px minmax(0, 1fr);
+    gap: 10px;
+    align-items: baseline;
+    min-width: 0;
+    padding: 10px 14px;
+    border-bottom: 1px solid #edf1ef;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .credit-invoice-table .table-row.table-credit > span:last-child {
+    border-bottom: 0;
+  }
+
+  .credit-invoice-table .table-row.table-credit > span::before {
+    content: attr(data-label);
+    color: #74817c;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .credit-invoice-table .invoice-detail-link {
+    min-width: 0;
+    font-size: 0.86rem;
+  }
+
+  .credit-invoice-table .invoice-detail-link svg {
+    width: 18px;
+    min-width: 18px;
+  }
+}

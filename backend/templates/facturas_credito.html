@@ -88,7 +88,7 @@
             Limpiar
           </button>
         </section>
-        <section class="module-table">
+        <section class="module-table credit-invoice-table">
           <div class="table-header table-credit">
             <span>Fecha</span>
             <span>Factura</span>
@@ -110,8 +110,8 @@
                 tabindex="0"
                 aria-label="Ver detalle de la factura {{ factura.numero_factura }}"
               >
-                <span class="cell-nowrap">{{ factura.fecha_label }}</span>
-                <span>
+                <span class="cell-nowrap" data-label="Fecha">{{ factura.fecha_label }}</span>
+                <span data-label="Factura">
                   <button
                     class="invoice-detail-link"
                     type="button"
@@ -147,22 +147,16 @@
                     {% endfor %}
                   </template>
                 </span>
-                <span>{{ clientes_map.get(factura.cliente_id, 'N/A') }}</span>
-                <span class="cell-nowrap">{{ factura.vendedor }}</span>
-                <span class="cell-nowrap">L {{ "%.2f"|format(factura.total or 0) }}</span>
-                <span class="cell-nowrap">L {{ "%.2f"|format(factura.abonado or 0) }}</span>
-                <span class="cell-nowrap">L {{ "%.2f"|format(factura.saldo or 0) }}</span>
+                <span data-label="Cliente">{{ clientes_map.get(factura.cliente_id, 'N/A') }}</span>
+                <span class="cell-nowrap" data-label="Vendedor">{{ factura.vendedor }}</span>
+                <span class="cell-nowrap" data-label="Total">L {{ "%.2f"|format(factura.total or 0) }}</span>
+                <span class="cell-nowrap" data-label="Abonado">L {{ "%.2f"|format(factura.abonado or 0) }}</span>
+                <span class="cell-nowrap" data-label="Saldo">L {{ "%.2f"|format(factura.saldo or 0) }}</span>
               </div>
             {% endfor %}
           {% else %}
             <div class="table-row table-credit">
-              <span>Sin registros</span>
-              <span>-</span>
-              <span>-</span>
-              <span>-</span>
-              <span>-</span>
-              <span>-</span>
-              <span>-</span>
+              <span data-label="Estado">Sin registros</span>
             </div>
           {% endif %}
         </section>
