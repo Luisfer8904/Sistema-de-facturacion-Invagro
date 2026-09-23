@@ -11,12 +11,13 @@
     <link rel="stylesheet" href="/static/css/personal_charge_analysis.css?v=20260922-mobile-sales" />
   </head>
   {% set body_class_value = self.body_class() %}
+  {% set body_classes = body_class_value.split() %}
   {% set role_class = "role-" ~ (current_user_role or "guest") %}
   <body class="{{ body_class_value }} {{ role_class }}">
-    {% if "dashboard-page" in body_class_value and not request.path.startswith("/aves") %}
+    {% if "dashboard-page" in body_classes and not request.path.startswith("/aves") %}
       {% include "partials/app_sidebar.html" %}
     {% endif %}
-    {% if "dashboard-page" not in body_class_value and "portal-shell-page" not in body_class_value %}
+    {% if "dashboard-page" not in body_classes and "portal-shell-page" not in body_classes %}
       <header class="site-header">
         <a href="/" class="logo">
           <img src="/static/assets/logo.jpg" alt="Logo Invagro" class="logo-image" />
@@ -29,7 +30,7 @@
       </header>
     {% endif %}
     {% block content %}{% endblock %}
-    {% if "no-chat" not in body_class_value %}
+    {% if "no-chat" not in body_classes %}
       <div class="chat-overlay" id="chatOverlay" aria-hidden="true">
         <div class="chat-drawer" role="dialog" aria-modal="true" aria-labelledby="chatTitle">
           <header class="chat-header">
