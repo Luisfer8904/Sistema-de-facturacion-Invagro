@@ -1489,16 +1489,9 @@ body {
 
 .top-products-chart-svg polyline {
   fill: none;
-  stroke-width: 0.75;
+  stroke-width: 0.7;
   stroke-linecap: round;
   stroke-linejoin: round;
-  vector-effect: non-scaling-stroke;
-}
-
-.top-products-chart-svg circle {
-  stroke: #ffffff;
-  stroke-width: 0.4;
-  vector-effect: non-scaling-stroke;
 }
 
 .top-products-chart-labels {

@@ -162,12 +162,9 @@
                     <line x1="8" y1="22" x2="92" y2="22" />
                     <line x1="8" y1="30" x2="92" y2="30" />
                     {% for product in top_product_series %}
-                      <polyline points="{{ product.polyline }}" style="stroke: {{ product.color }}" />
-                      {% for point in product.points %}
-                        <circle cx="{{ '%.1f'|format(point.x) }}" cy="{{ '%.1f'|format(point.y) }}" r="0.85" style="fill: {{ product.color }}">
-                          <title>{{ product.nombre }} · {{ point.label }}: L {{ "{:,.2f}".format(point.total or 0) }}</title>
-                        </circle>
-                      {% endfor %}
+                      <polyline points="{{ product.polyline }}" style="stroke: {{ product.color }}">
+                        <title>{{ product.nombre }}: L {{ "{:,.2f}".format(product.total or 0) }}</title>
+                      </polyline>
                     {% endfor %}
                   </svg>
                 </div>
