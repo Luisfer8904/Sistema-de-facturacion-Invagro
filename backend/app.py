@@ -246,7 +246,16 @@ def create_app():
             if last_invoice.numero_factura.startswith(rango_info["prefix"]):
                 suffix = last_invoice.numero_factura[len(rango_info["prefix"]):]
                 if suffix.isdigit():
-                    next_num = int(suffix) + 1
+                    next_num = max(next_num, int(suffix) + 1)
+
+        rango_fin_info = parse_rango_autorizado_inicio(
+            settings.rango_autorizado_fin or ""
+        )
+        if rango_fin_info and next_num > rango_fin_info["start_num"]:
+            raise ValueError(
+                "El rango autorizado de facturación se agotó. Actualiza los datos "
+                "de facturación antes de emitir otra factura."
+            )
 
         return f"{rango_info['prefix']}{next_num:0{rango_info['width']}d}"
 
@@ -8707,7 +8716,10 @@ def create_app():
         usuario_id = usuario.id if usuario else None
         vendedor_factura = usuario
         vendedor_factura_id = usuario_id
-        numero_factura = generate_invoice_number()
+        try:
+            numero_factura = generate_invoice_number()
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
 
         try:
             cliente = resolve_facturacion_cliente(cliente_id, cliente_nombre, rtn)
