@@ -4367,6 +4367,115 @@ def create_app():
                         "x": 8 + (index * 16.8),
                     }
                 )
+
+            product_period_start = month_start_with_offset(base_month, -5)
+            product_period_end = month_start_with_offset(base_month, 1)
+            top_product_rows = (
+                db.session.query(
+                    Producto.id,
+                    Producto.codigo,
+                    Producto.nombre,
+                    func.sum(DetalleFacturaContado.subtotal).label("total"),
+                )
+                .join(
+                    DetalleFacturaContado,
+                    DetalleFacturaContado.producto_id == Producto.id,
+                )
+                .join(
+                    FacturaContado,
+                    FacturaContado.id == DetalleFacturaContado.factura_id,
+                )
+                .filter(FacturaContado.estado != "anulada")
+                .filter(FacturaContado.fecha >= product_period_start)
+                .filter(FacturaContado.fecha < product_period_end)
+                .group_by(Producto.id, Producto.codigo, Producto.nombre)
+                .order_by(func.sum(DetalleFacturaContado.subtotal).desc())
+                .limit(5)
+                .all()
+            )
+            top_product_ids = [row.id for row in top_product_rows]
+            product_month_totals = {
+                product_id: [0.0 for _ in month_points]
+                for product_id in top_product_ids
+            }
+            if top_product_ids:
+                product_sales_rows = (
+                    db.session.query(
+                        DetalleFacturaContado.producto_id,
+                        FacturaContado.fecha,
+                        DetalleFacturaContado.subtotal,
+                    )
+                    .join(
+                        FacturaContado,
+                        FacturaContado.id == DetalleFacturaContado.factura_id,
+                    )
+                    .filter(DetalleFacturaContado.producto_id.in_(top_product_ids))
+                    .filter(FacturaContado.estado != "anulada")
+                    .filter(FacturaContado.fecha >= product_period_start)
+                    .filter(FacturaContado.fecha < product_period_end)
+                    .all()
+                )
+                first_month_index = (
+                    product_period_start.year * 12 + product_period_start.month - 1
+                )
+                for product_id, invoice_date, subtotal in product_sales_rows:
+                    if not invoice_date:
+                        continue
+                    month_index = (
+                        invoice_date.year * 12 + invoice_date.month - 1
+                    ) - first_month_index
+                    if 0 <= month_index < len(month_points):
+                        product_month_totals[product_id][month_index] += float(
+                            subtotal or 0
+                        )
+
+            product_chart_peak = max(
+                (
+                    monthly_total
+                    for totals in product_month_totals.values()
+                    for monthly_total in totals
+                ),
+                default=0,
+            )
+            product_chart_colors = [
+                "#0f766e",
+                "#f59e0b",
+                "#2563eb",
+                "#db2777",
+                "#7c3aed",
+            ]
+            top_product_series = []
+            for color_index, row in enumerate(top_product_rows):
+                monthly_totals = product_month_totals.get(row.id, [])
+                points = []
+                for index, total_value in enumerate(monthly_totals):
+                    x_value = 8 + (index * 16.8)
+                    y_value = (
+                        30 - ((total_value / product_chart_peak) * 24)
+                        if product_chart_peak
+                        else 30
+                    )
+                    points.append(
+                        {
+                            "x": x_value,
+                            "y": y_value,
+                            "label": month_points[index]["label"],
+                            "total": total_value,
+                        }
+                    )
+                top_product_series.append(
+                    {
+                        "codigo": row.codigo,
+                        "nombre": row.nombre,
+                        "total": float(row.total or 0),
+                        "color": product_chart_colors[color_index],
+                        "points": points,
+                        "polyline": " ".join(
+                            f"{point['x']:.1f},{point['y']:.1f}" for point in points
+                        ),
+                    }
+                )
+
             chart_peak = max([point["total"] for point in month_points] or [0])
             for point in month_points:
                 if chart_peak:
@@ -4411,6 +4520,7 @@ def create_app():
             sales_chart_area = ""
             sales_current_month_total = 0
             sales_month_change = 0
+            top_product_series = []
 
         return render_template(
             "dashboard.html",
@@ -4434,6 +4544,7 @@ def create_app():
             sales_chart_area=sales_chart_area,
             sales_current_month_total=sales_current_month_total,
             sales_month_change=sales_month_change,
+            top_product_series=top_product_series,
         )
 
     @app.get("/dashboard-aves")
